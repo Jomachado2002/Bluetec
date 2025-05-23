@@ -177,7 +177,7 @@ const Cart = () => {
         doc.text([
             "BlueTec",
             "Tel: +595 984 133733",
-            "Email: info@bluetec.com.py",
+            "Email: ventas@bluetec.com.py",
             "Web: www.bluetec.com.py"
         ], pageWidth - 10, 40, { align: "right" });
         
@@ -312,7 +312,7 @@ const Cart = () => {
         doc.setTextColor(100, 100, 100);
         
         const infoText = [
-            "• Forma de Pago: Contado",
+            "• Forma de Pago: A convenir",
             "• Tiempo de entrega: 48 horas hábiles",
             "• Garantía según políticas del fabricante",
             "• Precios válidos por 5 días hábiles"

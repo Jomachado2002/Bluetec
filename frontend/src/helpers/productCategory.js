@@ -141,7 +141,7 @@ const productCategory = [
           { id: 202, label: "Teclados", value: "teclados" },
           { id: 203, label: "Mouses", value: "mouses" },
        // { id: 204, label: "Adaptadores", value: "adaptadores" },
-       //{ id: 503, label: "Auriculares", value: "auriculares" },
+       { id: 503, label: "Auriculares", value: "auriculares" },
       // { id: 205, label: "Microfonos", value: "microfonos"}
           
       ]
@@ -176,7 +176,7 @@ const productCategory = [
           
       ]
   },
-  /*{
+  {
       id: 6,
       label: "Software y Licencias",
       value: "software_licencias",
@@ -190,11 +190,11 @@ const productCategory = [
       value: "telefonia",
       subcategories: [
           { id: 701, label: "Teléfonos Móviles", value: "telefonos_moviles" },
-          { id: 702, label: "Teléfonos Fijos", value: "telefonos_fijos" },
-          { id: 702, label: "Tablets", value: "tablets" },
+         // { id: 702, label: "Teléfonos Fijos", value: "telefonos_fijos" },
+          // { id: 702, label: "Tablets", value: "tablets" },
       ]
   },
-  {
+ /* {
     id: 8,
     label: "Redes",
     value: "redes",

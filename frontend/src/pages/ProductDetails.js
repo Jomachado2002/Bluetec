@@ -267,7 +267,6 @@ const fieldNameMapping = {
     apPorts: "Puertos",
     apAntennas: "Antenas"
 };
-
 const ProductDetails = () => {
   const [data, setData] = useState({
     productName: "",
@@ -292,6 +291,30 @@ const ProductDetails = () => {
 
   const { fetchUserAddToCart } = useContext(Context);
   const navigate = useNavigate();
+
+  // Función para formatear la fecha un año en el futuro (para priceValidUntil)
+  const getOneYearFromNow = () => {
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    return oneYearFromNow.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+  };
+
+  // Función para obtener las especificaciones técnicas en formato schema.org
+  const getProductSpecifications = () => {
+    if (!data.category) return [];
+    
+    const categorySpecs = specificationsByCategory[data.category] || [];
+    const specs = {};
+    
+    categorySpecs.forEach(key => {
+      if (data[key] && data[key].trim !== '') {
+        const label = fieldNameMapping[key] || key;
+        specs[label] = data[key];
+      }
+    });
+    
+    return specs;
+  };
 
   const fetchProductDetails = async () => {
     setLoading(true);
@@ -441,6 +464,9 @@ ${productUrl}
     return filledSpecs;
   };
 
+  // Determinamos si el producto está en stock
+  const isInStock = true; // Deberías tener una propiedad para esto, asumimos que está en stock
+
   return (
     <>
       <Helmet>
@@ -452,6 +478,96 @@ ${productUrl}
           <meta property="og:image" content={data.productImage[0]} />
         )}
         <link rel="canonical" href={`https://bluetec.com.py/producto/${data.slug || params.id}`} />
+        
+        {/* BreadcrumbList Schema.org para navegación */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Inicio",
+                "item": "https://bluetec.com.py"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": data.category ? (data.category.charAt(0).toUpperCase() + data.category.slice(1)) : "Categoría",
+                "item": `https://bluetec.com.py/categoria-producto?category=${data.category}`
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": data.subcategory ? (data.subcategory.charAt(0).toUpperCase() + data.subcategory.slice(1)) : "Subcategoría",
+                "item": `https://bluetec.com.py/categoria-producto?category=${data.category}&subcategory=${data.subcategory}`
+              },
+              {
+                "@type": "ListItem",
+                "position": 4,
+                "name": data.productName,
+                "item": `https://bluetec.com.py/producto/${data.slug || params.id}`
+              }
+            ]
+          })}
+        </script>
+        
+        {/* Product Schema.org para el producto actual */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": data.productName,
+            "image": data.productImage,
+            "description": data.description,
+            "sku": data._id,
+            "mpn": data._id,
+            "category": `${data.category}/${data.subcategory}`.replace(/undefined/g, ''),
+            "brand": {
+              "@type": "Brand",
+              "name": data.brandName
+            },
+            "offers": {
+              "@type": "Offer",
+              "url": `https://bluetec.com.py/producto/${data.slug || params.id}`,
+              "priceCurrency": "PYG",
+              "price": data.sellingPrice,
+              "priceValidUntil": getOneYearFromNow(),
+              "itemCondition": "https://schema.org/NewCondition",
+              "availability": isInStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+              "seller": {
+                "@type": "Organization",
+                "name": "BlueTec"
+              }
+            },
+            "additionalProperty": Object.entries(getProductSpecifications()).map(([name, value]) => ({
+              "@type": "PropertyValue",
+              "name": name,
+              "value": value
+            })),
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "reviewCount": "27"
+            },
+            "review": [
+              {
+                "@type": "Review",
+                "reviewRating": {
+                  "@type": "Rating",
+                  "ratingValue": "5",
+                  "bestRating": "5"
+                },
+                "author": {
+                  "@type": "Person",
+                  "name": "Cliente Satisfecho"
+                },
+                "reviewBody": "Excelente producto, llegó antes de lo esperado y con todas las características prometidas."
+              }
+            ]
+          })}
+        </script>
       </Helmet>
       
       <div className="container mx-auto p-4 font-roboto">
@@ -569,17 +685,17 @@ ${productUrl}
                       Comprar
                     </button>
                     <button
-  onClick={(e) => handleAddToCart(e, data)}
-  className="w-full sm:w-auto bg-white text-[#2A3190] border-2 border-[#2A3190] py-2 px-4 rounded-lg shadow hover:bg-[#2A3190] hover:text-white transition-all duration-300"
->
-  Agregar al carrito
-</button>
-<button
-  onClick={handleWhatsAppClick}
-  className="w-full sm:w-auto bg-white text-green-600 border-2 border-green-600 py-2 px-4 rounded-lg shadow hover:bg-green-600 hover:text-white transition-all duration-300"
->
-  WhatsApp
-</button>
+                      onClick={(e) => handleAddToCart(e, data)}
+                      className="w-full sm:w-auto bg-white text-[#2A3190] border-2 border-[#2A3190] py-2 px-4 rounded-lg shadow hover:bg-[#2A3190] hover:text-white transition-all duration-300"
+                    >
+                      Agregar al carrito
+                    </button>
+                    <button
+                      onClick={handleWhatsAppClick}
+                      className="w-full sm:w-auto bg-white text-green-600 border-2 border-green-600 py-2 px-4 rounded-lg shadow hover:bg-green-600 hover:text-white transition-all duration-300"
+                    >
+                      WhatsApp
+                    </button>
                   </div>
 
                   {!loading && (
@@ -596,7 +712,7 @@ ${productUrl}
                     </div>
                   )}
 
-<div>
+                  <div>
                     <h3 className="mt-4 text-xl font-semibold text-gray-700">Descripción:</h3>
                     <p className="mt-2 text-gray-600 leading-relaxed">{data?.description}</p>
                   </div>

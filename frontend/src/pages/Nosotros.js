@@ -1114,7 +1114,7 @@ const Nosotros = () => {
                   <div className="map-container h-full">
                     {/* Google Maps iframe */}
                     <iframe 
-                      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3607.0211139947164!2d-57.60114422483281!3d-25.30349467764267!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x945da9a2020311ab%3A0xd411b1ad1ab43b1b!2sJM%20Computer!5e0!3m2!1ses-419!2spy!4v1741101519462!5m2!1ses-419!2spy" 
+                      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d637.6457550500025!2d-57.59966256886732!3d-25.301882394230738!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x945da862c42f34fd%3A0x14ebd34ad01440a1!2sGaudioso%20Nu%C3%B1ez%20977%2C%20Asunci%C3%B3n%20001230!5e0!3m2!1ses-419!2spy!4v1742303180313!5m2!1ses-419!2spy" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" 
                       width="100%" 
                       height="100%" 
                       style={{border: 0, filter: 'contrast(1.1) saturate(1.2)'}} 
