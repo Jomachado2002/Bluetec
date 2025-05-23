@@ -45,7 +45,7 @@ try {
   });
   
   // Configuración de CORS mejorada con múltiples orígenes permitidos
-  app.use(cors({
+app.use(cors({
   origin: [
     'https://www.bluetec.com.py',
     'https://bluetec.com.py', 
@@ -54,8 +54,9 @@ try {
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-  optionsSuccessStatus: 200 // Para navegadores legacy
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
   
   // Middlewares
