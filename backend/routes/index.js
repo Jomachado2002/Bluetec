@@ -1,5 +1,4 @@
 const express = require('express');
-
 const router = express.Router();
 
 const userSignUpController = require("../controller/user/userSignUp");
@@ -15,6 +14,8 @@ const { updateProductController} = require('../controller/product/updateProduct'
 const getCategoryProduct = require('../controller/product/getCategoryProduct');
 const getCategoryWiseProduct = require('../controller/product/getCategoryWiseProduct');
 const getProductDetails = require('../controller/product/getProductDetails');
+const { updateAllPricesController } = require('../controller/product/updateAllPrices');
+
 //const addToCartController = require('../controller/user/addToCartController');
 //const countAddToCartProduct = require('../controller/user/countAddToCartProduct');
 //const addToCartViewProduct = require('../controller/user/addToCartViewProduct');
@@ -28,9 +29,21 @@ const getCategorySearch = require('../controller/product/getCategorySearch');
 const { deleteProductController } = require('../controller/product/deleteproductcontrolle');
 const getProductBySlug = require('../controller/product/getProductBySlug');
 
+// Nuevos controladores para finanzas
+const { updateProductFinanceController, getProductFinanceController } = require('../controller/product/updateProductFinance');
+const { getMarginReportController, getCategoryProfitabilityController } = require('../controller/reports/financialReportsController');
+const { createClientController, getAllClientsController, getClientByIdController, updateClientController, deleteClientController } = require('../controller/client/clientController');
 
-
-// Archivo: backend/routes/index.js
+// Importa los controladores de presupuestos con las nuevas funciones
+const { 
+    createBudgetController,
+    getAllBudgetsController, 
+    getBudgetByIdController, 
+    updateBudgetStatusController, 
+    getBudgetPDFController,
+    deleteBudgetController,
+    sendBudgetEmailController
+} = require('../controller/budget/budgetController');
 
 // Rutas de usuario
 router.post("/registro", userSignUpController); // Antes: signup
@@ -52,6 +65,7 @@ router.post("/detalles-producto", getProductDetails); // Antes: product-details
 router.get("/buscar", searchProduct); // Antes: search
 router.post("/filtrar-productos", filterProductController); // Antes: filter-product
 
+
 // Carrito de compras (si decides reactivarlos)
 //router.post("/agregar-al-carrito", authToken, addToCartController); // Antes: addtocart
 //router.get("/contar-productos-carrito", authToken, countAddToCartProduct); // Antes: countAddToCartProduct
@@ -71,8 +85,32 @@ router.post("/eliminar-producto", authToken, deleteProductController); // Antes:
 
 router.get("/producto-por-slug/:slug", getProductBySlug);
 
+// Rutas para gestión financiera de productos
+router.post("/finanzas/producto/finanzas", authToken, updateProductFinanceController);
+router.get("/finanzas/producto/finanzas/:productId", authToken, getProductFinanceController);
 
+// Rutas para reportes financieros
+router.get("/finanzas/reportes/margenes", authToken, getMarginReportController);
+router.get("/finanzas/reportes/rentabilidad", authToken, getCategoryProfitabilityController);
 
+// Rutas para gestión de clientes
+router.post("/finanzas/clientes", authToken, createClientController);
+router.get("/finanzas/clientes", authToken, getAllClientsController);
+router.get("/finanzas/clientes/:clientId", authToken, getClientByIdController);
+router.put("/finanzas/clientes/:clientId", authToken, updateClientController);
+router.delete("/finanzas/clientes/:clientId", authToken, deleteClientController);
 
+// Rutas para gestión de presupuestos
+router.post("/finanzas/presupuestos", authToken, createBudgetController);
+router.get("/finanzas/presupuestos", authToken, getAllBudgetsController);
+router.get("/finanzas/presupuestos/:budgetId", authToken, getBudgetByIdController);
+router.patch("/finanzas/presupuestos/:budgetId/estado", authToken, updateBudgetStatusController);
+router.get("/finanzas/presupuestos/:budgetId/pdf", authToken, getBudgetPDFController);
+
+// Nuevas rutas añadidas para presupuestos
+router.delete("/finanzas/presupuestos/:budgetId", authToken, deleteBudgetController);
+router.post("/finanzas/presupuestos/:budgetId/email", authToken, sendBudgetEmailController);
+
+router.post("/finanzas/actualizarprecios", authToken, updateAllPricesController);
 
 module.exports = router;

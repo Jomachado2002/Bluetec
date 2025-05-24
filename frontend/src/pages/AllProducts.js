@@ -2,9 +2,13 @@ import React, { useEffect, useState } from 'react'
 import UploadProduct from '../components/UploadProduct'
 import SummaryApi from '../common'
 import AdminProductCard from '../components/AdminProductCard'
-import { FaSearch, FaFilter, FaFileExcel } from 'react-icons/fa'
+import { FaSearch, FaFilter, FaFileExcel, FaCalculator, FaImage } from 'react-icons/fa'
 import productCategory from '../helpers/productCategory'
 import * as XLSX from 'xlsx'
+import ProductFinanceModal from '../components/admin/ProductFinanceModal'
+import ExchangeRateConfig from '../components/admin/ExchangeRateConfig'
+
+
 
 const AllProducts = () => {
   const [openUploadProduct, setOpenUploadProduct] = useState(false)
@@ -19,6 +23,16 @@ const AllProducts = () => {
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
   const [showSubcategoryMenu, setShowSubcategoryMenu] = useState(false)
   const [showSortMenu, setShowSortMenu] = useState(false)
+  
+  // Estado para gestión financiera
+  const [selectedProductForFinance, setSelectedProductForFinance] = useState(null)
+  
+  // Estado para el tipo de cambio global
+  const [exchangeRate, setExchangeRate] = useState(() => {
+    // Intentar cargar el tipo de cambio desde localStorage o usar valor predeterminado
+    const savedRate = localStorage.getItem('exchangeRate');
+    return savedRate ? Number(savedRate) : 7300;
+  });
 
   const fetchAllProduct = async() => {
     try {
@@ -107,27 +121,35 @@ const AllProducts = () => {
       'Categoría': product.category || '',
       'Subcategoría': product.subcategory || '',
       'Precio de Venta': product.sellingPrice || '',
-      'Precio': product.price || '',
-      'Stock': product.stock || 0,
+      'Precio de Compra USD': product.purchasePriceUSD || '',
+      'Tipo de Cambio': product.exchangeRate || '',
+      'Precio de Compra PYG': product.purchasePrice || '',
+      'Interés de Préstamo (%)': product.loanInterest || '',
+      'Costo de Envío': product.deliveryCost || '',
+      'Margen de Ganancia (%)': product.profitMargin || '',
+      'Utilidad': product.profitAmount || '',
       'Fecha de Creación': product.createdAt ? new Date(product.createdAt).toLocaleDateString() : '',
-      'Estado': product.status || '',
-      'SKU': product.sku || ''
+      'Última Actualización Financiera': product.lastUpdatedFinance ? new Date(product.lastUpdatedFinance).toLocaleDateString() : ''
     }))
 
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(excelData)
 
     const columnWidths = [
-      { wch: 40 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 10 },
-      { wch: 15 }
+      { wch: 40 }, // Nombre del Producto
+      { wch: 20 }, // Marca
+      { wch: 15 }, // Categoría
+      { wch: 15 }, // Subcategoría
+      { wch: 15 }, // Precio de Venta
+      { wch: 15 }, // Precio de Compra USD
+      { wch: 15 }, // Tipo de Cambio
+      { wch: 15 }, // Precio de Compra PYG
+      { wch: 15 }, // Interés de Préstamo
+      { wch: 15 }, // Costo de Envío
+      { wch: 15 }, // Margen de Ganancia
+      { wch: 15 }, // Utilidad
+      { wch: 15 }, // Fecha de Creación
+      { wch: 15 }  // Última Actualización Financiera
     ]
     ws['!cols'] = columnWidths
 
@@ -154,6 +176,11 @@ const AllProducts = () => {
     return description
   }
 
+  // Función para manejar la gestión financiera
+  const handleFinanceProduct = (product) => {
+    setSelectedProductForFinance(product);
+  };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.filter-menu')) {
@@ -172,6 +199,8 @@ const AllProducts = () => {
       <div className='bg-green-50 py-2 px-4 flex justify-between items-center'>
         <h2 className='font-bold text-lg'>Todos los productos</h2>
         <div className='flex gap-2'>
+          
+           
           <button
             className='flex items-center gap-2 border border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-all py-1 px-4 rounded-full'
             onClick={exportToExcel}
@@ -186,6 +215,14 @@ const AllProducts = () => {
             Cargar Productos
           </button>
         </div>
+      </div>
+      
+      {/* Componente de configuración del tipo de cambio */}
+      <div className="px-4 mt-4">
+        <ExchangeRateConfig 
+          exchangeRate={exchangeRate} 
+          setExchangeRate={setExchangeRate} 
+        />
       </div>
 
       <div className='flex flex-col'>
@@ -343,12 +380,13 @@ const AllProducts = () => {
         </div>
       </div>
 
-      <div className='flex items-center flex-wrap gap-5 p-4 h-[calc(100vh-250px)] overflow-y-auto'>
+      <div className='flex items-center flex-wrap gap-5 p-4 h-[calc(100vh-350px)] overflow-y-auto'>
         {filteredProducts.map((product, index) => (
           <AdminProductCard 
             data={product} 
             key={product._id || index+"allProduct"} 
             fetchdata={fetchAllProduct}
+            onFinance={handleFinanceProduct}
           />
         ))}
         
@@ -365,6 +403,32 @@ const AllProducts = () => {
           fetchData={fetchAllProduct}
         />
       )}
+
+      {/* Modal para gestión financiera */}
+      {selectedProductForFinance && (
+        <ProductFinanceModal
+          product={selectedProductForFinance}
+          onClose={() => setSelectedProductForFinance(null)}
+          exchangeRate={exchangeRate}
+          onUpdate={(updatedProduct) => {
+            // Actualizar el producto en la lista local para evitar recargar todo
+            const updatedProducts = allProduct.map(p => 
+              p._id === updatedProduct._id ? {...p, ...updatedProduct} : p
+            );
+            setAllProduct(updatedProducts);
+            
+            // También actualizar los productos filtrados si es necesario
+            if (filteredProducts.some(p => p._id === updatedProduct._id)) {
+              const updatedFiltered = filteredProducts.map(p => 
+                p._id === updatedProduct._id ? {...p, ...updatedProduct} : p
+              );
+              setFilteredProducts(updatedFiltered);
+            }
+          }}
+        />
+      )}
+
+      
     </div>
   )
 }

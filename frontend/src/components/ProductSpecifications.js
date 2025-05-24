@@ -968,9 +968,9 @@ const ProductSpecifications = ({
     // Telefonía
     telefonos_moviles: [
       { 
-        label: "Tipo", 
+        label: "Color ", 
         name: "phoneType", 
-        placeholder: "Ingresa el tipo de teléfono" 
+        placeholder: "Ingresa el color del teléfono" 
       },
       { 
         label: "Tamaño de Pantalla", 

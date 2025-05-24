@@ -164,7 +164,7 @@ const fieldNameMapping = {
   softwareLicenseQuantity: "Cantidad de Usuarios",
   softwareVersion: "Versión",
   softwareFeatures: "Características",
-  phoneType: "Tipo",
+  phoneType: "Color",
   phoneScreenSize: "Tamaño de Pantalla",
   phoneRAM: "RAM",
   phoneStorage: "Almacenamiento",

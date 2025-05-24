@@ -81,7 +81,74 @@ const SummaryApi = {
     productDetailsBySlug: {
         url: `${backendDomain}/api/producto-por-slug`,
         method: "get"
-      }
+      },
+      productFinance: {
+        url: `${backendDomain}/api/finanzas/producto/finanzas`,
+        method: 'post'
+    },
+    getProductFinance: {
+        url: `${backendDomain}/api/finanzas/producto/finanzas`, // usaremos el ID como parámetro
+        method: 'get'
+    },
+    marginReports: {
+        url: `${backendDomain}/api/finanzas/reportes/margenes`,
+        method: 'get'
+    },
+    profitabilityReports: {
+        url: `${backendDomain}/api/finanzas/reportes/rentabilidad`,
+        method: 'get'
+    },
+    
+    // Rutas para clientes
+    createClient: {
+        url: `${backendDomain}/api/finanzas/clientes`,
+        method: 'post'
+    },
+    getAllClients: {
+        url: `${backendDomain}/api/finanzas/clientes`,
+        method: 'get'
+    },
+    getClientById: {
+        url: `${backendDomain}/api/finanzas/clientes`, // usaremos el ID como parámetro
+        method: 'get'
+    },
+    updateClient: {
+        url: `${backendDomain}/api/finanzas/clientes`, // usaremos el ID como parámetro
+        method: 'put'
+    },
+    deleteClient: {
+        url: `${backendDomain}/api/finanzas/clientes`, // usaremos el ID como parámetro
+        method: 'delete'
+    },
+    
+    // Rutas para presupuestos
+    createBudget: {
+        url: `${backendDomain}/api/finanzas/presupuestos`,
+        method: 'post'
+    },
+    getAllBudgets: {
+        url: `${backendDomain}/api/finanzas/presupuestos`,
+        method: 'get'
+    },
+    getBudgetById: {
+        url: `${backendDomain}/api/finanzas/presupuestos`, // usaremos el ID como parámetro
+        method: 'get'
+    },
+    updateBudgetStatus: {
+        url: `${backendDomain}/api/finanzas/presupuestos`, // usaremos el ID como parámetro
+        method: 'patch'
+    },
+    getBudgetPDF: {
+        url: `${backendDomain}/api/finanzas/presupuestos`, // usaremos el ID como parámetro
+        method: 'get'
+    },
+    updateAllPrices: {
+        url: `${backendDomain}/api/finanzas/actualizarprecios`,
+        method: 'post'
+    },
+    
+    // También establece un baseURL para uso general
+    baseURL: backendDomain
 };
 
 export default SummaryApi;

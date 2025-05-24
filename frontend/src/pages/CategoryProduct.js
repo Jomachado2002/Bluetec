@@ -211,7 +211,7 @@ const InlineActiveFilters = ({ productCategories }) => {
       softwareFeatures: "Características",
 
       // Telefonía - Móviles
-      phoneType: "Tipo",
+      phoneType: "Color",
       phoneScreenSize: "Tamaño de Pantalla",
       phoneRAM: "RAM",
       phoneStorage: "Almacenamiento",

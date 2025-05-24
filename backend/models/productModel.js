@@ -248,7 +248,28 @@ tonerPrinterType: { type: String },
 tonerColor: { type: String },
 tonerYield: { type: String },
 tonerCartridgeType: { type: String },
-tonerCompatibleModel: { type: String }
+tonerCompatibleModel: { type: String },
+
+
+purchasePriceUSD: { type: Number, default: 0 },  // Precio de compra en USD
+exchangeRate: { type: Number, default: 7300 },   // Tipo de cambio usado en la última actualización
+purchasePrice: { type: Number, default: 0 },     // Precio de compra en PYG (calculado)
+loanInterest: { type: Number, default: 0 },      // Interés sobre préstamo, en porcentaje
+deliveryCost: { type: Number, default: 0 },      // Costo de envío/transportadora
+profitMargin: { type: Number, default: 30 },     // Margen de ganancia deseado como porcentaje
+profitAmount: { type: Number, default: 0 },      // Utilidad calculada en monto
+sellingPrice: { type: Number, default: 0 },      // Precio de venta final
+lastUpdatedFinance: { type: Date },              // Fecha de última actualización financiera
+
+    // Campos para presupuestos y seguimiento
+    budgets: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'budget'
+    }],
+    sales: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'sale'
+    }]
 }, {
     timestamps: true
 });
