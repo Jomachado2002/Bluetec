@@ -9,6 +9,7 @@ import "jspdf-autotable";
 import logo from '../helpers/logo.png';
 import { toast } from 'react-toastify';
 import { localCartHelper } from '../helpers/addToCart';
+import { trackWhatsAppContact, trackPDFDownload } from '../components/MetaPixelTracker';
 
 const Cart = () => {
     const [data, setData] = useState([]);
@@ -131,6 +132,9 @@ const Cart = () => {
         return prev;
     }, 0);
 
+    // Definir validProducts aquí para evitar el error de inicialización
+    const validProducts = data.filter(isValidProduct);
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setCustomerData(prev => ({
@@ -240,9 +244,6 @@ const Cart = () => {
         const tableColumn = ["#", "Descripción", "Cant.", "Precio Unitario", "Subtotal"];
         const tableRows = [];
         
-        // Filtrar productos válidos para el PDF
-        const validProducts = data.filter(isValidProduct);
-        
         validProducts.forEach((product, index) => {
             const subtotal = product.quantity * product.productId.sellingPrice;
             tableRows.push([
@@ -340,6 +341,9 @@ const Cart = () => {
         // Guardar el PDF
         doc.save(`Presupuesto-BlueTec-${presupuestoNo}.pdf`);
         toast.success("Presupuesto generado exitosamente");
+
+        // Tracking del PDF
+        trackPDFDownload(customerData, totalPrice);
     };
 
     // Función para enviar presupuesto por WhatsApp
@@ -349,8 +353,6 @@ const Cart = () => {
             return;
         }
 
-        const validProducts = data.filter(isValidProduct);
-        
         if (validProducts.length === 0) {
             toast.error("No hay productos válidos en el carrito");
             return;
@@ -380,6 +382,14 @@ const Cart = () => {
         // Codificar el mensaje para URL
         const encodedMessage = encodeURIComponent(message);
         
+        // Tracking de WhatsApp
+        trackWhatsAppContact({
+            productName: 'Presupuesto de carrito',
+            category: 'presupuesto',
+            sellingPrice: totalPrice,
+            _id: 'cart-budget'
+        });
+        
         // Abrir WhatsApp con el mensaje
         window.open(`https://wa.me/+595984133733?text=${encodedMessage}`, '_blank');
         toast.success("Redirigiendo a WhatsApp...");
@@ -388,8 +398,6 @@ const Cart = () => {
     const toggleCustomerForm = () => {
         setShowCustomerForm(!showCustomerForm);
     };
-
-    const validProducts = data.filter(isValidProduct);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
@@ -643,12 +651,12 @@ const Cart = () => {
                                                 </button>
                                                 
                                                 <button
-  onClick={sendToWhatsApp}
-  className="bg-[#25D366] text-white py-2.5 rounded-lg hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md"
->
-  <MdWhatsapp className="text-lg" />
-  <span>Enviar WhatsApp</span>
-</button>
+                                                    onClick={sendToWhatsApp}
+                                                    className="bg-[#25D366] text-white py-2.5 rounded-lg hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md"
+                                                >
+                                                    <MdWhatsapp className="text-lg" />
+                                                    <span>Enviar WhatsApp</span>
+                                                </button>
                                             </div>
                                         </div>
                                     )}

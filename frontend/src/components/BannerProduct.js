@@ -20,6 +20,7 @@ import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import SummaryApi from '../common';
 import displayPYGCurrency from '../helpers/displayCurrency';
+import { trackWhatsAppContact } from '../components/MetaPixelTracker';
 
 // Función para hacer scroll al inicio de la página
 const scrollTop = () => {
@@ -163,8 +164,28 @@ const BannerProduct = () => {
   };
 
   const handleWhatsApp = () => {
-    window.open('https://wa.me/+595984133733?text=Estoy%20interesado%20en%20' + 
-      encodeURIComponent(bannerData[activeTab].title), '_blank');
+    const currentBanner = bannerData[activeTab];
+    
+    // Tracking de WhatsApp
+    trackWhatsAppContact({
+      productName: currentBanner.title,
+      category: currentBanner.category,
+      subcategory: currentBanner.subcategory,
+      sellingPrice: 0,
+      _id: 'banner-' + currentBanner.category
+    });
+
+    const phoneNumber = "595984133733";
+    const message = encodeURIComponent(
+      `¡Hola! Me interesa obtener más información sobre:\n\n` +
+      `📱 ${currentBanner.title}\n` +
+      `📝 ${currentBanner.description}\n\n` +
+      `¿Podrían ayudarme con más detalles y precios?\n\n` +
+      `Gracias!`
+    );
+    
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const handlePdf = async () => {
@@ -571,15 +592,15 @@ const BannerProduct = () => {
         }
 
         .wave-animation {
-  background: linear-gradient(90deg, transparent, rgba(66, 165, 245, 0.2), transparent);
-  background-size: 200% 100%;
-  animation: wave 8s linear infinite;
-}
+          background: linear-gradient(90deg, transparent, rgba(66, 165, 245, 0.2), transparent);
+          background-size: 200% 100%;
+          animation: wave 8s linear infinite;
+        }
 
-@keyframes wave {
-  0% { background-position: 0% 0; }
-  100% { background-position: 200% 0; }
-}
+        @keyframes wave {
+          0% { background-position: 0% 0; }
+          100% { background-position: 200% 0; }
+        }
       `}</style>
     </div>
   );

@@ -11,6 +11,7 @@ import Context from './context';
 import { useDispatch } from 'react-redux';
 import { setUserDetails } from './store/userSlice';
 import { localCartHelper } from './helpers/addToCart'; // Importa el helper
+import MetaPixelTracker from './components/MetaPixelTracker'; // Importa el tracker
 
 function App() {
   const dispatch = useDispatch()
@@ -53,6 +54,9 @@ function App() {
         cartProductCount, // current user add to cart product count,
         fetchUserAddToCart
       }}>
+        {/* Meta Pixel Tracker */}
+        <MetaPixelTracker />
+        
         <ToastContainer 
           position='top-center'
         />

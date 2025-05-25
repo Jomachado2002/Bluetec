@@ -6,6 +6,7 @@ import displayINRCurrency from '../helpers/displayCurrency';
 import CategoryWiseProductDisplay from '../components/CategoryWiseProductDisplay';
 import addToCart from '../helpers/addToCart';
 import Context from '../context';
+import { trackWhatsAppContact, trackAddToCart } from '../components/MetaPixelTracker';
 
 // Lista de todas las posibles especificaciones por categoría
 const specificationsByCategory = {
@@ -267,6 +268,7 @@ const fieldNameMapping = {
     apPorts: "Puertos",
     apAntennas: "Antenas"
 };
+
 const ProductDetails = () => {
   const [data, setData] = useState({
     productName: "",
@@ -330,12 +332,15 @@ const ProductDetails = () => {
       
       if (dataResponse?.success) {
         setLoading(false);
-        setData(dataResponse?.data);
-        setCurrentProductId(dataResponse?.data?._id);
+        const productData = dataResponse?.data;
+        setData(productData);
+        setCurrentProductId(productData?._id);
+        
         // Solo actualizamos la imagen activa si hay imágenes disponibles
-        if (dataResponse?.data?.productImage && dataResponse?.data?.productImage.length > 0) {
-          setActiveImage(dataResponse?.data?.productImage[0]);
+        if (productData?.productImage && productData?.productImage.length > 0) {
+          setActiveImage(productData?.productImage[0]);
         }
+        
       } else {
         // Si no se encuentra por ID, intentamos buscar por slug
         try {
@@ -344,12 +349,15 @@ const ProductDetails = () => {
           
           if (slugData?.success) {
             setLoading(false);
-            setData(slugData?.data);
-            setCurrentProductId(slugData?.data?._id);
+            const productData = slugData?.data;
+            setData(productData);
+            setCurrentProductId(productData?._id);
+            
             // Solo actualizamos la imagen activa si hay imágenes disponibles
-            if (slugData?.data?.productImage && slugData?.data?.productImage.length > 0) {
-              setActiveImage(slugData?.data?.productImage[0]);
+            if (productData?.productImage && productData?.productImage.length > 0) {
+              setActiveImage(productData?.productImage[0]);
             }
+            
           } else {
             setLoading(false);
             console.error("Producto no encontrado");
@@ -415,15 +423,18 @@ const ProductDetails = () => {
     setZoomImage(false);
   }, []);
 
-  // Actualizado para usar el objeto completo del producto
+  // Función para agregar al carrito con tracking
   const handleAddToCart = async (e, product) => {
     e.preventDefault();
     e.stopPropagation();
     await addToCart(e, product);
     fetchUserAddToCart();
+    
+    // Tracking de Add to Cart
+    trackAddToCart(product);
   };
 
-  // Actualizado para usar el objeto completo del producto
+  // Función para ir al carrito
   const handleBuyProduct = async (e, product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -432,7 +443,7 @@ const ProductDetails = () => {
     navigate("/carrito");
   };
 
-  // Actualizado para incluir más información y la URL del producto
+  // Función principal para WhatsApp con tracking
   const handleWhatsAppClick = () => {
     const price = displayINRCurrency(data.sellingPrice);
     const productUrl = window.location.href;
@@ -440,6 +451,16 @@ const ProductDetails = () => {
 Precio: ${price}
 ${productUrl}
 ¿Me puedes brindar más detalles sobre disponibilidad y envío?`;
+    
+    // Tracking de WhatsApp - EVENTO PRINCIPAL
+    trackWhatsAppContact({
+      _id: data._id,
+      productName: data.productName,
+      category: data.category,
+      subcategory: data.subcategory,
+      brandName: data.brandName,
+      sellingPrice: data.sellingPrice
+    });
     
     const whatsappUrl = `https://wa.me/+595984133733?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -677,23 +698,30 @@ ${productUrl}
                       </>
                     )}
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-4">
+                  
+                  {/* Botones de acción - Diseño exacto como la imagen */}
+                  <div className="flex flex-wrap gap-3">
                     <button
                       onClick={(e) => handleBuyProduct(e, data)}
-                      className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white py-2 px-4 rounded-lg shadow-lg hover:shadow-2xl transition-all duration-300"
+                      className="bg-blue-500 text-white py-2.5 px-6 rounded-xl hover:bg-blue-600 transition duration-300 font-medium text-sm"
                     >
                       Comprar
                     </button>
+                    
                     <button
                       onClick={(e) => handleAddToCart(e, data)}
-                      className="w-full sm:w-auto bg-white text-[#2A3190] border-2 border-[#2A3190] py-2 px-4 rounded-lg shadow hover:bg-[#2A3190] hover:text-white transition-all duration-300"
+                      className="bg-white text-purple-600 border-2 border-purple-600 py-2.5 px-6 rounded-xl hover:bg-purple-50 transition duration-300 font-medium text-sm"
                     >
                       Agregar al carrito
                     </button>
+                    
                     <button
                       onClick={handleWhatsAppClick}
-                      className="w-full sm:w-auto bg-white text-green-600 border-2 border-green-600 py-2 px-4 rounded-lg shadow hover:bg-green-600 hover:text-white transition-all duration-300"
+                      className="bg-white text-green-600 border-2 border-green-600 py-2.5 px-6 rounded-xl hover:bg-green-50 transition duration-300 font-medium text-sm flex items-center gap-2"
                     >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                      </svg>
                       WhatsApp
                     </button>
                   </div>
@@ -728,7 +756,7 @@ ${productUrl}
               category={data?.category} 
               subcategory={data?.subcategory} 
               heading="Productos Recomendados"
-              currentProductId={currentProductId} // Añadimos el ID del producto actual para excluirlo
+              currentProductId={currentProductId}
             />
           </div>
         )}
