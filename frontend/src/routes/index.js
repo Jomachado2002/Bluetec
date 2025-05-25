@@ -60,7 +60,7 @@ const router = createBrowserRouter([
                 element: <MobileCategoriesPage />
             },
             {
-                path: "categoria-producto",  // ✅ Agregado parámetro
+                path: "categoria-producto/:categoryName", // ✅ Agregado parámetro
                 element: <CategoryProduct />
             },
             {
@@ -76,7 +76,7 @@ const router = createBrowserRouter([
                 element: <SearchProduct />
             },
 
-         
+          
            
             // ✅ Panel de admin separado
             {
