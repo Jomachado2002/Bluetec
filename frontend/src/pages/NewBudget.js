@@ -1,9 +1,9 @@
-// frontend/src/pages/NewBudget.js
+// frontend/src/pages/NewBudget.js - CON SOPORTE PARA MONEDAS
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SummaryApi from '../common';
 import { toast } from 'react-toastify';
-import { FaPlus, FaTrash, FaSearch, FaTimes } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaSearch, FaTimes, FaDollarSign, FaExchangeAlt } from 'react-icons/fa';
 import displayPYGCurrency from '../helpers/displayCurrency';
 
 const NewBudget = () => {
@@ -14,10 +14,12 @@ const NewBudget = () => {
     items: [],
     totalAmount: 0,
     discount: 0,
-    tax: 10, // IVA por defecto (10%)
+    tax: 10,
     finalAmount: 0,
+    currency: 'PYG', // NUEVO: Moneda seleccionada
+    exchangeRate: 7300, // NUEVO: Tipo de cambio
     notes: '',
-    validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 15 días por defecto
+    validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     paymentTerms: 'Pago a 30 días',
     deliveryMethod: 'Recogida en tienda'
   });
@@ -44,6 +46,28 @@ const NewBudget = () => {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   
   const navigate = useNavigate();
+
+  // Función para formatear moneda según tipo seleccionado
+  const formatCurrency = (value, currency = formData.currency) => {
+    if (currency === 'USD') {
+      return `$ ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else {
+      return `${value.toLocaleString('es-ES')} Gs.`;
+    }
+  };
+
+  // Función para convertir precios según moneda
+  const convertPrice = (price, fromCurrency, toCurrency, exchangeRate) => {
+    if (fromCurrency === toCurrency) return price;
+    
+    if (fromCurrency === 'PYG' && toCurrency === 'USD') {
+      return Math.round((price / exchangeRate) * 100) / 100;
+    } else if (fromCurrency === 'USD' && toCurrency === 'PYG') {
+      return Math.round(price * exchangeRate);
+    }
+    
+    return price;
+  };
 
   // Fetch clients
   useEffect(() => {
@@ -115,10 +139,10 @@ const NewBudget = () => {
       product.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
-    setFilteredProducts(filtered.slice(0, 10)); // Limitar a 10 resultados para mejor rendimiento
+    setFilteredProducts(filtered.slice(0, 10));
   }, [searchTerm, products]);
 
-  // Calculate totals whenever items, discount, or tax changes
+  // Calculate totals whenever items, discount, tax, or currency changes
   useEffect(() => {
     const calculateTotals = () => {
       const totalAmount = formData.items.reduce((sum, item) => {
@@ -142,7 +166,32 @@ const NewBudget = () => {
     };
     
     calculateTotals();
-  }, [formData.items, formData.discount, formData.tax]);
+  }, [formData.items, formData.discount, formData.tax, formData.currency]);
+
+  // NUEVO: Manejar cambio de moneda
+  const handleCurrencyChange = (newCurrency) => {
+    if (newCurrency === formData.currency) return;
+    
+    // Convertir todos los precios de los items
+    const convertedItems = formData.items.map(item => ({
+      ...item,
+      unitPrice: convertPrice(item.unitPrice, formData.currency, newCurrency, formData.exchangeRate)
+    }));
+    
+    // Convertir precio del producto personalizado si está abierto
+    if (showCustomProduct) {
+      setCurrentCustomProduct(prev => ({
+        ...prev,
+        unitPrice: convertPrice(prev.unitPrice, formData.currency, newCurrency, formData.exchangeRate)
+      }));
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      currency: newCurrency,
+      items: convertedItems
+    }));
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -153,13 +202,14 @@ const NewBudget = () => {
   };
 
   const handleAddProduct = (product) => {
-    // Verificar si el producto ya está en la lista
     const existingItemIndex = formData.items.findIndex(item => 
       item.product && item.product === product._id
     );
 
+    // Convertir precio según moneda actual
+    const convertedPrice = convertPrice(product.sellingPrice, 'PYG', formData.currency, formData.exchangeRate);
+
     if (existingItemIndex >= 0) {
-      // Si ya existe, aumentamos la cantidad
       const updatedItems = [...formData.items];
       updatedItems[existingItemIndex].quantity += 1;
       
@@ -168,7 +218,6 @@ const NewBudget = () => {
         items: updatedItems
       }));
     } else {
-      // Si no existe, lo añadimos
       const newItem = {
         product: product._id,
         productSnapshot: {
@@ -180,7 +229,7 @@ const NewBudget = () => {
           brandName: product.brandName
         },
         quantity: 1,
-        unitPrice: product.sellingPrice,
+        unitPrice: convertedPrice,
         discount: 0
       };
       
@@ -190,7 +239,6 @@ const NewBudget = () => {
       }));
     }
     
-    // Limpiar búsqueda y cerrar panel
     setSearchTerm('');
     setShowProductSearch(false);
   };
@@ -206,7 +254,6 @@ const NewBudget = () => {
       items: [...prev.items, { ...currentCustomProduct }]
     }));
     
-    // Resetear producto personalizado y cerrar panel
     setCurrentCustomProduct({
       productSnapshot: {
         name: '',
@@ -236,7 +283,6 @@ const NewBudget = () => {
     const updatedItems = [...formData.items];
     
     if (field.includes('.')) {
-      // Campos anidados como productSnapshot.name
       const [parent, child] = field.split('.');
       updatedItems[index][parent][child] = value;
     } else {
@@ -251,7 +297,6 @@ const NewBudget = () => {
 
   const handleCustomProductChange = (field, value) => {
     if (field.includes('.')) {
-      // Campos anidados como productSnapshot.name
       const [parent, child] = field.split('.');
       setCurrentCustomProduct(prev => ({
         ...prev,
@@ -318,36 +363,87 @@ const NewBudget = () => {
       <h1 className="text-2xl font-bold mb-4">Crear Nuevo Presupuesto</h1>
       
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow">
-        {/* Selección de cliente */}
-        <div className="mb-6">
-          <label htmlFor="clientId" className="block text-sm font-medium text-gray-700 mb-1">
-            Cliente *
-          </label>
-          {isLoadingClients ? (
-            <div className="w-full p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
-              Cargando clientes...
+        {/* Selección de cliente y moneda */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label htmlFor="clientId" className="block text-sm font-medium text-gray-700 mb-1">
+              Cliente *
+            </label>
+            {isLoadingClients ? (
+              <div className="w-full p-2.5 bg-gray-100 border border-gray-300 rounded-lg">
+                Cargando clientes...
+              </div>
+            ) : (
+              <select
+                id="clientId"
+                name="clientId"
+                value={formData.clientId}
+                onChange={handleChange}
+                className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg"
+                required
+              >
+                <option value="">Seleccione un cliente</option>
+                {clients.map(client => (
+                  <option key={client._id} value={client._id}>
+                    {client.name} {client.company ? `(${client.company})` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            
+            <Link to="/panel-admin/clientes/nuevo" className="text-blue-600 hover:underline text-sm mt-1 inline-block">
+              + Crear nuevo cliente
+            </Link>
+          </div>
+
+          {/* NUEVO: Selector de moneda y tipo de cambio */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Configuración de Moneda
+            </label>
+            <div className="space-y-3">
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => handleCurrencyChange('PYG')}
+                  className={`flex-1 p-2.5 rounded-lg border ${
+                    formData.currency === 'PYG' 
+                      ? 'bg-blue-600 text-white border-blue-600' 
+                      : 'bg-gray-50 border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  Guaraníes (Gs.)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCurrencyChange('USD')}
+                  className={`flex-1 p-2.5 rounded-lg border ${
+                    formData.currency === 'USD' 
+                      ? 'bg-green-600 text-white border-green-600' 
+                      : 'bg-gray-50 border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  <FaDollarSign className="inline mr-1" />
+                  Dólares (USD)
+                </button>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <FaExchangeAlt className="text-gray-500" />
+                <span className="text-sm text-gray-600">Tipo de cambio:</span>
+                <input
+                  type="number"
+                  name="exchangeRate"
+                  value={formData.exchangeRate}
+                  onChange={handleChange}
+                  className="w-24 p-1 border border-gray-300 rounded text-center text-sm"
+                  min="1"
+                  step="1"
+                />
+                <span className="text-sm text-gray-600">Gs. por USD</span>
+              </div>
             </div>
-          ) : (
-            <select
-              id="clientId"
-              name="clientId"
-              value={formData.clientId}
-              onChange={handleChange}
-              className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg"
-              required
-            >
-              <option value="">Seleccione un cliente</option>
-              {clients.map(client => (
-                <option key={client._id} value={client._id}>
-                  {client.name} {client.company ? `(${client.company})` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-          
-          <Link to="/panel-admin/clientes/nuevo" className="text-blue-600 hover:underline text-sm mt-1 inline-block">
-            + Crear nuevo cliente
-          </Link>
+          </div>
         </div>
         
         {/* Productos */}
@@ -419,7 +515,7 @@ const NewBudget = () => {
                         >
                           <div className="font-medium">{product.productName}</div>
                           <div className="text-sm text-gray-500">
-                            {product.brandName} - {displayPYGCurrency(product.sellingPrice)}
+                            {product.brandName} - {formatCurrency(convertPrice(product.sellingPrice, 'PYG', formData.currency, formData.exchangeRate))}
                           </div>
                         </li>
                       ))}
@@ -472,7 +568,7 @@ const NewBudget = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Precio *
+                    Precio ({formData.currency}) *
                   </label>
                   <input
                     type="number"
@@ -480,6 +576,7 @@ const NewBudget = () => {
                     onChange={(e) => handleCustomProductChange('unitPrice', Number(e.target.value))}
                     className="w-full p-2 bg-white border border-gray-300 rounded-lg"
                     min="0"
+                    step={formData.currency === 'USD' ? '0.01' : '1'}
                     required
                   />
                 </div>
@@ -529,9 +626,13 @@ const NewBudget = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Precio ({formData.currency})
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Dto.</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Subtotal ({formData.currency})
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
                 </tr>
               </thead>
@@ -544,7 +645,6 @@ const NewBudget = () => {
                   </tr>
                 ) : (
                   formData.items.map((item, index) => {
-                    // Calcular subtotal para este item
                     const quantity = Number(item.quantity) || 0;
                     const unitPrice = Number(item.unitPrice) || 0;
                     const discount = Number(item.discount) || 0;
@@ -572,6 +672,7 @@ const NewBudget = () => {
                             onChange={(e) => handleItemChange(index, 'unitPrice', Number(e.target.value))}
                             className="w-24 p-1 border border-gray-300 rounded text-right"
                             min="0"
+                            step={formData.currency === 'USD' ? '0.01' : '1'}
                           />
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -586,7 +687,7 @@ const NewBudget = () => {
                           %
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
-                          {displayPYGCurrency(subtotal)}
+                          {formatCurrency(subtotal)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
@@ -683,15 +784,15 @@ const NewBudget = () => {
             </div>
           </div>
           
-          {/* Columna 2: Resumen de totales */}
+          {/* Columna 2: Resumen de totales mejorado */}
           <div>
-            <h3 className="font-semibold mb-3">Resumen</h3>
+            <h3 className="font-semibold mb-3">Resumen - {formData.currency === 'USD' ? 'Dólares' : 'Guaraníes'}</h3>
             
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <div className="space-y-3">
                 <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                   <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{displayPYGCurrency(formData.totalAmount)}</span>
+                  <span className="font-medium">{formatCurrency(formData.totalAmount)}</span>
                 </div>
                 
                 <div className="flex justify-between items-center">
@@ -709,7 +810,7 @@ const NewBudget = () => {
                     <span className="ml-1">%</span>
                   </div>
                   <span className="font-medium">
-                    {displayPYGCurrency(formData.totalAmount * (formData.discount / 100))}
+                    -{formatCurrency(formData.totalAmount * (formData.discount / 100))}
                   </span>
                 </div>
                 
@@ -728,14 +829,28 @@ const NewBudget = () => {
                     <span className="ml-1">%</span>
                   </div>
                   <span className="font-medium">
-                    {displayPYGCurrency(formData.totalAmount * (1 - formData.discount / 100) * (formData.tax / 100))}
+                    +{formatCurrency(formData.totalAmount * (1 - formData.discount / 100) * (formData.tax / 100))}
                   </span>
                 </div>
                 
                 <div className="flex justify-between items-center text-lg font-bold text-blue-700">
                   <span>TOTAL:</span>
-                  <span>{displayPYGCurrency(formData.finalAmount)}</span>
+                  <span>{formatCurrency(formData.finalAmount)}</span>
                 </div>
+                
+                {/* NUEVO: Mostrar equivalencia en la otra moneda */}
+                {formData.finalAmount > 0 && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="text-sm text-gray-600 text-center">
+                      <span className="font-medium">Equivalencia:</span>
+                      <br />
+                      {formData.currency === 'USD' 
+                        ? formatCurrency(formData.finalAmount * formData.exchangeRate, 'PYG')
+                        : formatCurrency(formData.finalAmount / formData.exchangeRate, 'USD')
+                      }
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -753,16 +868,16 @@ const NewBudget = () => {
                 disabled={isLoading}
               >
                 {isLoading ? (
-  <span className="flex items-center">
-    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-    </svg>
-    Creando presupuesto...
-  </span>
-) : (
-  "Crear Presupuesto"
-)}
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creando presupuesto...
+                  </span>
+                ) : (
+                  "Crear Presupuesto"
+                )}
               </button>
             </div>
           </div>
