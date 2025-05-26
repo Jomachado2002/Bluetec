@@ -1,4 +1,4 @@
-// backend/models/clientModel.js
+// backend/models/clientModel.js - VERSIÓN CORREGIDA
 const mongoose = require('mongoose');
 
 const clientSchema = new mongoose.Schema({
@@ -40,8 +40,8 @@ const clientSchema = new mongoose.Schema({
         ref: 'sale'
     }],
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'user'
+        type: String, // ARREGLO: Cambiar de ObjectId a String para soportar guest users
+        default: '000000000000000000000000' // ID por defecto para usuarios guest
     },
     isActive: {
         type: Boolean,
