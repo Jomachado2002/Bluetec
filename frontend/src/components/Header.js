@@ -541,10 +541,6 @@ const Header = () => {
           <CiHome className="text-2xl" />
           <span className="text-xs">Inicio</span>
         </Link>
-        <Link to="/arma-tu-pc" className="flex flex-col items-center text-gray-600 hover:text-blue-600" onClick={scrollTop}>
-          <Cpu className="text-2xl" />
-          <span className="text-xs">Arma tu PC</span>
-        </Link>
         <button onClick={() => { toggleCategoryMenu(); scrollTop(); }} className="flex flex-col items-center text-gray-600 hover:text-blue-600">
           <BiCategoryAlt className="text-2xl" />
           <span className="text-xs">Categorías</span>
