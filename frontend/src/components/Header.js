@@ -198,7 +198,10 @@ const Header = () => {
         <div className="container mx-auto px-4 lg:px-6 h-20 hidden lg:flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center transition-transform duration-300 hover:scale-105" onClick={scrollTop}>
-            <div className="text-white text-3xl font-bold">BlueTec</div>
+          <div className="text-left">
+          <div className="text-white text-lg font-bold tracking-wide" style={{fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontWeight: '700'}}>BlueTec Alliance</div>
+          <div className="text-white text-xs font-medium -mt-1 tracking-wide" style={{fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontWeight: '400'}}>Socio Estratégico</div>
+          </div>
           </Link>
 
           {/* Barra de búsqueda mejorada */}
@@ -406,7 +409,10 @@ const Header = () => {
           <div className="flex items-center justify-between px-4 h-12 bg-[#002060]">
             {/* Logo */}
             <Link to="/" className="flex items-center" onClick={scrollTop}>
-              <div className="text-white text-xl font-bold">BlueTec</div>
+              <div className="text-left">
+              <div className="text-white text-lg font-bold tracking-wide" style={{fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontWeight: '700'}}>BlueTec Alliance</div>
+              <div className="text-white text-xs font-medium -mt-1 tracking-wide" style={{fontFamily: 'Inter, system-ui, -apple-system, sans-serif', fontWeight: '400'}}>Socio Estratégico</div>
+              </div>
             </Link>
 
             {/* Iconos: búsqueda y carrito */}

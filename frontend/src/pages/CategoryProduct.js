@@ -1,15 +1,60 @@
 // src/pages/CategoryProduct.js
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { IoGridOutline, IoMenuOutline } from 'react-icons/io5';
 import { BiX, BiFilter } from 'react-icons/bi';
 import { FilterProvider, useFilters } from '../context/FilterContext';
-import VerticalCard from '../components/VerticalCard';
+
 import DesktopFilters from '../components/filters/DesktopFilters';
 import SideDrawerFilters from '../components/filters/SideDrawerFilters';
 import productCategory from '../helpers/productCategory';
 import getSeoTitle from '../utils/getSeoTitle';
 import { Helmet } from 'react-helmet';
+import VerticalCard from '../components/VerticalCard';
+
+// Hook para detectar dirección del scroll
+const useScrollDirection = () => {
+  const [scrollDirection, setScrollDirection] = useState(null);
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    let lastScrollY = window.pageYOffset;
+    let ticking = false;
+
+    const updateScrollDirection = () => {
+      const scrollY = window.pageYOffset;
+      const direction = scrollY > lastScrollY ? "down" : "up";
+      
+      // Solo actualizar si hay un cambio significativo (más de 10px)
+      if (Math.abs(scrollY - lastScrollY) > 10) {
+        setScrollDirection(direction);
+        
+        // Mostrar/ocultar según la dirección del scroll
+        if (direction === "down" && scrollY > 100) {
+          setIsVisible(false);
+        } else if (direction === "up") {
+          setIsVisible(true);
+        }
+      }
+      
+      lastScrollY = scrollY > 0 ? scrollY : 0;
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(updateScrollDirection);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", onScroll);
+
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return { scrollDirection, isVisible };
+};
 
 // Componente para filtros activos en línea
 const InlineActiveFilters = ({ productCategories }) => {
@@ -373,6 +418,7 @@ const CategoryProductContent = () => {
   } = useFilters();
   
   const location = useLocation();
+  const { isVisible } = useScrollDirection();
   
   // Configurar metadatos de SEO
   useEffect(() => {
@@ -389,8 +435,12 @@ const CategoryProductContent = () => {
 
   return (
     <>
-      {/* Nueva barra de filtros justo debajo del header */}
-      <div className="sticky top-12 z-22 bg-white shadow-sm border-b border-gray-200 px-4 py-2">
+      {/* Barra de filtros con auto-hide */}
+      <div 
+        className={`sticky top-12 z-22 bg-white shadow-sm border-b border-gray-200 px-4 py-2 transition-transform duration-300 ${
+          isVisible ? 'translate-y-0' : '-translate-y-full'
+        }`}
+      >
         <div className="container mx-auto">
           <div className="flex flex-col sm:flex-row items-center">
             <div className="flex items-center w-full">
@@ -473,7 +523,7 @@ const CategoryProductContent = () => {
               </div>
             ) : data.length > 0 ? (
               <div className="transition-opacity duration-300" style={{ opacity: loading ? 0.5 : 1 }}>
-                <VerticalCard data={data} loading={loading} gridView={gridView} />
+                <VerticalCard data={data} loading={loading} />
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow-sm p-8 text-center border border-gray-100">

@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import fetchCategoryWiseProduct from '../helpers/fetchCategoryWiseProduct';
 import displayPYGCurrency from '../helpers/displayCurrency';
-import { FaAngleLeft, FaAngleRight, FaShoppingCart, FaExpand } from 'react-icons/fa';
+import { FaAngleLeft, FaAngleRight, FaShoppingCart } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import addToCart from '../helpers/addToCart';
 import Context from '../context';
@@ -13,6 +13,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
     const [showLeftButton, setShowLeftButton] = useState(false);
     const [showRightButton, setShowRightButton] = useState(true);
     const [hoveredProductId, setHoveredProductId] = useState(null);
+    const [hoverTimeout, setHoverTimeout] = useState(null);
     const loadingList = new Array(6).fill(null);
 
     const scrollElement = useRef();
@@ -36,6 +37,24 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
             setLoading(false);
         }
     };
+
+    // Precargar todas las imágenes cuando se cargan los datos
+    useEffect(() => {
+        if (data.length > 0) {
+            data.forEach(product => {
+                // Precargar primera imagen
+                if (product?.productImage?.[0]) {
+                    const img1 = new Image();
+                    img1.src = product.productImage[0];
+                }
+                // Precargar segunda imagen si existe
+                if (product?.productImage?.[1]) {
+                    const img2 = new Image();
+                    img2.src = product.productImage[1];
+                }
+            });
+        }
+    }, [data]);
 
     useEffect(() => {
         fetchData();
@@ -78,9 +97,15 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
     }
 
     // Filtrar para mostrar solo placas madre si la categoría es informática
+    // Y también filtrar productos sin stock
     const filteredData = category === "informatica" && subcategory === "placas_madre" 
-        ? data.filter(product => product.subcategory?.toLowerCase() === "placas_madre")
-        : data;
+        ? data.filter(product => 
+            product.subcategory?.toLowerCase() === "placas_madre" && 
+            (product?.stock === undefined || product?.stock === null || product?.stock > 0)
+          )
+        : data.filter(product => 
+            product?.stock === undefined || product?.stock === null || product?.stock > 0
+          );
 
     return (
         <div className='w-full relative'>
@@ -131,92 +156,132 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                 {/* Contenedor de productos */}
                 <div
                     ref={scrollElement}
-                    className='flex gap-6 overflow-x-auto scrollbar-hide scroll-smooth py-4 snap-x'
+                    className='flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth py-4 snap-x'
                 >
                     {loading
                         ? loadingList.map((_, index) => (
                             <div
                                 key={index}
-                                className='snap-center flex-none w-[220px] sm:w-[250px] md:w-[280px] bg-white rounded-xl shadow-md animate-pulse'
+                                className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] bg-white rounded-lg shadow-sm border animate-pulse'
                             >
-                                <div className='bg-gray-200 h-48 rounded-t-xl'></div>
-                                <div className='p-5 space-y-3'>
-                                    <div className='h-4 bg-gray-300 rounded-full'></div>
-                                    <div className='h-4 bg-gray-300 rounded-full w-2/3'></div>
-                                    <div className='h-10 bg-gray-300 rounded-full'></div>
+                                <div className='bg-gray-200 h-32 sm:h-36 rounded-t-lg'></div>
+                                <div className='p-2.5 space-y-1.5'>
+                                    <div className='h-4 bg-gray-200 rounded'></div>
+                                    <div className='h-3 bg-gray-200 rounded w-2/3'></div>
+                                    <div className='h-6 bg-gray-200 rounded'></div>
+                                    <div className='h-8 bg-gray-200 rounded'></div>
                                 </div>
                             </div>
                         ))
                         : filteredData.map((product) => {
                             const discount = calculateDiscount(product?.price, product?.sellingPrice);
+                            const isHovered = hoveredProductId === product?._id;
+                            const secondImage = product.productImage?.[1];
+                            const showSecondImage = isHovered && secondImage;
+                            
+                            // Funciones para manejar hover con delay
+                            const handleMouseEnter = () => {
+                                // Limpiar cualquier timeout previo
+                                if (hoverTimeout) {
+                                    clearTimeout(hoverTimeout);
+                                }
+                                
+                                // Establecer nuevo timeout de 300ms
+                                const timeout = setTimeout(() => {
+                                    setHoveredProductId(product?._id);
+                                }, 300);
+                                
+                                setHoverTimeout(timeout);
+                            };
+                            
+                            const handleMouseLeave = () => {
+                                // Limpiar timeout si existe
+                                if (hoverTimeout) {
+                                    clearTimeout(hoverTimeout);
+                                    setHoverTimeout(null);
+                                }
+                                
+                                // Inmediatamente quitar el hover
+                                setHoveredProductId(null);
+                            };
                             
                             return (
                                 <Link to={`/producto/${product?.slug || product?._id}`}
                                     key={product?._id} 
-                                    className='snap-center flex-none w-[220px] sm:w-[250px] md:w-[280px] bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 group/card product-card relative'
+                                    className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] h-[280px] sm:h-[300px] bg-white rounded-lg shadow-sm border hover:shadow-md transition-all duration-200 group/card relative flex flex-col'
                                     onClick={scrollTop}
-                                    onMouseEnter={() => setHoveredProductId(product?._id)}
-                                    onMouseLeave={() => setHoveredProductId(null)}
+                                    onMouseEnter={handleMouseEnter}
+                                    onMouseLeave={handleMouseLeave}
                                 >
-                                    {/* Etiqueta de descuento */}
-                                    {discount && (
-                                        <div className='absolute top-4 left-4 z-10 bg-[#1565C0] text-white px-3 py-1 rounded-full text-xs font-bold'>
-                                            {discount}
-                                        </div>
-                                    )}
-                                    
                                     {/* Imagen del producto */}
-                                    <div className='block bg-[#f4f7fb] h-48 rounded-t-xl flex items-center justify-center overflow-hidden relative'>
+                                    <div className='h-32 sm:h-36 rounded-t-lg flex items-center justify-center overflow-hidden relative bg-gray-50'>
+                                        {/* Imagen principal */}
                                         <img
                                             src={product.productImage[0]}
                                             alt={product.productName}
-                                            className='object-contain h-full w-full transform group-hover/card:scale-110 transition-transform duration-500'
+                                            className={`object-contain h-full w-full transition-all duration-500 ease-in-out ${
+                                                showSecondImage ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+                                            }`}
                                         />
-                                        <div className='absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300'>
-                                            <div className='bg-white/70 p-2 rounded-full'>
-                                                <FaExpand className='text-[#002060]' />
+                                        
+                                        {/* Imagen de hover (segunda imagen) */}
+                                        {secondImage && (
+                                            <img
+                                                src={secondImage}
+                                                alt={product.productName}
+                                                className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
+                                                    showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
+                                                }`}
+                                            />
+                                        )}
+
+                                        {/* Badge de descuento - solo en la esquina superior izquierda */}
+                                        {discount && (
+                                            <div className="absolute top-2 left-2">
+                                                <span className='bg-red-500 text-white text-xs font-bold px-2 py-1 rounded'>
+                                                    -{Math.round(((product?.price - product?.sellingPrice) / product?.price) * 100)}%
+                                                </span>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
 
-                                    {/* Detalles del producto */}
-                                    <div className='p-5 space-y-3'>
-                                        <h2 
-                                            className={`font-semibold text-base text-gray-700 ${
-                                                hoveredProductId === product?._id 
-                                                    ? 'line-clamp-none' 
-                                                    : 'line-clamp-2'
-                                            } hover:line-clamp-none transition-all duration-300`}
-                                        >
-                                            {product?.productName}
-                                        </h2>
-                                        
-                                        <div className='flex items-center justify-between'>
-                                            <span className='text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded-full'>
-                                                {product?.brandName}
-                                            </span>
-                                            <div className='flex flex-col items-end'>
-                                                <p className='text-[#002060] font-bold text-base'>
-                                                    {displayPYGCurrency(product?.sellingPrice)}
-                                                </p>
-                                                {product?.price > 0 && (
-                                                    <p className='text-gray-400 line-through text-xs'>
-                                                        {displayPYGCurrency(product?.price)}
-                                                    </p>
-                                                )}
+                                    {/* Detalles del producto - ESTRUCTURA FIJA */}
+                                    <div className='p-2.5 flex flex-col flex-grow'>
+                                        {/* Contenido superior que puede variar */}
+                                        <div className='flex-grow space-y-1.5'>
+                                            <h3 className='font-medium text-xs text-gray-600 leading-tight line-clamp-4 min-h-[2.8rem]'>
+                                                {product?.productName}
+                                            </h3>
+                                            
+                                            <div className='text-xs text-gray-500 uppercase font-medium tracking-wide'>
+                                                {product?.subcategory || product?.brandName}
                                             </div>
                                         </div>
+                                        
+                                        {/* Contenido inferior fijo - SIEMPRE EN LA MISMA POSICIÓN */}
+                                        <div className='mt-auto space-y-2'>
+                                            <div className='space-y-0.5 text-center'>
+                                                <div className='text-lg font-bold text-black'>
+                                                    {displayPYGCurrency(product?.sellingPrice)}
+                                                </div>
+                                                {product?.price > 0 && product?.price > product?.sellingPrice && (
+                                                    <div className='text-xs text-gray-400 line-through'>
+                                                        {displayPYGCurrency(product?.price)}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        <button
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleAddToCart(e, product);
-                                            }}
-                                            className='w-full flex items-center justify-center gap-2 bg-[#002060] hover:bg-[#003399] 
-                                                    text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors active:scale-95'
-                                        >
-                                            <FaShoppingCart /> Agregar al Carrito
-                                        </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    handleAddToCart(e, product);
+                                                }}
+                                                className='w-full flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 
+                                                        text-white px-2 py-1.5 rounded-lg text-xs font-medium transition-colors'
+                                            >
+                                                <FaShoppingCart size={11} /> Agregar
+                                            </button>
+                                        </div>
                                     </div>
                                 </Link>
                             );

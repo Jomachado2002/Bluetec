@@ -7,6 +7,7 @@ import CategoryWiseProductDisplay from '../components/CategoryWiseProductDisplay
 import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import { trackWhatsAppContact, trackAddToCart } from '../components/MetaPixelTracker';
+import VerticalCardProduct from '../components/VerticalCardProduct';
 
 // Lista de todas las posibles especificaciones por categoría
 const specificationsByCategory = {
@@ -269,6 +270,7 @@ const fieldNameMapping = {
     apAntennas: "Antenas"
 };
 
+
 const ProductDetails = () => {
   const [data, setData] = useState({
     productName: "",
@@ -293,6 +295,22 @@ const ProductDetails = () => {
 
   const { fetchUserAddToCart } = useContext(Context);
   const navigate = useNavigate();
+
+  // Función simplificada para determinar el estado del stock
+  const getStockStatus = (stock) => {
+    // Si no hay stock definido o es null/undefined, asumir que está en stock
+    if (stock === undefined || stock === null) {
+      return { status: 'in_stock', text: 'En Stock', color: 'bg-green-500' };
+    }
+    
+    // Si stock es 0, está agotado
+    if (stock === 0) {
+      return { status: 'out_of_stock', text: 'Sin Stock', color: 'bg-red-500' };
+    }
+    
+    // Si stock es mayor a 0, está disponible
+    return { status: 'in_stock', text: 'En Stock', color: 'bg-green-500' };
+  };
 
   // Función para formatear la fecha un año en el futuro (para priceValidUntil)
   const getOneYearFromNow = () => {
@@ -431,7 +449,9 @@ const ProductDetails = () => {
     fetchUserAddToCart();
     
     // Tracking de Add to Cart
-    trackAddToCart(product);
+    if (typeof trackAddToCart === 'function') {
+      trackAddToCart(product);
+    }
   };
 
   // Función para ir al carrito
@@ -453,14 +473,16 @@ ${productUrl}
 ¿Me puedes brindar más detalles sobre disponibilidad y envío?`;
     
     // Tracking de WhatsApp - EVENTO PRINCIPAL
-    trackWhatsAppContact({
-      _id: data._id,
-      productName: data.productName,
-      category: data.category,
-      subcategory: data.subcategory,
-      brandName: data.brandName,
-      sellingPrice: data.sellingPrice
-    });
+    if (typeof trackWhatsAppContact === 'function') {
+      trackWhatsAppContact({
+        _id: data._id,
+        productName: data.productName,
+        category: data.category,
+        subcategory: data.subcategory,
+        brandName: data.brandName,
+        sellingPrice: data.sellingPrice
+      });
+    }
     
     const whatsappUrl = `https://wa.me/+595984133733?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -485,8 +507,9 @@ ${productUrl}
     return filledSpecs;
   };
 
-  // Determinamos si el producto está en stock
-  const isInStock = true; // Deberías tener una propiedad para esto, asumimos que está en stock
+  // Variables optimizadas para Google Merchant
+  const isInStock = data?.stock === undefined || data?.stock === null || data?.stock > 0;
+  const stockInfo = getStockStatus(data?.stock);
 
   return (
     <>
@@ -534,7 +557,7 @@ ${productUrl}
           })}
         </script>
         
-        {/* Product Schema.org para el producto actual */}
+        {/* Product Schema.org optimizado para Google Merchant */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -559,7 +582,7 @@ ${productUrl}
               "availability": isInStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
               "seller": {
                 "@type": "Organization",
-                "name": "BlueTec"
+                "name": "BlueTec Alliance"
               }
             },
             "additionalProperty": Object.entries(getProductSpecifications()).map(([name, value]) => ({
@@ -673,14 +696,21 @@ ${productUrl}
               ) : (
                 <div className="space-y-6">
                   <div>
-                    <p className="inline-block bg-[#2A3190] text-white px-3 py-1 rounded-full text-sm font-semibold">
-                      {data?.brandName}
-                    </p>
+                    <div className="flex items-center gap-3 mb-2">
+                      <p className="inline-block bg-[#2A3190] text-white px-3 py-1 rounded-full text-sm font-semibold">
+                        {data?.brandName}
+                      </p>
+                      {/* Badge de Stock simplificado para Google Merchant */}
+                      <span className={`${stockInfo.color} text-white text-xs px-2 py-1 rounded-full`}>
+                        {stockInfo.text}
+                      </span>
+                    </div>
                     <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-800">
                       {data?.productName}
                     </h2>
                     <p className="capitalize text-sm md:text-lg text-gray-500">{data?.subcategory}</p>
                   </div>
+                  
                   <div className="flex items-center gap-4">
                     <p className="text-3xl lg:text-4xl font-bold text-[#2A3190]">
                       {displayINRCurrency(data.sellingPrice)}
@@ -699,20 +729,29 @@ ${productUrl}
                     )}
                   </div>
                   
-                  {/* Botones de acción - Diseño exacto como la imagen */}
+                  {/* Botones de acción optimizados */}
                   <div className="flex flex-wrap gap-3">
                     <button
                       onClick={(e) => handleBuyProduct(e, data)}
-                      className="bg-blue-500 text-white py-2.5 px-6 rounded-xl hover:bg-blue-600 transition duration-300 font-medium text-sm"
+                      disabled={!isInStock}
+                      className={`py-2.5 px-6 rounded-xl transition duration-300 font-medium text-sm ${
+                        isInStock 
+                          ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
                     >
-                      Comprar
+                      {isInStock ? 'Comprar' : 'Sin Stock'}
                     </button>
-                    
                     <button
                       onClick={(e) => handleAddToCart(e, data)}
-                      className="bg-white text-purple-600 border-2 border-purple-600 py-2.5 px-6 rounded-xl hover:bg-purple-50 transition duration-300 font-medium text-sm"
+                      disabled={!isInStock}
+                      className={`py-2.5 px-6 rounded-xl border-2 transition duration-300 font-medium text-sm ${
+                        isInStock 
+                          ? 'bg-white text-purple-600 border-purple-600 hover:bg-purple-50' 
+                          : 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
+                      }`}
                     >
-                      Agregar al carrito
+                      {isInStock ? 'Agregar al carrito' : 'No disponible'}
                     </button>
                     
                     <button

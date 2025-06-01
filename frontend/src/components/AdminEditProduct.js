@@ -26,6 +26,8 @@ const AdminEditProduct = ({
         description: productData?.description || "",
         price: productData?.price || "",
         sellingPrice: productData?.sellingPrice || "",
+        stock: productData?.stock || 0,
+        isVipOffer: productData?.isVipOffer || false,
         
         // Campos específicos por categoría inicializados con valores del productData
         // (resto de campos como en el código original)
@@ -378,6 +380,36 @@ const AdminEditProduct = ({
                                            transition-all duration-300'
                                 placeholder="Ingresa el enlace de documentación"
                                 />
+                                </div>
+                                <div>
+                                <label htmlFor="stock" className='block text-sm font-medium text-gray-700 mb-1'>
+                                    Stock
+                                </label>
+                                <input
+                                    type="number"
+                                    id="stock"
+                                    name="stock"
+                                    value={data.stock}
+                                    onChange={handleOnChange}
+                                    className='w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg 
+                                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                                            transition-all duration-300'
+                                    placeholder="Cantidad en stock"
+                                    min="0"
+                                />
+                                </div>
+                                <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="isVipOffer"
+                                    name="isVipOffer"
+                                    checked={data.isVipOffer}
+                                    onChange={(e) => setData(prev => ({...prev, isVipOffer: e.target.checked}))}
+                                    className="mr-2"
+                                />
+                                <label htmlFor="isVipOffer" className='text-sm font-medium text-gray-700'>
+                                    Marcar como Oferta VIP
+                                </label>
                                 </div>
         
                                 {/* Sección de Imágenes */}

@@ -10,6 +10,22 @@ const productSchema = mongoose.Schema({
     description: { type: String },
     price: { type: Number, required: true },
     sellingPrice: { type: Number, required: true },
+    stock: {
+    type: Number,
+    default: 0,
+    min: 0
+    },
+    stockStatus: {
+    type: String,
+    enum: ['in_stock', 'out_of_stock', 'low_stock'],
+    default: function() {
+        return this.stock > 0 ? (this.stock <= 5 ? 'low_stock' : 'in_stock') : 'out_of_stock';
+    }
+    },
+    isVipOffer: {
+    type: Boolean,
+    default: false
+    },
     
     // Informática - Notebooks
     processor: { type: String },

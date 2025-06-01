@@ -60,7 +60,7 @@ const router = createBrowserRouter([
                 element: <MobileCategoriesPage />
             },
             {
-                path: "categoria-producto/:categoryName", // ✅ Agregado parámetro
+                path: "categoria-producto", // ✅ Agregado parámetro
                 element: <CategoryProduct />
             },
             {

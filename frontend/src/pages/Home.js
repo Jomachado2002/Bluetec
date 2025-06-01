@@ -13,6 +13,8 @@ import '../styles/global.css';
 
 // Importar la función scrollTop mejorada
 import scrollTop from '../helpers/scrollTop';
+import VerticalCard from '../components/VerticalCard';
+
 
 // Animaciones predefinidas
 const fadeIn = {
