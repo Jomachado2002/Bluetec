@@ -3,13 +3,11 @@ import { useSelector } from 'react-redux';
 import { CiUser } from 'react-icons/ci';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ROLE from '../common/role';
-import { FaBars, FaTimes, FaUsers, FaBoxOpen, FaChartPie, FaUserFriends, FaFileInvoiceDollar, FaSignOutAlt } from 'react-icons/fa';
+import { FaBars, FaTimes, FaUsers, FaBoxOpen, FaChartPie, FaUserFriends, FaFileInvoiceDollar, FaSignOutAlt, FaTruck, FaChartLine, FaCalculator, FaFileAlt, FaPlus } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import SummaryApi from '../common';
 import { useDispatch } from 'react-redux';
 import { setUserDetails } from '../store/userSlice';
-import { FaTruck } from 'react-icons/fa';
-
 
 const AdminPanel = () => {
   const user = useSelector(state => state?.user?.user);
@@ -80,9 +78,14 @@ const AdminPanel = () => {
       icon: <FaFileInvoiceDollar className="mr-2" />
     },
     {
-    path: "proveedores",
-    label: "Proveedores",
-    icon: <FaTruck className="mr-2" />
+      path: "proveedores",
+      label: "Proveedores",
+      icon: <FaTruck className="mr-2" />
+    },
+    {
+      path: "analisis-rentabilidad",
+      label: "Análisis Rentabilidad",
+      icon: <FaChartLine className="mr-2" />
     }
   ];
 

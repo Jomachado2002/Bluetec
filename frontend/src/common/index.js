@@ -167,6 +167,35 @@ const SummaryApi = {
         url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro
         method: 'delete'
     },
+     // Rutas para análisis de rentabilidad
+    createProfitabilityAnalysis: {
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`,
+        method: 'post'
+    },
+    getAllProfitabilityAnalyses: {
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`,
+        method: 'get'
+    },
+    getProfitabilityAnalysisById: {
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`, // usaremos el ID como parámetro
+        method: 'get'
+    },
+    compareSupplierPrices: {
+        url: `${backendDomain}/api/finanzas/comparar-proveedores`,
+        method: 'post'
+    },
+    updateAnalysisStatus: {
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`, // usaremos el ID como parámetro
+        method: 'patch'
+    },
+    deleteAnalysis: {
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`, // usaremos el ID como parámetro
+        method: 'delete'
+    },
+    getSupplierProfitability: {
+        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro + /rentabilidad
+        method: 'get'
+    },
     
     // También establece un baseURL para uso general
     baseURL: backendDomain

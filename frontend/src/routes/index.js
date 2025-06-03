@@ -24,7 +24,10 @@ import BudgetDetails from "../pages/BudgetDetails"
 import NewBudget from "../pages/NewBudget"
 import NewClient from "../pages/NewClient"
 import SuppliersManagement from "../pages/SuppliersManagement"
-
+import ProfitabilityAnalysis from "../pages/ProfitabilityAnalysis"
+import NewProfitabilityAnalysis from "../pages/NewProfitabilityAnalysis"
+import SupplierPriceComparison from "../pages/SupplierPriceComparison"
+import ProfitabilityAnalysisDetails from "../pages/ProfitabilityAnalysisDetails"
 
 
 const router = createBrowserRouter([
@@ -133,6 +136,23 @@ const router = createBrowserRouter([
                     {
                         path: "proveedores/:supplierId", 
                         element: <SuppliersManagement />
+                    },
+                    // Gestión de análisis de rentabilidad
+                    {
+                        path: "analisis-rentabilidad",
+                        element: <ProfitabilityAnalysis />
+                    },
+                    {
+                        path: "analisis-rentabilidad/nuevo",
+                        element: <NewProfitabilityAnalysis />
+                    },
+                    {
+                        path: "analisis-rentabilidad/comparar",
+                        element: <SupplierPriceComparison />
+                    },
+                    {
+                        path: "analisis-rentabilidad/:analysisId",
+                        element: <ProfitabilityAnalysisDetails />
                     }
                 ]
             }

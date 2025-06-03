@@ -1,12 +1,15 @@
-// backend/models/profitabilityAnalysisModel.js
+// backend/models/profitabilityAnalysisModel.js - VERSIÓN FINAL CORREGIDA
 const mongoose = require('mongoose');
 
 const profitabilityAnalysisSchema = new mongoose.Schema({
-    // Número único del análisis
+    // Número único del análisis - HACER OPCIONAL Y AGREGAR DEFAULT
     analysisNumber: {
         type: String,
-        required: true,
-        unique: true
+        required: false, // CAMBIAR A OPCIONAL TEMPORALMENTE
+        unique: true,
+        default: function() {
+            return `ANAL-${Date.now().toString().slice(-5)}`;
+        }
     },
     
     // Relaciones
@@ -29,16 +32,17 @@ const profitabilityAnalysisSchema = new mongoose.Schema({
             ref: 'product'
         },
         productSnapshot: {
-            name: String,
-            description: String,
-            category: String,
-            subcategory: String,
-            brandName: String
+            name: { type: String, default: '' },
+            description: { type: String, default: '' },
+            category: { type: String, default: '' },
+            subcategory: { type: String, default: '' },
+            brandName: { type: String, default: '' }
         },
         quantity: {
             type: Number,
             required: true,
-            min: 1
+            min: 1,
+            default: 1
         },
         
         // Información del proveedor
@@ -48,17 +52,18 @@ const profitabilityAnalysisSchema = new mongoose.Schema({
             required: true
         },
         supplierSnapshot: {
-            name: String,
-            contactPerson: String,
-            phone: String,
-            email: String
+            name: { type: String, default: '' },
+            contactPerson: { type: String, default: '' },
+            phone: { type: String, default: '' },
+            email: { type: String, default: '' }
         },
         
         // Costos
         purchasePrice: {
             type: Number,
             required: true,
-            min: 0
+            min: 0,
+            default: 0
         },
         purchaseCurrency: {
             type: String,
@@ -71,7 +76,8 @@ const profitabilityAnalysisSchema = new mongoose.Schema({
         },
         purchasePricePYG: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         shippingCost: {
             type: Number,
@@ -87,67 +93,80 @@ const profitabilityAnalysisSchema = new mongoose.Schema({
         },
         totalCostPerUnit: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         
         // Precios de venta
         sellingPrice: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         
         // Análisis calculado
         grossProfit: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         profitMargin: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         totalGrossProfit: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         
         // Metadatos del item
-        notes: String,
-        deliveryTime: String // Tiempo estimado de entrega del proveedor
+        notes: { type: String, default: '' },
+        deliveryTime: { type: String, default: '' }
     }],
     
     // Resumen total del análisis
     totals: {
         totalPurchaseCost: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         totalShippingCost: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         totalOtherCosts: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         totalCosts: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         totalRevenue: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         totalGrossProfit: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         averageProfitMargin: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         },
         totalQuantity: {
             type: Number,
-            required: true
+            required: true,
+            default: 0
         }
     },
     
@@ -157,7 +176,7 @@ const profitabilityAnalysisSchema = new mongoose.Schema({
         enum: ['draft', 'confirmed', 'completed', 'cancelled'],
         default: 'draft'
     },
-    notes: String,
+    notes: { type: String, default: '' },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
@@ -172,35 +191,18 @@ const profitabilityAnalysisSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Pre-save hook para generar número de análisis
-profitabilityAnalysisSchema.pre('save', async function(next) {
-    try {
-        if (this.isNew && !this.analysisNumber) {
-            const lastAnalysis = await this.constructor.findOne({}, {}, { sort: { 'createdAt': -1 } });
-            
-            if (lastAnalysis && lastAnalysis.analysisNumber) {
-                const lastNumberStr = lastAnalysis.analysisNumber.split('-')[1];
-                if (!lastNumberStr) {
-                    this.analysisNumber = 'ANAL-00001';
-                } else {
-                    const lastNumber = parseInt(lastNumberStr);
-                    this.analysisNumber = `ANAL-${(lastNumber + 1).toString().padStart(5, '0')}`;
-                }
-            } else {
-                this.analysisNumber = 'ANAL-00001';
-            }
-        }
-        next();
-    } catch (error) {
-        console.error('Error generando analysisNumber:', error);
-        this.analysisNumber = `ANAL-${Date.now().toString().slice(-5)}`;
-        next();
+// Pre-save hook SIMPLIFICADO para generar número de análisis
+profitabilityAnalysisSchema.pre('save', function(next) {
+    // Si es nuevo y no tiene analysisNumber, generar uno simple
+    if (this.isNew && !this.analysisNumber) {
+        this.analysisNumber = `ANAL-${Date.now().toString().slice(-8)}`;
     }
+    next();
 });
 
-// Pre-save hook para calcular totales
+// Pre-save hook para calcular totales - SIMPLIFICADO
 profitabilityAnalysisSchema.pre('save', function(next) {
-    // Calcular totales automáticamente
+    // Inicializar totales
     let totalPurchaseCost = 0;
     let totalShippingCost = 0;
     let totalOtherCosts = 0;
@@ -208,18 +210,31 @@ profitabilityAnalysisSchema.pre('save', function(next) {
     let totalGrossProfit = 0;
     let totalQuantity = 0;
     
+    // Calcular totales de cada item
     this.items.forEach(item => {
-        const quantity = item.quantity;
+        const quantity = Number(item.quantity) || 0;
         totalQuantity += quantity;
+        
+        // Asegurar que purchasePricePYG esté calculado
+        if (!item.purchasePricePYG && item.purchasePrice) {
+            if (item.purchaseCurrency === 'USD') {
+                item.purchasePricePYG = item.purchasePrice * (item.exchangeRate || 7300);
+            } else if (item.purchaseCurrency === 'EUR') {
+                item.purchasePricePYG = item.purchasePrice * 1.1 * (item.exchangeRate || 7300);
+            } else {
+                item.purchasePricePYG = item.purchasePrice;
+            }
+        }
+        
         totalPurchaseCost += item.purchasePricePYG * quantity;
-        totalShippingCost += item.shippingCost * quantity;
-        totalOtherCosts += (item.customsCost + item.otherCosts) * quantity;
-        totalRevenue += item.sellingPrice * quantity;
+        totalShippingCost += (item.shippingCost || 0) * quantity;
+        totalOtherCosts += ((item.customsCost || 0) + (item.otherCosts || 0)) * quantity;
+        totalRevenue += (item.sellingPrice || 0) * quantity;
         
         // Calcular totales del item
-        item.totalCostPerUnit = item.purchasePricePYG + item.shippingCost + item.customsCost + item.otherCosts;
-        item.grossProfit = item.sellingPrice - item.totalCostPerUnit;
-        item.profitMargin = item.sellingPrice > 0 ? (item.grossProfit / item.sellingPrice) * 100 : 0;
+        item.totalCostPerUnit = (item.purchasePricePYG || 0) + (item.shippingCost || 0) + (item.customsCost || 0) + (item.otherCosts || 0);
+        item.grossProfit = (item.sellingPrice || 0) - item.totalCostPerUnit;
+        item.profitMargin = (item.sellingPrice || 0) > 0 ? (item.grossProfit / item.sellingPrice) * 100 : 0;
         item.totalGrossProfit = item.grossProfit * quantity;
         
         totalGrossProfit += item.totalGrossProfit;
@@ -228,22 +243,23 @@ profitabilityAnalysisSchema.pre('save', function(next) {
     const totalCosts = totalPurchaseCost + totalShippingCost + totalOtherCosts;
     const averageProfitMargin = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : 0;
     
+    // Asignar totales calculados con valores por defecto
     this.totals = {
-        totalPurchaseCost,
-        totalShippingCost,
-        totalOtherCosts,
-        totalCosts,
-        totalRevenue,
-        totalGrossProfit,
-        averageProfitMargin,
-        totalQuantity
+        totalPurchaseCost: totalPurchaseCost || 0,
+        totalShippingCost: totalShippingCost || 0,
+        totalOtherCosts: totalOtherCosts || 0,
+        totalCosts: totalCosts || 0,
+        totalRevenue: totalRevenue || 0,
+        totalGrossProfit: totalGrossProfit || 0,
+        averageProfitMargin: averageProfitMargin || 0,
+        totalQuantity: totalQuantity || 0
     };
     
     next();
 });
 
 // Índices
-profitabilityAnalysisSchema.index({ analysisNumber: 1 }, { unique: true });
+profitabilityAnalysisSchema.index({ analysisNumber: 1 }, { unique: true, sparse: true });
 profitabilityAnalysisSchema.index({ budget: 1 });
 profitabilityAnalysisSchema.index({ client: 1 });
 profitabilityAnalysisSchema.index({ status: 1 });

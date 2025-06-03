@@ -53,6 +53,18 @@ const {
     deleteSupplierController 
 } = require('../controller/supplier/supplierController');
 
+const {
+    createProfitabilityAnalysisController,
+    getAllProfitabilityAnalysesController,
+    getProfitabilityAnalysisByIdController,
+    compareSupplierPricesController,
+    updateAnalysisStatusController,
+    deleteAnalysisController,
+    getSupplierProfitabilitySummaryController
+} = require('../controller/profitability/profitabilityController');
+
+
+
 
 // Rutas para gestión de proveedores
 router.post("/finanzas/proveedores", authToken, createSupplierController);
@@ -60,6 +72,15 @@ router.get("/finanzas/proveedores", authToken, getAllSuppliersController);
 router.get("/finanzas/proveedores/:supplierId", authToken, getSupplierByIdController);
 router.put("/finanzas/proveedores/:supplierId", authToken, updateSupplierController);
 router.delete("/finanzas/proveedores/:supplierId", authToken, deleteSupplierController);
+
+// Rutas para análisis de rentabilidad
+router.post("/finanzas/analisis-rentabilidad", authToken, createProfitabilityAnalysisController);
+router.get("/finanzas/analisis-rentabilidad", authToken, getAllProfitabilityAnalysesController);
+router.get("/finanzas/analisis-rentabilidad/:analysisId", authToken, getProfitabilityAnalysisByIdController);
+router.post("/finanzas/comparar-proveedores", authToken, compareSupplierPricesController);
+router.patch("/finanzas/analisis-rentabilidad/:analysisId/estado", authToken, updateAnalysisStatusController);
+router.delete("/finanzas/analisis-rentabilidad/:analysisId", authToken, deleteAnalysisController);
+router.get("/finanzas/proveedores/:supplierId/rentabilidad", authToken, getSupplierProfitabilitySummaryController);
 
 // Rutas de usuario
 router.post("/registro", userSignUpController); // Antes: signup
