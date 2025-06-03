@@ -23,6 +23,7 @@ import BudgetsList from "../pages/BudgetsList"
 import BudgetDetails from "../pages/BudgetDetails"
 import NewBudget from "../pages/NewBudget"
 import NewClient from "../pages/NewClient"
+import SuppliersManagement from "../pages/SuppliersManagement"
 
 
 
@@ -124,6 +125,14 @@ const router = createBrowserRouter([
                     {
                         path: "presupuestos/:budgetId",
                         element: <BudgetDetails />
+                    },
+                    {
+                        path: "proveedores",
+                        element: <SuppliersManagement />
+                    },
+                    {
+                        path: "proveedores/:supplierId", 
+                        element: <SuppliersManagement />
                     }
                 ]
             }

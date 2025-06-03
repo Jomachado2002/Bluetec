@@ -8,6 +8,8 @@ import { toast } from 'react-toastify';
 import SummaryApi from '../common';
 import { useDispatch } from 'react-redux';
 import { setUserDetails } from '../store/userSlice';
+import { FaTruck } from 'react-icons/fa';
+
 
 const AdminPanel = () => {
   const user = useSelector(state => state?.user?.user);
@@ -76,6 +78,11 @@ const AdminPanel = () => {
       path: "presupuestos",
       label: "Presupuestos",
       icon: <FaFileInvoiceDollar className="mr-2" />
+    },
+    {
+    path: "proveedores",
+    label: "Proveedores",
+    icon: <FaTruck className="mr-2" />
     }
   ];
 

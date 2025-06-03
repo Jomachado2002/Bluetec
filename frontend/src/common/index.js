@@ -146,6 +146,27 @@ const SummaryApi = {
         url: `${backendDomain}/api/finanzas/actualizarprecios`,
         method: 'post'
     },
+
+        createSupplier: {
+        url: `${backendDomain}/api/finanzas/proveedores`,
+        method: 'post'
+    },
+    getAllSuppliers: {
+        url: `${backendDomain}/api/finanzas/proveedores`,
+        method: 'get'
+    },
+    getSupplierById: {
+        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro
+        method: 'get'
+    },
+    updateSupplier: {
+        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro
+        method: 'put'
+    },
+    deleteSupplier: {
+        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro
+        method: 'delete'
+    },
     
     // También establece un baseURL para uso general
     baseURL: backendDomain

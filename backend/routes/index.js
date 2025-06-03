@@ -45,6 +45,22 @@ const {
     sendBudgetEmailController
 } = require('../controller/budget/budgetController');
 
+const { 
+    createSupplierController, 
+    getAllSuppliersController, 
+    getSupplierByIdController, 
+    updateSupplierController, 
+    deleteSupplierController 
+} = require('../controller/supplier/supplierController');
+
+
+// Rutas para gestión de proveedores
+router.post("/finanzas/proveedores", authToken, createSupplierController);
+router.get("/finanzas/proveedores", authToken, getAllSuppliersController);
+router.get("/finanzas/proveedores/:supplierId", authToken, getSupplierByIdController);
+router.put("/finanzas/proveedores/:supplierId", authToken, updateSupplierController);
+router.delete("/finanzas/proveedores/:supplierId", authToken, deleteSupplierController);
+
 // Rutas de usuario
 router.post("/registro", userSignUpController); // Antes: signup
 router.post("/iniciar-sesion", userSignInController); // Antes: signin
