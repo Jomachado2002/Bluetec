@@ -1,4 +1,4 @@
-// backend/models/budgetModel.js
+// backend/models/budgetModel.js - VERSIÓN CORREGIDA
 const mongoose = require('mongoose');
 
 const budgetSchema = new mongoose.Schema({
@@ -75,11 +75,18 @@ const budgetSchema = new mongoose.Schema({
     deliveryMethod: {
         type: String
     },
+    // CORREGIDO PARA SOPORTAR USUARIOS INVITADOS
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'user',
-        required: true
+        type: mongoose.Schema.Types.Mixed, // Permite ObjectId o String
+        required: false // Hacer opcional para usuarios invitados
     },
+    
+    // Campo adicional para usuarios invitados
+    createdByGuest: {
+        type: String,
+        required: false
+    },
+    
     pdfPath: {
         type: String
     }
