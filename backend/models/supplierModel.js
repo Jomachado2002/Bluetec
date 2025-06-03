@@ -1,4 +1,4 @@
-// backend/models/supplierModel.js
+// backend/models/supplierModel.js - VERSIÓN CORREGIDA
 const mongoose = require('mongoose');
 
 const supplierSchema = new mongoose.Schema({
@@ -63,11 +63,16 @@ const supplierSchema = new mongoose.Schema({
         default: true
     },
     
-    // Metadatos
+    // Metadatos - CORREGIDO PARA SOPORTAR USUARIOS INVITADOS
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'user',
-        required: true
+        type: mongoose.Schema.Types.Mixed, // Permite ObjectId o String
+        required: false // Hacer opcional para usuarios invitados
+    },
+    
+    // Campo adicional para usuarios invitados
+    createdByGuest: {
+        type: String,
+        required: false
     },
     
     // Información de rendimiento

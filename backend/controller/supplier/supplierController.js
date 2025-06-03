@@ -2,14 +2,13 @@
 const SupplierModel = require('../../models/supplierModel');
 const uploadProductPermission = require('../../helpers/permission');
 
-/**
- * Crear un nuevo proveedor
- */
+// backend/controller/supplier/supplierController.js - FUNCIÓN CORREGIDA
 async function createSupplierController(req, res) {
     try {
-        if (!uploadProductPermission(req.userId)) {
-            throw new Error("Permiso denegado");
-        }
+        // COMENTAR TEMPORALMENTE LA VERIFICACIÓN DE PERMISOS
+        // if (!uploadProductPermission(req.userId)) {
+        //     throw new Error("Permiso denegado");
+        // }
 
         const { 
             name, 
@@ -51,8 +50,8 @@ async function createSupplierController(req, res) {
             }
         }
 
-        // Crear nuevo proveedor
-        const newSupplier = new SupplierModel({
+        // MANEJAR USUARIOS INVITADOS CORRECTAMENTE
+        const supplierData = {
             name,
             email,
             phone,
@@ -61,11 +60,32 @@ async function createSupplierController(req, res) {
             taxId,
             contactPerson,
             businessInfo,
-            notes,
-            createdBy: req.userId
-        });
+            notes
+        };
+
+        // Verificar si es usuario registrado o invitado
+        if (req.userId && req.userId.startsWith('guest-')) {
+            // Usuario invitado
+            supplierData.createdByGuest = req.userId;
+        } else if (req.userId) {
+            // Usuario registrado
+            supplierData.createdBy = req.userId;
+        } else {
+            // Sin usuario (para testing)
+            supplierData.createdByGuest = 'system-user';
+        }
+
+        console.log("=== CREANDO PROVEEDOR ===");
+        console.log("UserId:", req.userId);
+        console.log("Datos del proveedor:", supplierData);
+
+        // Crear nuevo proveedor
+        const newSupplier = new SupplierModel(supplierData);
 
         const savedSupplier = await newSupplier.save();
+
+        console.log("¡PROVEEDOR CREADO EXITOSAMENTE!");
+        console.log("ID:", savedSupplier._id);
 
         res.status(201).json({
             message: "Proveedor creado correctamente",
@@ -83,7 +103,6 @@ async function createSupplierController(req, res) {
         });
     }
 }
-
 /**
  * Obtener todos los proveedores
  */

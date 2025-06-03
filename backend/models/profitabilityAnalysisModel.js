@@ -177,10 +177,17 @@ const profitabilityAnalysisSchema = new mongoose.Schema({
         default: 'draft'
     },
     notes: { type: String, default: '' },
+    
+    // CORREGIDO PARA SOPORTAR USUARIOS INVITADOS
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'user',
-        required: true
+        type: mongoose.Schema.Types.Mixed, // Permite ObjectId o String
+        required: false // Hacer opcional para usuarios invitados
+    },
+    
+    // Campo adicional para usuarios invitados
+    createdByGuest: {
+        type: String,
+        required: false
     },
     
     // Fechas importantes
