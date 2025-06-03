@@ -1,4 +1,4 @@
-// backend/controller/budget/budgetController.js
+// backend/controller/budget/budgetController.js - VERSIÓN CORREGIDA PARA VERCEL
 const BudgetModel = require('../../models/budgetModel');
 const ClientModel = require('../../models/clientModel');
 const ProductModel = require('../../models/productModel');
@@ -7,7 +7,7 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const { uploadTempFile } = require('../../helpers/uploadImage');
+const os = require('os');
 
 /**
  * Crea un nuevo presupuesto
@@ -135,14 +135,6 @@ async function createBudgetController(req, res) {
           { $push: { budgets: savedBudget._id } }
       );
 
-      // Generar PDF del presupuesto
-      try {
-          await generateBudgetPDF(savedBudget._id);
-      } catch (pdfError) {
-          console.error("Error al generar PDF:", pdfError);
-          // No hacemos fallar toda la operación si el PDF falla
-      }
-
       res.status(201).json({
           message: "Presupuesto creado correctamente",
           data: savedBudget,
@@ -159,6 +151,7 @@ async function createBudgetController(req, res) {
       });
   }
 }
+
 // Función auxiliar para generar el siguiente número de presupuesto
 async function generateNextBudgetNumber() {
   try {
@@ -311,20 +304,6 @@ async function getBudgetByIdController(req, res) {
  */
 async function updateBudgetStatusController(req, res) {
   try {
-      // Remove the permission check entirely, or set it to always return true
-      // for testing purposes. In production, you should implement proper permissions.
-      // Don't depend on uploadProductPermission if it's not working correctly
-      
-      // Either remove this block:
-      /*
-      if (!uploadProductPermission(req.userId)) {
-          throw new Error("Permiso denegado");
-      }
-      */
-      
-      // Or temporarily force it to return true:
-      // const hasPermission = true; // Override permission check temporarily
-
       const { budgetId } = req.params;
       const { status } = req.body;
 
@@ -370,6 +349,7 @@ async function updateBudgetStatusController(req, res) {
       });
   }
 }
+
 /**
  * Elimina un presupuesto
  */
@@ -389,16 +369,6 @@ async function deleteBudgetController(req, res) {
         const budget = await BudgetModel.findById(budgetId);
         if (!budget) {
             throw new Error("Presupuesto no encontrado");
-        }
-
-        // Si existe un archivo PDF asociado, intentar eliminarlo
-        if (budget.pdfPath && fs.existsSync(budget.pdfPath)) {
-            try {
-                fs.unlinkSync(budget.pdfPath);
-            } catch (error) {
-                console.error("Error al eliminar el archivo PDF:", error);
-                // No detenemos el proceso si hay error al eliminar el archivo
-            }
         }
 
         // Eliminar la referencia del presupuesto en el cliente
@@ -428,9 +398,9 @@ async function deleteBudgetController(req, res) {
 }
 
 /**
- * Genera el PDF de un presupuesto con diseño mejorado
+ * Genera el PDF de un presupuesto en memoria (sin escribir a disco)
  */
-async function generateBudgetPDF(budgetId, isTemporary = false) {
+async function generateBudgetPDF(budgetId) {
   try {
     const budget = await BudgetModel.findById(budgetId)
       .populate('client', 'name email phone company address taxId')
@@ -440,49 +410,25 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       throw new Error("Presupuesto no encontrado");
     }
 
-    // Crear un documento PDF
+    // Crear un documento PDF en memoria
     const doc = new PDFDocument({ 
       margin: 50,
       size: 'A4'
     });
     
-    // Crear carpeta temporal si no existe
-    const tempDir = path.join(__dirname, '../../temp');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
+    const chunks = [];
     
-    // Ruta del archivo temporal
-    const filename = `presupuesto-${budget.budgetNumber}-${Date.now()}.pdf`;
-    const pdfPath = path.join(tempDir, filename);
-    const pdfStream = fs.createWriteStream(pdfPath);
-
+    // Capturar el PDF en memoria
+    doc.on('data', chunk => chunks.push(chunk));
+    
     // Configuración de fuentes y colores
-    const primaryColor = '#0047AB'; // Azul corporativo
-    const secondaryColor = '#333333'; // Color oscuro para texto
-    const accentColor = '#4682B4'; // Azul celeste para acentos
+    const primaryColor = '#0047AB';
+    const secondaryColor = '#333333';
+    const accentColor = '#4682B4';
     
     // ----- ENCABEZADO DEL DOCUMENTO -----
     
-    // Intenta agregar el logo que está en la misma carpeta que el controlador
-    try {
-      // El logo.png está en la misma carpeta que budgetController.js (carpeta budget)
-      const logoPath = path.join(__dirname, 'logo.png');
-      
-      if (fs.existsSync(logoPath)) {
-        // Agregar el logo en la parte superior izquierda
-        doc.image(logoPath, 50, 50, { width: 120 });
-        // Mover hacia abajo para el resto del contenido del encabezado
-        doc.moveDown(4);
-        console.log("Logo encontrado y agregado desde:", logoPath);
-      } else {
-        console.warn("Logo no encontrado en:", logoPath);
-      }
-    } catch (logoError) {
-      console.error("Error al agregar el logo:", logoError);
-    }
-    
-    // Título del documento (alineado a la derecha si hay logo)
+    // Título del documento
     doc.fontSize(22).fillColor(primaryColor).text('PRESUPUESTO', 250, 60, { align: 'right' });
     doc.fontSize(14).fillColor(secondaryColor).text(`Nº ${budget.budgetNumber}`, 250, 85, { align: 'right' });
     
@@ -521,7 +467,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       // Manejo seguro de la dirección
       if (budget.client.address) {
         if (typeof budget.client.address === 'object') {
-          // Si la dirección es un objeto con campos separados
           const { street, city, state, zip, country } = budget.client.address;
           if (street) {
             doc.text(street, 350, clientYPos, { width: 200 });
@@ -543,7 +488,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
             clientYPos += 15;
           }
         } else {
-          // Si la dirección es un string
           doc.text(budget.client.address, 350, clientYPos, { width: 200 });
           clientYPos += 15;
         }
@@ -569,7 +513,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     
     // ----- INFORMACIÓN DEL PRESUPUESTO -----
     
-    // Línea divisoria
     const infoY = Math.max(clientYPos + 20, 260);
     doc.strokeColor(accentColor)
        .lineWidth(0.5)
@@ -577,7 +520,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
        .lineTo(550, infoY)
        .stroke();
        
-    // Información del presupuesto en 2 columnas
     const infoStartY = infoY + 20;
     
     // Columna 1
@@ -603,11 +545,9 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     
     // ----- TABLA DE PRODUCTOS -----
     
-    // Encabezado de tabla
     const tableStartY = infoStartY + 80;
     doc.fontSize(11).fillColor(primaryColor).text('PRODUCTOS Y SERVICIOS', 50, tableStartY);
     
-    // Definición de la tabla con medidas ajustadas
     const tableConfig = {
       headers: [
         { label: 'Descripción', property: 'name', width: 230, align: 'left' },
@@ -619,12 +559,11 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       rows: []
     };
     
-    // Llenar datos de la tabla (manejo seguro)
+    // Llenar datos de la tabla
     if (budget.items && Array.isArray(budget.items)) {
       budget.items.forEach(item => {
         const name = item.productSnapshot ? item.productSnapshot.name : 'Producto';
         
-        // Formateo de moneda sin símbolo para mejor alineación
         const formatCurrency = (value) => {
           return value.toLocaleString('es-ES') + ' PYG';
         };
@@ -642,39 +581,33 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     // Dibujar cabecera de tabla
     const tableHeaderY = tableStartY + 20;
     
-    // Fondo de cabecera de tabla
     doc.fillColor(primaryColor)
        .rect(50, tableHeaderY, 500, 20)
        .fill();
     
-    // Texto de cabeceras (definimos márgenes precisos para mejor alineación)
     doc.fontSize(9).fillColor('#FFFFFF');
     
-    // Descripción
+    // Headers
     doc.text(tableConfig.headers[0].label, 55, tableHeaderY + 5, { 
       width: tableConfig.headers[0].width - 10, 
       align: tableConfig.headers[0].align 
     });
     
-    // Cantidad
     doc.text(tableConfig.headers[1].label, 55 + tableConfig.headers[0].width, tableHeaderY + 5, { 
       width: tableConfig.headers[1].width - 10, 
       align: tableConfig.headers[1].align 
     });
     
-    // Precio
     doc.text(tableConfig.headers[2].label, 55 + tableConfig.headers[0].width + tableConfig.headers[1].width, tableHeaderY + 5, { 
       width: tableConfig.headers[2].width - 10, 
       align: tableConfig.headers[2].align 
     });
     
-    // Descuento
     doc.text(tableConfig.headers[3].label, 55 + tableConfig.headers[0].width + tableConfig.headers[1].width + tableConfig.headers[2].width, tableHeaderY + 5, { 
       width: tableConfig.headers[3].width - 10, 
       align: tableConfig.headers[3].align 
     });
     
-    // Importe
     doc.text(tableConfig.headers[4].label, 55 + tableConfig.headers[0].width + tableConfig.headers[1].width + tableConfig.headers[2].width + tableConfig.headers[3].width, tableHeaderY + 5, { 
       width: tableConfig.headers[4].width - 10, 
       align: tableConfig.headers[4].align 
@@ -685,44 +618,37 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     let rowCounter = 0;
     
     tableConfig.rows.forEach((row, rowIndex) => {
-      // Verificar si necesitamos una nueva página
       if (yPos > doc.page.height - 150) {
         doc.addPage();
-        // Reiniciar posición Y en la nueva página
         yPos = 50;
         
-        // Dibujar nuevamente la cabecera en la nueva página
+        // Redibujar cabecera en nueva página
         doc.fillColor(primaryColor)
            .rect(50, yPos, 500, 20)
            .fill();
         
         doc.fontSize(9).fillColor('#FFFFFF');
         
-        // Descripción
         doc.text(tableConfig.headers[0].label, 55, yPos + 5, { 
           width: tableConfig.headers[0].width - 10, 
           align: tableConfig.headers[0].align 
         });
         
-        // Cantidad
         doc.text(tableConfig.headers[1].label, 55 + tableConfig.headers[0].width, yPos + 5, { 
           width: tableConfig.headers[1].width - 10, 
           align: tableConfig.headers[1].align 
         });
         
-        // Precio
         doc.text(tableConfig.headers[2].label, 55 + tableConfig.headers[0].width + tableConfig.headers[1].width, yPos + 5, { 
           width: tableConfig.headers[2].width - 10, 
           align: tableConfig.headers[2].align 
         });
         
-        // Descuento
         doc.text(tableConfig.headers[3].label, 55 + tableConfig.headers[0].width + tableConfig.headers[1].width + tableConfig.headers[2].width, yPos + 5, { 
           width: tableConfig.headers[3].width - 10, 
           align: tableConfig.headers[3].align 
         });
         
-        // Importe
         doc.text(tableConfig.headers[4].label, 55 + tableConfig.headers[0].width + tableConfig.headers[1].width + tableConfig.headers[2].width + tableConfig.headers[3].width, yPos + 5, { 
           width: tableConfig.headers[4].width - 10, 
           align: tableConfig.headers[4].align 
@@ -731,7 +657,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
         yPos += 25;
       }
       
-      // Alternar colores para las filas
       if (rowCounter % 2 === 0) {
         doc.fillColor('#F7F7F7')
            .rect(50, yPos - 5, 500, 25)
@@ -741,14 +666,12 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       
       doc.fontSize(8).fillColor(secondaryColor);
       
-      // Calcular posiciones exactas para cada columna
       const col1 = 55;
       const col2 = col1 + tableConfig.headers[0].width;
       const col3 = col2 + tableConfig.headers[1].width;
       const col4 = col3 + tableConfig.headers[2].width;
       const col5 = col4 + tableConfig.headers[3].width;
       
-      // Descripción (nombre)
       let displayName = row.name;
       if (displayName && displayName.length > 40) {
         displayName = displayName.substring(0, 37) + '...';
@@ -760,28 +683,24 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
         lineBreak: false
       });
       
-      // Cantidad
       doc.text(row.quantity || '', col2, yPos, { 
         width: tableConfig.headers[1].width - 10,
         align: 'center',
         lineBreak: false
       });
       
-      // Precio
       doc.text(row.unitPrice || '', col3, yPos, { 
         width: tableConfig.headers[2].width - 10,
         align: 'right',
         lineBreak: false
       });
       
-      // Descuento
       doc.text(row.discount || '', col4, yPos, { 
         width: tableConfig.headers[3].width - 10,
         align: 'center',
         lineBreak: false
       });
       
-      // Importe
       doc.text(row.subtotal || '', col5, yPos, { 
         width: tableConfig.headers[4].width - 10,
         align: 'right',
@@ -793,31 +712,26 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     
     // ----- RESUMEN DE TOTALES -----
     
-    // Línea divisoria final de la tabla
     doc.strokeColor('#CCCCCC')
        .lineWidth(1)
        .moveTo(50, yPos - 5)
        .lineTo(550, yPos - 5)
        .stroke();
     
-    // Recuadro de totales
     const totalsBoxX = 380;
     const totalsBoxY = yPos + 10;
     const totalsBoxWidth = 170;
     
-    // Línea superior de totales
     doc.strokeColor('#CCCCCC')
        .lineWidth(0.5)
        .moveTo(totalsBoxX, totalsBoxY)
        .lineTo(totalsBoxX + totalsBoxWidth, totalsBoxY)
        .stroke();
     
-    // Formateo de moneda sin símbolo para mejor alineación
     const formatCurrency = (value) => {
       return value.toLocaleString('es-ES') + ' PYG';
     };
     
-    // Subtotal
     yPos = totalsBoxY + 15;
     doc.fontSize(9).fillColor(secondaryColor).text('Subtotal:', totalsBoxX, yPos, { width: 80, align: 'left' });
     doc.fontSize(9).fillColor(secondaryColor).text(
@@ -825,7 +739,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       totalsBoxX + 90, yPos, { width: 80, align: 'right' }
     );
     
-    // Descuento
     if (budget.discount > 0) {
       yPos += 20;
       doc.fontSize(9).fillColor(secondaryColor).text(
@@ -840,7 +753,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       );
     }
     
-    // IVA
     if (budget.tax > 0) {
       yPos += 20;
       doc.fontSize(9).fillColor(secondaryColor).text(
@@ -855,7 +767,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       );
     }
     
-    // Línea divisoria para el total final
     yPos += 20;
     doc.strokeColor('#CCCCCC')
        .lineWidth(1)
@@ -873,11 +784,9 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     
     // ----- NOTAS Y CONDICIONES -----
     
-    // Notas
     if (budget.notes) {
       const notesY = Math.min(yPos + 60, doc.page.height - 150);
       
-      // Si estamos cerca del final de la página, crear una nueva
       if (notesY > doc.page.height - 120) {
         doc.addPage();
         yPos = 50;
@@ -891,13 +800,11 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     
     // ----- PIE DE PÁGINA -----
     
-    // Pie de página en todas las páginas
     try {
       const pageCount = doc.bufferedPageRange().count;
       for (let i = 0; i < pageCount; i++) {
         doc.switchToPage(i);
         
-        // Línea separadora del pie
         const footerLineY = doc.page.height - 50;
         doc.strokeColor('#CCCCCC')
            .lineWidth(0.5)
@@ -905,7 +812,6 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
            .lineTo(550, footerLineY)
            .stroke();
         
-        // Texto del pie
         const footerY = footerLineY + 10;
         doc.fontSize(8).fillColor('#999999').text(
           `Este presupuesto ha sido generado por ${budget.createdBy && budget.createdBy.name ? budget.createdBy.name : 'un administrador'} | Página ${i + 1} de ${pageCount}`,
@@ -914,34 +820,19 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
       }
     } catch (footerError) {
       console.error("Error al generar pie de página:", footerError);
-      // Continuar sin pie de página si hay error
     }
 
     // Finalizar el PDF
-    doc.pipe(pdfStream);
     doc.end();
     
     return new Promise((resolve, reject) => {
-      pdfStream.on('finish', async () => {
-        try {
-          // Solo guardar referencia en la base de datos si no es temporal
-          if (!isTemporary) {
-            // Registrar la ruta del archivo en el presupuesto
-            budget.pdfPath = pdfPath;
-            await budget.save();
-          }
-          
-          console.log(`PDF generado exitosamente: ${pdfPath}`);
-          resolve(pdfPath);
-        } catch (error) {
-          console.error("Error al guardar ruta del PDF:", error);
-          // Aún así, resolvemos con la ruta para que el proceso continúe
-          resolve(pdfPath);
-        }
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(chunks);
+        resolve(pdfBuffer);
       });
       
-      pdfStream.on('error', (error) => {
-        console.error("Error al escribir el PDF:", error);
+      doc.on('error', (error) => {
+        console.error("Error al generar el PDF:", error);
         reject(error);
       });
     });
@@ -951,8 +842,9 @@ async function generateBudgetPDF(budgetId, isTemporary = false) {
     throw error;
   }
 }
+
 /**
- * Descarga el PDF de un presupuesto
+ * Descarga el PDF de un presupuesto - VERSIÓN CORREGIDA PARA VERCEL
  */
 async function getBudgetPDFController(req, res) {
   try {
@@ -972,32 +864,19 @@ async function getBudgetPDFController(req, res) {
       throw new Error("Presupuesto no encontrado");
     }
 
-    // Generar el PDF directamente para descarga (no guardarlo permanentemente)
-    const pdfPath = await generateBudgetPDF(budgetId, true);
+    // Generar el PDF en memoria
+    const pdfBuffer = await generateBudgetPDF(budgetId);
     
     // Establecer encabezados para forzar la descarga
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=presupuesto-${budget.budgetNumber}.pdf`);
+    res.setHeader('Content-Length', pdfBuffer.length);
     
-    // Enviar el archivo como descarga
-    res.download(pdfPath, `presupuesto-${budget.budgetNumber}.pdf`, (err) => {
-      if (err) {
-        console.error("Error al descargar el PDF:", err);
-      }
-      
-      // Eliminar el archivo temporal después de enviarlo
-      try {
-        setTimeout(() => {
-          if (fs.existsSync(pdfPath)) {
-            fs.unlinkSync(pdfPath);
-          }
-        }, 1000); // Esperar un segundo para asegurar que se completó la descarga
-      } catch (e) {
-        console.error("Error al eliminar el archivo temporal:", e);
-      }
-    });
+    // Enviar el buffer directamente
+    res.send(pdfBuffer);
 
   } catch (err) {
+    console.error("Error en getBudgetPDFController:", err);
     res.status(400).json({
       message: err.message || err,
       error: true,
@@ -1006,12 +885,8 @@ async function getBudgetPDFController(req, res) {
   }
 }
 
-// backend/controller/budget/budgetController.js
-
-// ... resto del código anterior ...
-
 /**
- * Envía un presupuesto por email
+ * Envía un presupuesto por email - VERSIÓN CORREGIDA PARA VERCEL
  */
 async function sendBudgetEmailController(req, res) {
   try {
@@ -1026,10 +901,8 @@ async function sendBudgetEmailController(req, res) {
       throw new Error("ID de presupuesto no proporcionado");
     }
 
-    // Si no se proporciona un email, usamos el del cliente si existe
     let destinationEmail = emailTo;
     
-    // Buscar el presupuesto
     const budget = await BudgetModel.findById(budgetId)
       .populate('client', 'name email')
       .populate('createdBy', 'name email');
@@ -1038,21 +911,19 @@ async function sendBudgetEmailController(req, res) {
       throw new Error("Presupuesto no encontrado");
     }
 
-    // Si no hay email específico, usar el del cliente
     if (!destinationEmail && budget.client && budget.client.email) {
       destinationEmail = budget.client.email;
     }
 
-    // Verificar si hay un email de destino
     if (!destinationEmail) {
       throw new Error("No se ha proporcionado un email de destino y el cliente no tiene email registrado");
     }
 
-    // Generar PDF temporal
-    const pdfPath = await generateBudgetPDF(budgetId, true);
+    // Generar PDF en memoria
+    const pdfBuffer = await generateBudgetPDF(budgetId);
 
     // Configuración de nodemailer
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       service: "gmail",
       auth: {
         user: process.env.EMAIL_USER,
@@ -1060,7 +931,6 @@ async function sendBudgetEmailController(req, res) {
       },
     });
 
-    // Construir el asunto y mensaje del email
     const emailSubject = subject || `Presupuesto ${budget.budgetNumber}`;
     const emailMessage = message || `
 Estimado/a ${budget.client?.name || 'Cliente'},
@@ -1077,10 +947,10 @@ Para cualquier consulta o aclaración, no dude en contactarnos.
 
 Atentamente,
 ${budget.createdBy?.name || 'El equipo comercial'}
-JM Computer
+BlueTec EAS
 `;
 
-    // Enviar el email con el PDF adjunto
+    // Enviar el email con el PDF adjunto desde memoria
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: destinationEmail,
@@ -1089,7 +959,8 @@ JM Computer
       attachments: [
         {
           filename: `presupuesto-${budget.budgetNumber}.pdf`,
-          path: pdfPath
+          content: pdfBuffer,
+          contentType: 'application/pdf'
         }
       ]
     });
@@ -1098,13 +969,6 @@ JM Computer
     if (budget.status === 'draft') {
       budget.status = 'sent';
       await budget.save();
-    }
-
-    // Limpiar el archivo temporal
-    try {
-      fs.unlinkSync(pdfPath);
-    } catch (error) {
-      console.error("Error al eliminar el archivo temporal:", error);
     }
 
     res.json({
@@ -1119,6 +983,7 @@ JM Computer
     });
 
   } catch (err) {
+    console.error("Error en sendBudgetEmailController:", err);
     res.status(400).json({
       message: err.message || err,
       error: true,
@@ -1127,7 +992,6 @@ JM Computer
   }
 }
 
-// Asegúrate de exportar la nueva función
 module.exports = {
     createBudgetController,
     getAllBudgetsController,
