@@ -7,10 +7,11 @@ const uploadProductPermission = require('../../helpers/permission');
  */
 async function createClientController(req, res) {
     try {
-        // Comentamos temporalmente esta validación para pruebas
-        // if (!uploadProductPermission(req.userId)) {
-        //     throw new Error("Permiso denegado");
-        // }
+        // VALIDAR PERMISOS - Solo ADMIN puede crear clientes
+        const hasPermission = await uploadProductPermission(req.userId);
+        if (!hasPermission) {
+            throw new Error("Permiso denegado. Solo administradores pueden crear clientes.");
+        }
 
         const { 
             name, 
@@ -86,8 +87,10 @@ async function createClientController(req, res) {
  */
 async function getAllClientsController(req, res) {
     try {
-        if (!uploadProductPermission(req.userId)) {
-            throw new Error("Permiso denegado");
+        // VALIDAR PERMISOS - Solo ADMIN puede ver clientes
+        const hasPermission = await uploadProductPermission(req.userId);
+        if (!hasPermission) {
+            throw new Error("Permiso denegado. Solo administradores pueden ver los clientes.");
         }
 
         const { search, limit = 50, page = 1, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
@@ -137,6 +140,7 @@ async function getAllClientsController(req, res) {
         });
 
     } catch (err) {
+        console.error("Error en getAllClientsController:", err);
         res.status(400).json({
             message: err.message || err,
             error: true,
@@ -150,8 +154,10 @@ async function getAllClientsController(req, res) {
  */
 async function getClientByIdController(req, res) {
     try {
-        if (!uploadProductPermission(req.userId)) {
-            throw new Error("Permiso denegado");
+        // VALIDAR PERMISOS - Solo ADMIN puede ver detalles de clientes
+        const hasPermission = await uploadProductPermission(req.userId);
+        if (!hasPermission) {
+            throw new Error("Permiso denegado. Solo administradores pueden ver los detalles del cliente.");
         }
 
         const { clientId } = req.params;
@@ -212,8 +218,10 @@ async function getClientByIdController(req, res) {
  */
 async function updateClientController(req, res) {
     try {
-        if (!uploadProductPermission(req.userId)) {
-            throw new Error("Permiso denegado");
+        // VALIDAR PERMISOS - Solo ADMIN puede actualizar clientes
+        const hasPermission = await uploadProductPermission(req.userId);
+        if (!hasPermission) {
+            throw new Error("Permiso denegado. Solo administradores pueden actualizar clientes.");
         }
 
         const { clientId } = req.params;
@@ -290,6 +298,7 @@ async function updateClientController(req, res) {
         });
 
     } catch (err) {
+        console.error("Error en updateClientController:", err);
         res.status(400).json({
             message: err.message || err,
             error: true,
@@ -299,14 +308,15 @@ async function updateClientController(req, res) {
 }
 
 /**
- * Elimina un cliente (soft delete)
+ * Elimina un cliente
  */
 async function deleteClientController(req, res) {
     try {
-        // Comentamos temporalmente esta validación para pruebas
-        // if (!uploadProductPermission(req.userId)) {
-        //     throw new Error("Permiso denegado");
-        // }
+        // VALIDAR PERMISOS - Solo ADMIN puede eliminar clientes
+        const hasPermission = await uploadProductPermission(req.userId);
+        if (!hasPermission) {
+            throw new Error("Permiso denegado. Solo administradores pueden eliminar clientes.");
+        }
 
         const { clientId } = req.params;
 
