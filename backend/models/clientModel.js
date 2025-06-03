@@ -39,9 +39,15 @@ const clientSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'sale'
     }],
+    // ✅ CAMBIO PRINCIPAL: Permitir tanto ObjectId como String
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'user'
+        type: mongoose.Schema.Types.Mixed, // Acepta cualquier tipo
+        required: false // Hacer opcional para usuarios invitados
+    },
+    // ✅ ALTERNATIVA: Agregar campo separado para usuarios invitados
+    createdByGuest: {
+        type: String,
+        required: false
     },
     isActive: {
         type: Boolean,
