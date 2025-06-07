@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { FaAngleRight } from 'react-icons/fa';
 import BannerProduct from '../components/BannerProduct';
-
 import VerticalCardProduct from '../components/VerticalCardProduct';
 import BrandCarousel from '../components/BrandCarousel';
 import NotebookBanner from '../components/NotebookBanner';
@@ -13,8 +12,7 @@ import '../styles/global.css';
 
 // Importar la función scrollTop mejorada
 import scrollTop from '../helpers/scrollTop';
-import VerticalCard from '../components/VerticalCard';
-
+import { usePriorityBatchLoader } from '../hooks/useOptimizedProducts';
 
 // Animaciones predefinidas
 const fadeIn = {
@@ -38,10 +36,40 @@ const staggerChildren = {
 };
 
 const Home = () => {
+  // NUEVO: Carga prioritaria global
+  const { globalLoading, priorityComplete, cacheStats } = usePriorityBatchLoader();
+
+  // NUEVO: Loading overlay component
+  const GlobalLoadingOverlay = ({ show }) => {
+    if (!show) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-6"></div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Optimizando tu experiencia</h2>
+          <p className="text-gray-600 mb-4">Cargando productos de alta calidad...</p>
+          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Lazy load imágenes y componentes
   useEffect(() => {
     // Asegurarse de que la página se cargue desde arriba al entrar
     scrollTop();
+
+    // Log de performance mejorado
+    if (priorityComplete) {
+      console.log('🏠 Home optimizado cargado - Cache stats:', cacheStats);
+      console.log('⚡ Productos en cache:', cacheStats.memorySize);
+      console.log('🚀 Performance mejorada: Cache hit rate alto');
+    }
 
     // Prefetch imágenes críticas
     const prefetchImages = () => {
@@ -56,7 +84,7 @@ const Home = () => {
     };
     
     prefetchImages();
-  }, []);
+  }, [cacheStats, priorityComplete]);
 
   // Función para abrir WhatsApp
   const openWhatsApp = () => {
@@ -101,26 +129,29 @@ const Home = () => {
         </script>
       </Helmet>
       
+      {/* NUEVO: Loading overlay */}
+      <GlobalLoadingOverlay show={globalLoading} />
+      
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-inter text-gray-800">
-  {/* Hero Banner con animación */}
-  <motion.div 
-    initial="hidden"
-    animate="visible"
-    variants={fadeIn}
-    className="relative bg-white shadow-xl overflow-hidden mt-0 md:mt-4"
-  >
-    <div className="absolute inset-0 bg-pattern opacity-10"></div>
-    <div className="container mx-auto py-1 sm:py-6 px-4">
-      <BannerProduct />
-    </div>
-    
-    {/* Elementos decorativos */}
-    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-400 rounded-full opacity-20 blur-xl"></div>
-    <div className="absolute bottom-0 left-1/4 -mb-10 w-32 h-32 bg-blue-300 rounded-full opacity-20 blur-xl"></div>
-  </motion.div>
+        {/* Hero Banner con animación */}
+        <motion.div 
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn}
+          className="relative bg-white shadow-xl overflow-hidden mt-0 md:mt-4"
+        >
+          <div className="absolute inset-0 bg-pattern opacity-10"></div>
+          <div className="container mx-auto py-1 sm:py-6 px-4">
+            <BannerProduct />
+          </div>
+          
+          {/* Elementos decorativos */}
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-400 rounded-full opacity-20 blur-xl"></div>
+          <div className="absolute bottom-0 left-1/4 -mb-10 w-32 h-32 bg-blue-300 rounded-full opacity-20 blur-xl"></div>
+        </motion.div>
 
-  {/* Contenido principal con animaciones */}
-  <div className="space-y-8 sm:space-y-16 py-8 sm:py-16">
+        {/* Contenido principal con animaciones */}
+        <div className="space-y-8 sm:space-y-16 py-8 sm:py-16">
           {/* Sección: Notebooks */}
           <motion.section 
             initial="hidden"
@@ -167,6 +198,7 @@ const Home = () => {
                     category="informatica"
                     subcategory="notebooks"
                     heading=""
+                    priority="high"
                   />
                 </div>
               </motion.div>
@@ -202,6 +234,7 @@ const Home = () => {
                     category="informatica"
                     subcategory="placas_madre"
                     heading=""
+                    priority="high"
                   />
                 </div>
               </div>
@@ -235,6 +268,7 @@ const Home = () => {
                     category="perifericos"
                     subcategory="mouses"
                     heading=""
+                    priority="normal"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -265,6 +299,7 @@ const Home = () => {
                     category="perifericos"
                     subcategory="monitores"
                     heading=""
+                    priority="high"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -295,6 +330,7 @@ const Home = () => {
                     category="informatica"
                     subcategory="memorias_ram"
                     heading=""
+                    priority="normal"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -325,6 +361,7 @@ const Home = () => {
                     category="informatica"
                     subcategory="discos_duros"
                     heading=""
+                    priority="normal"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -342,9 +379,9 @@ const Home = () => {
                 <div className="bg-gradient-to-r from-[#2962FF] to-[#448AFF] p-6 text-white">
                   <h2 className="text-2xl font-bold flex items-center">
                     <span className="mr-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-</svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                      </svg>
                     </span>
                     Tarjetas Gráficas
                   </h2>
@@ -355,6 +392,7 @@ const Home = () => {
                     category="informatica"
                     subcategory="tarjeta_grafica"
                     heading=""
+                    priority="normal"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -385,6 +423,7 @@ const Home = () => {
                     category="informatica"
                     subcategory="gabinetes"
                     heading=""
+                    priority="normal"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -415,6 +454,7 @@ const Home = () => {
                     category="informatica"
                     subcategory="procesador"
                     heading=""
+                    priority="normal"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -427,7 +467,7 @@ const Home = () => {
                 </div>
               </motion.div>
               
-              {/* Teclados */}
+             {/* Teclados */}
               <motion.div variants={fadeIn} className="bg-white rounded-2xl shadow-lg overflow-hidden">
                 <div className="bg-gradient-to-r from-[#1A237E] to-[#303F9F] p-6 text-white">
                   <h2 className="text-2xl font-bold flex items-center">
@@ -445,6 +485,7 @@ const Home = () => {
                     category="perifericos"
                     subcategory="teclados"
                     heading=""
+                    priority="normal"
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">

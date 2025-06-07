@@ -1,15 +1,28 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import fetchCategoryWiseProduct from '../helpers/fetchCategoryWiseProduct';
 import displayPYGCurrency from '../helpers/displayCurrency';
 import { FaAngleLeft, FaAngleRight, FaShoppingCart } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import scrollTop from '../helpers/scrollTop';
+import { useOptimizedProducts } from '../hooks/useOptimizedProducts';
 
-const VerticalCardProduct = ({ category, subcategory, heading }) => {
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
+const VerticalCardProduct = ({ category, subcategory, heading, currentProductId, priority = 'normal' }) => {
+
+    // NUEVO: Usar hook optimizado en lugar de estado manual
+    const { 
+        data, 
+        loading, 
+        loadingMore, 
+        isComplete 
+    } = useOptimizedProducts(category, subcategory, {
+        priority: priority,
+        initialLimit: 6, // Mostrar 6 inicialmente
+        enableProgressiveLoading: true,
+        autoLoadFull: true
+    });
+
+    // Estados para UI (mantener los existentes)
     const [showLeftButton, setShowLeftButton] = useState(false);
     const [showRightButton, setShowRightButton] = useState(true);
     const [hoveredProductId, setHoveredProductId] = useState(null);
@@ -17,25 +30,12 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
     const loadingList = new Array(6).fill(null);
 
     const scrollElement = useRef();
-
     const { fetchUserAddToCart } = useContext(Context);
 
     const handleAddToCart = (e, product) => {
         e.preventDefault();
         addToCart(e, product);
         fetchUserAddToCart();
-    };
-
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const categoryProduct = await fetchCategoryWiseProduct(category, subcategory);
-            setData(categoryProduct?.data || []);
-        } catch (error) {
-            console.error("Error al cargar productos:", error);
-        } finally {
-            setLoading(false);
-        }
     };
 
     // Precargar todas las imágenes cuando se cargan los datos
@@ -55,10 +55,6 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
             });
         }
     }, [data]);
-
-    useEffect(() => {
-        fetchData();
-    }, [category, subcategory]);
 
     const scrollRight = () => {
         scrollElement.current.scrollBy({ left: 300, behavior: 'smooth' });
@@ -91,19 +87,24 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
         return null;
     };
 
+    // Filtrar producto actual si estamos en página de producto
+    const filteredData = currentProductId 
+        ? data.filter(product => product._id !== currentProductId)
+        : data;
+
     // Si no hay datos y terminó de cargar, no renderizar nada
-    if (!loading && data.length === 0) {
+    if (!loading && filteredData.length === 0) {
         return null;
     }
 
     // Filtrar para mostrar solo placas madre si la categoría es informática
     // Y también filtrar productos sin stock
-    const filteredData = category === "informatica" && subcategory === "placas_madre" 
-        ? data.filter(product => 
+    const finalFilteredData = category === "informatica" && subcategory === "placas_madre" 
+        ? filteredData.filter(product => 
             product.subcategory?.toLowerCase() === "placas_madre" && 
             (product?.stock === undefined || product?.stock === null || product?.stock > 0)
           )
-        : data.filter(product => 
+        : filteredData.filter(product => 
             product?.stock === undefined || product?.stock === null || product?.stock > 0
           );
 
@@ -173,7 +174,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                                 </div>
                             </div>
                         ))
-                        : filteredData.map((product) => {
+                        : finalFilteredData.map((product) => {
                             const discount = calculateDiscount(product?.price, product?.sellingPrice);
                             const isHovered = hoveredProductId === product?._id;
                             const secondImage = product.productImage?.[1];
@@ -287,6 +288,16 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                             );
                         })}
                 </div>
+
+                {/* NUEVO: Indicador de carga progresiva */}
+                {loadingMore && !loading && (
+                    <div className="text-center py-4">
+                        <div className="inline-flex items-center text-blue-600 text-sm">
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent mr-2"></div>
+                            Cargando más productos...
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -1,3 +1,4 @@
+// 1. VerticalCard.js - OPTIMIZADO COMPLETO
 import React, { useContext, useRef, useState, useEffect } from 'react';
 import scrollTop from '../helpers/scrollTop';
 import Context from '../context';
@@ -5,23 +6,60 @@ import addToCart from '../helpers/addToCart';
 import { Link } from 'react-router-dom';
 import displayPYGCurrency from '../helpers/displayCurrency';
 import { FaShoppingCart } from 'react-icons/fa';
+import { optimizedCache } from '../services/OptimizedCacheService';
 
-const VerticalCard = ({ loading, data = [] }) => {
+const VerticalCard = ({ loading, data = [], category, subcategory, useCache = false }) => {
     const loadingList = new Array(12).fill(null);
     const { fetchUserAddToCart } = useContext(Context);
     const cardContainerRef = useRef(null);
     const [imageErrors, setImageErrors] = useState(new Set());
     const [hoveredProductId, setHoveredProductId] = useState(null);
     const [hoverTimeout, setHoverTimeout] = useState(null);
+    
+    // NUEVO: Estados para cache optimizado
+    const [cacheData, setCacheData] = useState([]);
+    const [cacheLoading, setCacheLoading] = useState(false);
 
-    // Cache simple para imágenes
+    // NUEVO: Función para cargar desde cache
+    const loadFromCache = async () => {
+        if (!useCache || !category) return;
+        
+        try {
+            setCacheLoading(true);
+            console.log('🔄 VerticalCard cargando desde cache:', category, subcategory);
+            
+            const response = await optimizedCache.getProducts(category, subcategory, 'normal', null);
+            if (response?.success && response.data) {
+                setCacheData(response.data);
+                console.log('✅ VerticalCard cache loaded:', response.data.length, 'productos');
+            }
+        } catch (error) {
+            console.error('Error loading from cache in VerticalCard:', error);
+        } finally {
+            setCacheLoading(false);
+        }
+    };
+
+    // NUEVO: Efecto para cargar desde cache si se especifica
     useEffect(() => {
-        if (data.length > 0) {
+        if (useCache && category) {
+            loadFromCache();
+        }
+    }, [useCache, category, subcategory]);
+
+    // Determinar qué datos usar: cache o props
+    const finalData = useCache ? cacheData : data;
+    const finalLoading = useCache ? cacheLoading : loading;
+
+    // Cache simple para imágenes (optimizado)
+    useEffect(() => {
+        if (finalData.length > 0) {
             // Precargar primeras 6 imágenes
-            const firstSix = data.slice(0, 6);
+            const firstSix = finalData.slice(0, 6);
             firstSix.forEach(product => {
                 if (product?.productImage?.[0]) {
                     const img = new Image();
+                    img.fetchPriority = 'high';
                     img.src = product.productImage[0];
                 }
                 // Precargar segunda imagen si existe
@@ -31,7 +69,7 @@ const VerticalCard = ({ loading, data = [] }) => {
                 }
             });
         }
-    }, [data]);
+    }, [finalData]);
 
     const handleAddToCart = (e, product) => {
         e.stopPropagation();
@@ -52,7 +90,7 @@ const VerticalCard = ({ loading, data = [] }) => {
         setImageErrors(prev => new Set([...prev, productId]));
     };
 
-    if (loading) {
+    if (finalLoading) {
         return (
             <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 p-4'>
                 {loadingList.map((_, index) => (
@@ -78,10 +116,9 @@ const VerticalCard = ({ loading, data = [] }) => {
             className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 p-4'
             ref={cardContainerRef}
         >
-            {data
+            {finalData
                 .filter(product => {
                     // Filtrar productos sin stock
-                    // Si stock es undefined, null o mayor a 0, mostrar el producto
                     return product?.stock === undefined || product?.stock === null || product?.stock > 0;
                 })
                 .map((product) => {
@@ -91,29 +128,24 @@ const VerticalCard = ({ loading, data = [] }) => {
                 const secondImage = product.productImage?.[1];
                 const showSecondImage = isHovered && secondImage;
                 
-                // Funciones para manejar hover con delay
+                // Funciones para manejar hover con delay optimizado
                 const handleMouseEnter = () => {
-                    // Limpiar cualquier timeout previo
                     if (hoverTimeout) {
                         clearTimeout(hoverTimeout);
                     }
                     
-                    // Establecer nuevo timeout de 300ms
                     const timeout = setTimeout(() => {
                         setHoveredProductId(product?._id);
-                    }, 300);
+                    }, 200); // Reducido de 300ms a 200ms
                     
                     setHoverTimeout(timeout);
                 };
                 
                 const handleMouseLeave = () => {
-                    // Limpiar timeout si existe
                     if (hoverTimeout) {
                         clearTimeout(hoverTimeout);
                         setHoverTimeout(null);
                     }
-                    
-                    // Inmediatamente quitar el hover
                     setHoveredProductId(null);
                 };
                 
@@ -134,7 +166,7 @@ const VerticalCard = ({ loading, data = [] }) => {
                                     <img
                                         src={product.productImage[0]}
                                         alt={product.productName}
-                                        className={`object-contain h-full w-full transition-all duration-500 ease-in-out ${
+                                        className={`object-contain h-full w-full transition-all duration-400 ease-in-out ${
                                             showSecondImage ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
                                         }`}
                                         loading="lazy"
@@ -146,7 +178,7 @@ const VerticalCard = ({ loading, data = [] }) => {
                                         <img
                                             src={secondImage}
                                             alt={product.productName}
-                                            className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
+                                            className={`absolute inset-0 object-contain h-full w-full transition-all duration-400 ease-in-out ${
                                                 showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
                                             }`}
                                         />
