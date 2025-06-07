@@ -1,47 +1,49 @@
-import SummaryApi from '../common'; // ← AGREGAR ESTA LÍNEA
+import SummaryApi from '../common';
 
 class OptimizedCacheService {
   constructor() {
     this.memoryCache = new Map();
     this.loadingPromises = new Map();
     this.priorityQueue = [];
-    this.sessionKey = 'bluetec_product_cache_v1';
     
-    // Cargar cache desde sessionStorage al inicializar
-    this.loadFromSession();
+    // NUEVO: Configuración móvil-optimizada
+    this.isMobile = window.innerWidth < 768;
+    this.isLowMemory = this.detectLowMemoryDevice();
+    this.maxCacheSize = this.isLowMemory ? 8 : 15; // Menos cache para móviles
+    this.compressionEnabled = true;
+    
+    console.log('📱 Cache optimizado - Móvil:', this.isMobile, 'Baja memoria:', this.isLowMemory);
   }
 
-  // Cargar cache desde sessionStorage
-  loadFromSession() {
-    try {
-      const cached = sessionStorage.getItem(this.sessionKey);
-      if (cached) {
-        const data = JSON.parse(cached);
-        // Verificar que no sea muy viejo (30 minutos)
-        if (Date.now() - data.timestamp < 30 * 60 * 1000) {
-          this.memoryCache = new Map(data.cache);
-          console.log('🚀 Cache cargado desde sesión:', this.memoryCache.size, 'elementos');
-        }
-      }
-    } catch (error) {
-      console.warn('Error cargando cache:', error);
-    }
+  // NUEVO: Detectar dispositivos de baja memoria
+  detectLowMemoryDevice() {
+    const memory = navigator.deviceMemory || 4;
+    const cores = navigator.hardwareConcurrency || 4;
+    const isMobile = window.innerWidth < 768;
+    
+    return memory < 4 || cores < 4 || isMobile;
   }
 
-  // Guardar cache en sessionStorage
-  saveToSession() {
-    try {
-      const data = {
-        timestamp: Date.now(),
-        cache: Array.from(this.memoryCache.entries())
-      };
-      sessionStorage.setItem(this.sessionKey, JSON.stringify(data));
-    } catch (error) {
-      console.warn('Error guardando cache:', error);
-    }
+  // OPTIMIZADO: Comprimir datos para móvil
+  compressProductData(products) {
+    if (!this.compressionEnabled) return products;
+    
+    return products.map(product => ({
+      _id: product._id,
+      productName: product.productName,
+      sellingPrice: product.sellingPrice,
+      price: product.price,
+      productImage: [product.productImage[0]], // Solo primera imagen
+      subcategory: product.subcategory,
+      slug: product.slug,
+      stock: product.stock,
+      brandName: product.brandName,
+      createdAt: product.createdAt
+      // Eliminar campos innecesarios para móvil
+    }));
   }
 
-  // Obtener productos con prioridad
+  // OPTIMIZADO: Obtener productos con límites móvil
   async getProducts(category, subcategory = null, priority = 'normal', limit = null) {
     const cacheKey = this.getCacheKey(category, subcategory, limit);
     
@@ -57,8 +59,11 @@ class OptimizedCacheService {
       return this.loadingPromises.get(cacheKey);
     }
 
+    // NUEVO: Límites automáticos para móvil
+    const mobileLimit = this.calculateMobileLimit(limit, priority);
+
     // Crear nueva promesa de carga
-    const loadPromise = this.fetchAndCache(category, subcategory, limit, priority);
+    const loadPromise = this.fetchAndCache(category, subcategory, mobileLimit, priority);
     this.loadingPromises.set(cacheKey, loadPromise);
 
     try {
@@ -71,11 +76,26 @@ class OptimizedCacheService {
     }
   }
 
-  // Fetch y cache de productos
+  // NUEVO: Calcular límites inteligentes para móvil
+  calculateMobileLimit(requestedLimit, priority) {
+    if (!this.isMobile) return requestedLimit;
+    
+    // Límites más agresivos para móvil
+    if (priority === 'high') return Math.min(requestedLimit || 5, 5);
+    if (priority === 'normal') return Math.min(requestedLimit || 8, 8);
+    return Math.min(requestedLimit || 6, 6);
+  }
+
+  // OPTIMIZADO: Fetch con gestión de memoria
   async fetchAndCache(category, subcategory, limit, priority) {
     console.log(`🔄 Fetching ${priority} priority:`, category, subcategory, limit);
     
     try {
+      // Limpiar cache si está lleno
+      if (this.memoryCache.size >= this.maxCacheSize) {
+        this.cleanOldestEntries(3);
+      }
+
       const response = await fetch(SummaryApi.categoryWiseProduct.url, {
         method: SummaryApi.categoryWiseProduct.method,
         headers: { "content-type": "application/json" },
@@ -85,73 +105,135 @@ class OptimizedCacheService {
       const dataResponse = await response.json();
       let products = dataResponse?.data || [];
 
+      // OPTIMIZADO: Comprimir datos para móvil
+      if (this.isMobile || this.isLowMemory) {
+        products = this.compressProductData(products);
+      }
+
       // Aplicar limit si se especifica
       if (limit && products.length > limit) {
-        // Para carga prioritaria, tomar los primeros
         products = products.slice(0, limit);
       }
 
-      // Precargar imágenes críticas basado en prioridad
+      // OPTIMIZADO: Precargar solo imágenes críticas
       if (priority === 'high' && products.length > 0) {
-        this.preloadCriticalImages(products.slice(0, 3));
+        this.preloadCriticalImages(products.slice(0, this.isMobile ? 2 : 3));
       }
 
-      const cacheKey = this.getCacheKey(category, subcategory, limit);
-      this.memoryCache.set(cacheKey, dataResponse);
-      this.saveToSession();
+      const processedResponse = {
+        ...dataResponse,
+        data: products
+      };
 
-      return dataResponse;
+      const cacheKey = this.getCacheKey(category, subcategory, limit);
+      this.memoryCache.set(cacheKey, processedResponse);
+
+      console.log(`💾 Cached: ${cacheKey} (${this.memoryCache.size}/${this.maxCacheSize})`);
+      return processedResponse;
+
     } catch (error) {
       console.error('Error fetching products:', error);
       throw error;
     }
   }
 
-  // Precargar imágenes críticas
+  // OPTIMIZADO: Precargar menos imágenes
   preloadCriticalImages(products) {
-    products.forEach(product => {
+    const maxImages = this.isMobile ? 2 : 3;
+    products.slice(0, maxImages).forEach((product, index) => {
       if (product.productImage?.[0]) {
         const img = new Image();
-        img.fetchPriority = 'high';
-        img.loading = 'eager';
+        img.fetchPriority = index === 0 ? 'high' : 'low';
+        img.loading = index === 0 ? 'eager' : 'lazy';
         img.src = product.productImage[0];
       }
     });
   }
 
-  // Generar clave de cache
-  getCacheKey(category, subcategory, limit) {
-    return `${category}_${subcategory || 'all'}_${limit || 'full'}`;
+  // NUEVO: Limpiar entradas más antiguas
+  cleanOldestEntries(count = 1) {
+    const entries = Array.from(this.memoryCache.entries())
+      .sort((a, b) => {
+        // Ordenar por último acceso (simulado con timestamp)
+        return (a[1].lastAccess || 0) - (b[1].lastAccess || 0);
+      })
+      .slice(0, count);
+    
+    entries.forEach(([key]) => {
+      this.memoryCache.delete(key);
+      console.log(`🗑️ Cache limpiado: ${key}`);
+    });
   }
 
-  // Batch loading para múltiples categorías
-  async batchLoadPriority(categories) {
-    console.log('🚀 Iniciando carga batch prioritaria');
-    
-    const promises = categories.map(({ category, subcategory, limit }) => 
-      this.getProducts(category, subcategory, 'high', limit)
-    );
+  // OPTIMIZADO: Generar clave de cache
+  getCacheKey(category, subcategory, limit) {
+    const limitSuffix = this.isMobile ? `_m${limit || 'full'}` : `_${limit || 'full'}`;
+    return `${category}_${subcategory || 'all'}${limitSuffix}`;
+  }
 
-    const results = await Promise.allSettled(promises);
-    console.log('✅ Batch carga completada:', results.length);
+  // OPTIMIZADO: Batch loading secuencial para móvil
+  async batchLoadPriority(categories) {
+    console.log('🚀 Iniciando carga batch optimizada para móvil');
     
-    return results;
+    if (this.isMobile) {
+      // SECUENCIAL para móvil - una por vez
+      const results = [];
+      for (const category of categories) {
+        try {
+          const result = await this.getProducts(
+            category.category, 
+            category.subcategory, 
+            'high', 
+            category.limit
+          );
+          results.push({ status: 'fulfilled', value: result });
+          
+          // Delay entre cargas para móvil
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          results.push({ status: 'rejected', reason: error });
+        }
+      }
+      return results;
+    } else {
+      // PARALELO para desktop
+      const promises = categories.map(({ category, subcategory, limit }) => 
+        this.getProducts(category, subcategory, 'high', limit)
+      );
+      return await Promise.allSettled(promises);
+    }
   }
 
   // Limpiar cache
   clearCache() {
     this.memoryCache.clear();
     this.loadingPromises.clear();
-    sessionStorage.removeItem(this.sessionKey);
+    console.log('🧹 Cache completamente limpiado');
   }
 
-  // Obtener estadísticas del cache
+  // OPTIMIZADO: Estadísticas con info móvil
   getStats() {
+    const memorySize = this.memoryCache.size;
+    const estimatedMemory = Array.from(this.memoryCache.values())
+      .reduce((acc, val) => acc + JSON.stringify(val).length, 0);
+
     return {
-      memorySize: this.memoryCache.size,
+      memorySize,
+      maxSize: this.maxCacheSize,
       loadingPromises: this.loadingPromises.size,
-      hasSessionCache: !!sessionStorage.getItem(this.sessionKey)
+      isMobile: this.isMobile,
+      isLowMemory: this.isLowMemory,
+      estimatedKB: Math.round(estimatedMemory / 1024),
+      compressionEnabled: this.compressionEnabled
     };
+  }
+
+  // NUEVO: Optimizar para la sesión actual
+  optimizeForSession() {
+    if (this.isMobile && this.memoryCache.size > 5) {
+      console.log('📱 Optimizando cache para sesión móvil');
+      this.cleanOldestEntries(Math.floor(this.memoryCache.size / 2));
+    }
   }
 }
 
