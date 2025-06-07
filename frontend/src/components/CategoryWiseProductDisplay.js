@@ -1,26 +1,14 @@
-// 2. CategoryWiseProductDisplay.js - OPTIMIZADO COMPLETO
 import React, { useContext, useEffect, useRef, useState, useCallback } from 'react';
+import fetchCategoryWiseProduct from '../helpers/fetchCategoryWiseProduct';
 import { FaAngleLeft, FaAngleRight, FaShoppingCart, FaExpand } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import displayPYGCurrency from '../helpers/displayCurrency';
-import { useOptimizedProducts } from '../hooks/useOptimizedProducts';
 
 const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentProductId }) => {
-  // NUEVO: Usar hook optimizado en lugar de fetch manual
-  const { 
-    data: rawData, 
-    loading, 
-    loadingMore 
-  } = useOptimizedProducts(category, subcategory, {
-    priority: 'normal',
-    initialLimit: null, // Cargar todos
-    enableProgressiveLoading: false,
-    autoLoadFull: false
-  });
-
-  // Estados para UI
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showLeftButton, setShowLeftButton] = useState(false);
   const [showRightButton, setShowRightButton] = useState(true);
   const [hoveredProductId, setHoveredProductId] = useState(null);
@@ -28,12 +16,8 @@ const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentPro
 
   const scrollElement = useRef();
   const navigate = useNavigate();
-  const { fetchUserAddToCart } = useContext(Context);
 
-  // Filtrar el producto actual de los resultados si tenemos su ID
-  const data = currentProductId 
-    ? rawData.filter(product => product._id !== currentProductId)
-    : rawData;
+  const { fetchUserAddToCart } = useContext(Context);
 
   // Función para calcular el descuento
   const calculateDiscount = (price, sellingPrice) => {
@@ -48,7 +32,7 @@ const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentPro
   const handleAddToCart = useCallback(
     (e, product) => {
       e.preventDefault();
-      e.stopPropagation();
+      e.stopPropagation(); // Evita que el clic se propague al Link
       addToCart(e, product);
       fetchUserAddToCart();
     },
@@ -61,6 +45,31 @@ const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentPro
     // Forzar una recarga completa para evitar problemas de estado
     window.location.href = `/producto/${productSlug}`;
   }, []);
+
+  // Función para obtener datos
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const categoryProduct = await fetchCategoryWiseProduct(category, subcategory);
+      
+      // Filtrar el producto actual de los resultados si tenemos su ID
+      let filteredProducts = categoryProduct?.data || [];
+      if (currentProductId && filteredProducts.length > 0) {
+        filteredProducts = filteredProducts.filter(product => product._id !== currentProductId);
+      }
+      
+      setData(filteredProducts);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [category, subcategory, currentProductId]);
+
+  // useEffect para cargar datos
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Función para desplazar a la derecha
   const scrollRight = () => {
@@ -90,6 +99,8 @@ const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentPro
     const scrollContainer = scrollElement.current;
     if (scrollContainer) {
       scrollContainer.addEventListener('scroll', checkScrollPosition);
+      
+      // Verificar la posición inicial del scroll cuando se carga el componente
       checkScrollPosition();
       
       return () => {
@@ -156,6 +167,7 @@ const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentPro
               ))
             : data.map((product) => {
                 const discount = calculateDiscount(product?.price, product?.sellingPrice);
+                const productUrl = `/producto/${product?.slug || product?._id}`;
                 
                 return (
                   <div
@@ -178,7 +190,6 @@ const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentPro
                         src={product.productImage[0]}
                         alt={product.productName}
                         className='object-contain h-full w-full transform group-hover/card:scale-110 transition-transform duration-500'
-                        loading="lazy"
                       />
                       <div className='absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300'>
                         <div className='bg-white/70 p-2 rounded-full'>
@@ -237,16 +248,6 @@ const CategoryWiseProductDisplay = ({ category, subcategory, heading, currentPro
           >
             <FaAngleRight className='text-gray-700' />
           </button>
-        )}
-
-        {/* NUEVO: Indicador de carga progresiva */}
-        {loadingMore && !loading && (
-          <div className="text-center py-4">
-            <div className="inline-flex items-center text-blue-600 text-sm">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent mr-2"></div>
-              Cargando más productos...
-            </div>
-          </div>
         )}
       </div>
     </div>
