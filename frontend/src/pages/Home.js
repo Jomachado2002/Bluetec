@@ -153,15 +153,26 @@ const Home = () => {
                 className="w-full lg:w-2/3"
               >
                 <div className="bg-white rounded-2xl shadow-lg p-6 h-full">
-                  <h2 className="text-2xl sm:text-3xl font-bold text-[#002060] mb-4 flex items-center">
-                    <span className="mr-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </span>
-                    Notebooks de Alto Rendimiento
-                  </h2>
-                  <div className="h-1 w-32 bg-[#002060] mb-6 rounded-full"></div>
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h2 className="text-2xl sm:text-3xl font-bold text-[#002060] mb-4 flex items-center">
+                        <span className="mr-3">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </span>
+                        Notebooks de Alto Rendimiento
+                      </h2>
+                      <div className="h-1 w-32 bg-[#002060] mb-6 rounded-full"></div>
+                    </div>
+                    
+                    <Link to="/categoria-producto?category=informatica&subcategory=notebooks" 
+                          onClick={() => scrollTop()}>
+                      <button className="px-6 py-3 bg-[#002060] text-white hover:bg-[#003399] rounded-lg text-sm font-medium transition duration-300 shadow-md shine-button flex items-center">
+                        Ver más <FaAngleRight className="ml-1" />
+                      </button>
+                    </Link>
+                  </div>
                   
                   <VerticalCardProduct
                     category="informatica"
@@ -170,6 +181,40 @@ const Home = () => {
                   />
                 </div>
               </motion.div>
+            </div>
+          </motion.section>
+          {/* Sección: Teléfonos Móviles */}
+          <motion.section 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={fadeIn}
+            className="container mx-auto px-4"
+          >
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Teléfonos Móviles</h2>
+                    <p className="mt-2 text-gray-600 max-w-lg">La última tecnología móvil al alcance de tus manos</p>
+                    <div className="h-1 w-24 bg-[#002060] mt-2 rounded-full"></div>
+                  </div>
+                  <Link to="/categoria-producto?category=telefonia&subcategory=telefonos_moviles" 
+                        onClick={() => scrollTop()}>
+                    <button className="mt-4 md:mt-0 px-6 py-3 bg-[#002060] text-white hover:bg-[#003399] rounded-lg text-sm font-medium transition duration-300 shadow-md shine-button">
+                      Ver toda la colección
+                    </button>
+                  </Link>
+                </div>
+                
+                <div className="mt-6">
+                  <VerticalCardProduct
+                    category="telefonia"
+                    subcategory="telefonos_moviles"
+                    heading=""
+                  />
+                </div>
+              </div>
             </div>
           </motion.section>
 
@@ -192,7 +237,7 @@ const Home = () => {
                   <Link to="/categoria-producto?category=informatica&subcategory=placas_madre" 
                         onClick={() => scrollTop()}>
                     <button className="mt-4 md:mt-0 px-6 py-3 bg-[#002060] text-white hover:bg-[#003399] rounded-lg text-sm font-medium transition duration-300 shadow-md shine-button">
-                      Ver toda la colección
+                     Ver más
                     </button>
                   </Link>
                 </div>

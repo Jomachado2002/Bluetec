@@ -30,7 +30,38 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
         setLoading(true);
         try {
             const categoryProduct = await fetchCategoryWiseProduct(category, subcategory);
-            setData(categoryProduct?.data || []);
+            let products = categoryProduct?.data || [];
+            
+            // Filtrar productos sin stock
+            products = products.filter(product => 
+                product?.stock === undefined || product?.stock === null || product?.stock > 0
+            );
+            
+            // 🚀 NUEVA VALIDACIÓN: Limitar a 6 productos en móvil
+                const isMobile = window.innerWidth < 768;
+                if (isMobile && products.length > 6) {
+                    // Ordenar productos por precio
+                    const sortedByPrice = [...products].sort((a, b) => a.sellingPrice - b.sellingPrice);
+                    
+                    // Dividir en 3 rangos de precios
+                    const total = sortedByPrice.length;
+                    const tercio = Math.floor(total / 3);
+                    
+                    const baratos = sortedByPrice.slice(0, tercio); // 33% más baratos
+                    const medios = sortedByPrice.slice(tercio, tercio * 2); // 33% precio medio  
+                    const caros = sortedByPrice.slice(tercio * 2); // 33% más caros
+                    
+                    // Seleccionar 2 de cada rango
+                    const seleccionados = [
+                        ...baratos.slice(0, 2),
+                        ...medios.slice(0, 2),
+                        ...caros.slice(0, 2)
+                    ];
+                    
+                    products = seleccionados;
+                }
+            
+            setData(products);
         } catch (error) {
             console.error("Error al cargar productos:", error);
         } finally {
@@ -69,9 +100,11 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
     };
 
     const checkScrollPosition = () => {
-        const { scrollLeft, scrollWidth, clientWidth } = scrollElement.current;
-        setShowLeftButton(scrollLeft > 0);
-        setShowRightButton(scrollLeft < scrollWidth - clientWidth);
+        if (scrollElement.current) {
+            const { scrollLeft, scrollWidth, clientWidth } = scrollElement.current;
+            setShowLeftButton(scrollLeft > 0);
+            setShowRightButton(scrollLeft < scrollWidth - clientWidth);
+        }
     };
     
     useEffect(() => {
@@ -81,7 +114,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
             checkScrollPosition();
             return () => scrollContainer.removeEventListener('scroll', checkScrollPosition);
         }
-    }, []);
+    }, [data]);
 
     const calculateDiscount = (price, sellingPrice) => {
         if (price && price > 0) {
@@ -95,17 +128,6 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
     if (!loading && data.length === 0) {
         return null;
     }
-
-    // Filtrar para mostrar solo placas madre si la categoría es informática
-    // Y también filtrar productos sin stock
-    const filteredData = category === "informatica" && subcategory === "placas_madre" 
-        ? data.filter(product => 
-            product.subcategory?.toLowerCase() === "placas_madre" && 
-            (product?.stock === undefined || product?.stock === null || product?.stock > 0)
-          )
-        : data.filter(product => 
-            product?.stock === undefined || product?.stock === null || product?.stock > 0
-          );
 
     return (
         <div className='w-full relative'>
@@ -153,7 +175,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                     </button>
                 )}
 
-                {/* Contenedor de productos */}
+                {/* Contenedor de productos - MANTIENE EL DISEÑO ORIGINAL */}
                 <div
                     ref={scrollElement}
                     className='flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth py-4 snap-x'
@@ -162,7 +184,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                         ? loadingList.map((_, index) => (
                             <div
                                 key={index}
-                                className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] bg-white rounded-lg shadow-sm border animate-pulse'
+                                className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] h-[280px] sm:h-[300px] bg-white rounded-lg shadow-sm border animate-pulse'
                             >
                                 <div className='bg-gray-200 h-32 sm:h-36 rounded-t-lg'></div>
                                 <div className='p-2.5 space-y-1.5'>
@@ -173,7 +195,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                                 </div>
                             </div>
                         ))
-                        : filteredData.map((product) => {
+                        : data.map((product) => {
                             const discount = calculateDiscount(product?.price, product?.sellingPrice);
                             const isHovered = hoveredProductId === product?._id;
                             const secondImage = product.productImage?.[1];
@@ -222,6 +244,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                                             className={`object-contain h-full w-full transition-all duration-500 ease-in-out ${
                                                 showSecondImage ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
                                             }`}
+                                            loading="lazy"
                                         />
                                         
                                         {/* Imagen de hover (segunda imagen) */}
@@ -232,6 +255,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
                                                 className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
                                                     showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
                                                 }`}
+                                                loading="lazy"
                                             />
                                         )}
 
