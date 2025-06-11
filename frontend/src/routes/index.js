@@ -1,3 +1,4 @@
+// frontend/src/router/index.js - ACTUALIZACIÓN
 import { createBrowserRouter } from "react-router-dom"
 import App from "../App"
 import Home from "../pages/Home"
@@ -15,6 +16,9 @@ import MobileCategoriesPage from "../pages/MobileCategoriesPage"
 import ResetPassword from "../pages/ResetPassword"
 import Nosotros from "../pages/Nosotros"
 
+// ✅ IMPORTAR EL NUEVO COMPONENTE
+import AdminDashboard from "../pages/AdminDashboard"
+
 // Importar páginas financieras
 import FinancialReports from "../pages/FinancialReports"
 import ClientsList from "../pages/ClientsList"
@@ -29,6 +33,11 @@ import NewProfitabilityAnalysis from "../pages/NewProfitabilityAnalysis"
 import SupplierPriceComparison from "../pages/SupplierPriceComparison"
 import ProfitabilityAnalysisDetails from "../pages/ProfitabilityAnalysisDetails"
 
+import SalesManagement from "../pages/SalesManagement"
+import PurchaseManagement from "../pages/PurchaseManagement"
+import SaleDetails from "../pages/SaleDetails"
+import PurchaseDetails from "../pages/PurchaseDetails"
+import FinancialDashboard from "../pages/FinancialDashboard"
 
 const router = createBrowserRouter([
     {
@@ -64,7 +73,7 @@ const router = createBrowserRouter([
                 element: <MobileCategoriesPage />
             },
             {
-                path: "categoria-producto", // ✅ Agregado parámetro
+                path: "categoria-producto",
                 element: <CategoryProduct />
             },
             {
@@ -79,14 +88,16 @@ const router = createBrowserRouter([
                 path: "buscar",
                 element: <SearchProduct />
             },
-
-          
-           
+            
             // ✅ Panel de admin separado
             {
                 path: "panel-admin",
                 element: <AdminPanel />,
                 children: [
+                    {
+                        path: "",  // ✅ USAR EL NUEVO COMPONENTE
+                        element: <AdminDashboard />
+                    },
                     {
                         path: "todos-usuarios",
                         element: <AllUsers />
@@ -95,10 +106,31 @@ const router = createBrowserRouter([
                         path: "todos-productos",
                         element: <AllProducts />
                     },
-                    
-                    // Rutas financieras
+                    // ✅ RUTAS FINANCIERAS
                     {
-                        path: "reportes-financieros",
+                        path: "dashboard",
+                        element: <FinancialDashboard />
+                    },
+                    {
+                        path: "ventas",
+                        element: <SalesManagement />
+                    },
+                    {
+                        path: "ventas/:saleId",
+                        element: <SaleDetails />
+                    },
+                    {
+                        path: "compras",
+                        element: <PurchaseManagement />
+                    },
+                    {
+                        path: "compras/:purchaseId",
+                        element: <PurchaseDetails />
+                    },
+                    
+                    // Rutas financieras adicionales
+                    {
+                        path: "reportes",
                         element: <FinancialReports />
                     },
                     

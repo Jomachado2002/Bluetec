@@ -1,93 +1,103 @@
 const backendDomain = process.env.REACT_APP_BACKEND_URL;
 
 const SummaryApi = {
-    // Autenticación
+    // ===========================================
+    // AUTENTICACIÓN
+    // ===========================================
     SignUP: {
-        url: `${backendDomain}/api/registro`,  // Cambiar "signup" a "registro"
+        url: `${backendDomain}/api/registro`,
         method: "post"
     },
     signIn: {
-        url: `${backendDomain}/api/iniciar-sesion`,  // Cambiar "signin" a "iniciar-sesion"
+        url: `${backendDomain}/api/iniciar-sesion`,
         method: "post"
     },
     current_user : {
-        url: `${backendDomain}/api/detalles-usuario`,  // Cambiar "user-details" a "detalles-usuario"
+        url: `${backendDomain}/api/detalles-usuario`,
         method: "get"
     },
     logout_user: {
-        url: `${backendDomain}/api/cerrar-sesion`,  // Cambiar "userLogout" a "cerrar-sesion"
+        url: `${backendDomain}/api/cerrar-sesion`,
         method : "get"
     },
     allUser:{
-        url: `${backendDomain}/api/todos-usuarios`,  // Cambiar "all-user" a "todos-usuarios"
+        url: `${backendDomain}/api/todos-usuarios`,
         method : "get"
      },
     updateUser: {
-        url: `${backendDomain}/api/actualizar-usuario`,  // Cambiar "update-user" a "actualizar-usuario"
+        url: `${backendDomain}/api/actualizar-usuario`,
         method : "post"
     },
-    uploadProduct: {
-        url : `${backendDomain}/api/cargar-producto`,  // Cambiar "upload-product" a "cargar-producto"
-        method : 'post'
-    },
-    allProduct: {
-        url: `${backendDomain}/api/obtener-productos`,  // Cambiar "get-product" a "obtener-productos"
-        method : 'get'
-    },
-    updateProduct : {
-        url : `${backendDomain}/api/actualizar-producto`,  // Cambiar "update-product" a "actualizar-producto"
-        method : 'post'
-    },
-    categoryProduct : {
-        url: `${backendDomain}/api/obtener-categorias`,  // Cambiar "get-categoryProduct" a "obtener-categorias"
-        method: 'get'
-    },
-    categoryWiseProduct : {
-        url : `${backendDomain}/api/productos-por-categoria`,  // Cambiar "category-product" a "productos-por-categoria"
-        method : 'post'
-    },
-    productDetails : {
-        url : `${backendDomain}/api/detalles-producto`,  // Cambiar "product-details" a "detalles-producto"
-        method : 'post'
-    },
-    addToCartProduct : {
-        url : `${backendDomain}/api/agregar-al-carrito`,  // Cambiar "addtocart" a "agregar-al-carrito"
-        method : 'post'
-    },
-    searchProduct : {
-        url : `${backendDomain}/api/buscar`,  // Mantenido como "search" -> "buscar" (corto y claro)
-        method : 'get'
-    },
-    filterProduct : {
-        url : `${backendDomain}/api/filtrar-productos`,  // Cambiar "filter-product" a "filtrar-productos"
-        method : 'post'
-    },
     forgotPassword: {
-        url: `${backendDomain}/api/solicitar-restablecer-contrasena`,  // Cambiar "request-password-reset" a "solicitar-restablecer-contrasena"
+        url: `${backendDomain}/api/solicitar-restablecer-contrasena`,
         method: 'post'
     },
     resetPassword: {
-        url: `${backendDomain}/api/restablecer-contrasena`,  // Cambiar "reset-password" a "restablecer-contrasena"
+        url: `${backendDomain}/api/restablecer-contrasena`,
         method: 'post'
     },
-    getCategorySearch: {
-        url: `${backendDomain}/api/buscar-por-categoria`,  // Cambiar "get-categorySearch" a "buscar-por-categoria"
-        method: "GET"
+
+    // ===========================================
+    // PRODUCTOS
+    // ===========================================
+    uploadProduct: {
+        url : `${backendDomain}/api/cargar-producto`,
+        method : 'post'
     },
-    deleteProductController: {
-        url: `${backendDomain}/api/eliminar-producto`,  // Cambiar "delete-product" a "eliminar-producto"
+    allProduct: {
+        url: `${backendDomain}/api/obtener-productos`,
+        method : 'get'
+    },
+    updateProduct : {
+        url : `${backendDomain}/api/actualizar-producto`,
+        method : 'post'
+    },
+    deleteProduct: {
+        url: `${backendDomain}/api/eliminar-producto`,
         method: 'post'
+    },
+    categoryProduct : {
+        url: `${backendDomain}/api/obtener-categorias`,
+        method: 'get'
+    },
+    categoryWiseProduct : {
+        url : `${backendDomain}/api/productos-por-categoria`,
+        method : 'post'
+    },
+    productDetails : {
+        url : `${backendDomain}/api/detalles-producto`,
+        method : 'post'
     },
     productDetailsBySlug: {
         url: `${backendDomain}/api/producto-por-slug`,
         method: "get"
-      },
-      productFinance: {
+    },
+    searchProduct : {
+        url : `${backendDomain}/api/buscar`,
+        method : 'get'
+    },
+    filterProduct : {
+        url : `${backendDomain}/api/filtrar-productos`,
+        method : 'post'
+    },
+    getCategorySearch: {
+        url: `${backendDomain}/api/buscar-por-categoria`,
+        method: "GET"
+    },
+    updateAllPrices: {
+        url: `${backendDomain}/api/finanzas/actualizarprecios`,
+        method: 'post'
+    },
+
+    // ===========================================
+    // FINANZAS DE PRODUCTOS
+    // ===========================================
+    productFinance: {
         url: `${backendDomain}/api/finanzas/producto/finanzas`,
         method: 'post'
     },
     getProductFinance: {
-        url: `${backendDomain}/api/finanzas/producto/finanzas`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/producto/finanzas`,
         method: 'get'
     },
     marginReports: {
@@ -98,8 +108,90 @@ const SummaryApi = {
         url: `${backendDomain}/api/finanzas/reportes/rentabilidad`,
         method: 'get'
     },
+
+    // ===========================================
+    // VENTAS
+    // ===========================================
+    createSale: {
+        url: `${backendDomain}/api/finanzas/ventas`,
+        method: 'post'
+    },
+    getAllSales: {
+        url: `${backendDomain}/api/finanzas/ventas`,
+        method: 'get'
+    },
+    getSaleById: {
+        url: `${backendDomain}/api/finanzas/ventas`, // + /:saleId
+        method: 'get'
+    },
+    updateSalePayment: {
+        url: `${backendDomain}/api/finanzas/ventas`, // + /:saleId/pago
+        method: 'patch'
+    },
+    uploadSaleInvoice: {
+        url: `${backendDomain}/api/finanzas/ventas`, // + /:saleId/factura
+        method: 'post'
+    },
+    getSalesSummary: {
+        url: `${backendDomain}/api/finanzas/ventas/resumen`,
+        method: 'get'
+    },
+    deleteSale: {
+        url: `${backendDomain}/api/finanzas/ventas`, // + /:saleId
+        method: 'delete'
+    },
+
+    // ===========================================
+    // COMPRAS
+    // ===========================================
+    createPurchase: {
+        url: `${backendDomain}/api/finanzas/compras`,
+        method: 'post'
+    },
+    getAllPurchases: {
+        url: `${backendDomain}/api/finanzas/compras`,
+        method: 'get'
+    },
+    getPurchaseById: {
+        url: `${backendDomain}/api/finanzas/compras`, // + /:purchaseId
+        method: 'get'
+    },
+    updatePurchasePayment: {
+        url: `${backendDomain}/api/finanzas/compras`, // + /:purchaseId/pago
+        method: 'patch'
+    },
+    uploadPurchaseDocuments: {
+        url: `${backendDomain}/api/finanzas/compras`, // + /:purchaseId/documentos
+        method: 'post'
+    },
+    getPurchasesSummary: {
+        url: `${backendDomain}/api/finanzas/compras/resumen`,
+        method: 'get'
+    },
+    deletePurchase: {
+        url: `${backendDomain}/api/finanzas/compras`, // + /:purchaseId
+        method: 'delete'
+    },
+
+    // ===========================================
+    // DASHBOARD Y ESTADOS DE CUENTA
+    // ===========================================
+    getDashboardSummary: {
+        url: `${backendDomain}/api/finanzas/dashboard`,
+        method: 'get'
+    },
+    getAccountStatement: {
+        url: `${backendDomain}/api/finanzas/estado-cuenta`,
+        method: 'get'
+    },
+    getYearlyMetrics: {
+        url: `${backendDomain}/api/finanzas/metricas-anuales`,
+        method: 'get'
+    },
     
-    // Rutas para clientes
+    // ===========================================
+    // CLIENTES
+    // ===========================================
     createClient: {
         url: `${backendDomain}/api/finanzas/clientes`,
         method: 'post'
@@ -109,19 +201,21 @@ const SummaryApi = {
         method: 'get'
     },
     getClientById: {
-        url: `${backendDomain}/api/finanzas/clientes`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/clientes`,
         method: 'get'
     },
     updateClient: {
-        url: `${backendDomain}/api/finanzas/clientes`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/clientes`,
         method: 'put'
     },
     deleteClient: {
-        url: `${backendDomain}/api/finanzas/clientes`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/clientes`,
         method: 'delete'
     },
     
-    // Rutas para presupuestos
+    // ===========================================
+    // PRESUPUESTOS
+    // ===========================================
     createBudget: {
         url: `${backendDomain}/api/finanzas/presupuestos`,
         method: 'post'
@@ -131,23 +225,30 @@ const SummaryApi = {
         method: 'get'
     },
     getBudgetById: {
-        url: `${backendDomain}/api/finanzas/presupuestos`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/presupuestos`,
         method: 'get'
     },
     updateBudgetStatus: {
-        url: `${backendDomain}/api/finanzas/presupuestos`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/presupuestos`,
         method: 'patch'
     },
     getBudgetPDF: {
-        url: `${backendDomain}/api/finanzas/presupuestos`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/presupuestos`,
         method: 'get'
     },
-    updateAllPrices: {
-        url: `${backendDomain}/api/finanzas/actualizarprecios`,
+    deleteBudget: {
+        url: `${backendDomain}/api/finanzas/presupuestos`,
+        method: 'delete'
+    },
+    sendBudgetEmail: {
+        url: `${backendDomain}/api/finanzas/presupuestos`,
         method: 'post'
     },
 
-        createSupplier: {
+    // ===========================================
+    // PROVEEDORES
+    // ===========================================
+    createSupplier: {
         url: `${backendDomain}/api/finanzas/proveedores`,
         method: 'post'
     },
@@ -156,18 +257,21 @@ const SummaryApi = {
         method: 'get'
     },
     getSupplierById: {
-        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/proveedores`,
         method: 'get'
     },
     updateSupplier: {
-        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/proveedores`,
         method: 'put'
     },
     deleteSupplier: {
-        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/proveedores`,
         method: 'delete'
     },
-     // Rutas para análisis de rentabilidad
+
+    // ===========================================
+    // ANÁLISIS DE RENTABILIDAD
+    // ===========================================
     createProfitabilityAnalysis: {
         url: `${backendDomain}/api/finanzas/analisis-rentabilidad`,
         method: 'post'
@@ -177,7 +281,7 @@ const SummaryApi = {
         method: 'get'
     },
     getProfitabilityAnalysisById: {
-        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`,
         method: 'get'
     },
     compareSupplierPrices: {
@@ -185,15 +289,15 @@ const SummaryApi = {
         method: 'post'
     },
     updateAnalysisStatus: {
-        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`,
         method: 'patch'
     },
     deleteAnalysis: {
-        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`, // usaremos el ID como parámetro
+        url: `${backendDomain}/api/finanzas/analisis-rentabilidad`,
         method: 'delete'
     },
     getSupplierProfitability: {
-        url: `${backendDomain}/api/finanzas/proveedores`, // usaremos el ID como parámetro + /rentabilidad
+        url: `${backendDomain}/api/finanzas/proveedores`,
         method: 'get'
     },
     

@@ -3,7 +3,25 @@ import { useSelector } from 'react-redux';
 import { CiUser } from 'react-icons/ci';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import ROLE from '../common/role';
-import { FaBars, FaTimes, FaUsers, FaBoxOpen, FaChartPie, FaUserFriends, FaFileInvoiceDollar, FaSignOutAlt, FaTruck, FaChartLine, FaCalculator, FaFileAlt, FaPlus } from 'react-icons/fa';
+import { 
+  FaBars, 
+  FaTimes, 
+  FaUsers, 
+  FaBoxOpen, 
+  FaChartPie, 
+  FaUserFriends, 
+  FaFileInvoiceDollar, 
+  FaSignOutAlt, 
+  FaTruck, 
+  FaChartLine, 
+  FaCalculator, 
+  FaFileAlt, 
+  FaPlus, 
+  FaMoneyBillWave, 
+  FaShoppingCart,
+  FaTachometerAlt, // ✅ Cambiar FaDashboard por FaTachometerAlt
+  FaHome
+} from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import SummaryApi from '../common';
 import { useDispatch } from 'react-redux';
@@ -50,44 +68,119 @@ const AdminPanel = () => {
     return location.pathname.includes(path);
   };
 
-  // Menú de navegación administrativa
+  // Menú de navegación administrativa actualizado
   const navItems = [
+    {
+      path: "dashboard",
+      label: "Dashboard",
+      icon: <FaTachometerAlt className="mr-2" />, // ✅ Cambiar aquí también
+      description: "Vista general del sistema"
+    },
+    {
+      category: "Gestión de Productos",
+      items: [
+        {
+          path: "todos-productos",
+          label: "Productos",
+          icon: <FaBoxOpen className="mr-2" />,
+          description: "Gestionar productos"
+        }
+      ]
+    },
+    {
+      category: "Gestión Financiera",
+      items: [
+        {
+          path: "clientes",
+          label: "Clientes",
+          icon: <FaUserFriends className="mr-2" />,
+          description: "Gestionar clientes"
+        },
+        {
+          path: "proveedores",
+          label: "Proveedores",
+          icon: <FaTruck className="mr-2" />,
+          description: "Gestionar proveedores"
+        },
+        {
+          path: "presupuestos",
+          label: "Presupuestos",
+          icon: <FaFileInvoiceDollar className="mr-2" />,
+          description: "Crear y gestionar presupuestos"
+        },
+        {
+          path: "ventas",
+          label: "Ventas",
+          icon: <FaMoneyBillWave className="mr-2" />,
+          description: "Registrar y gestionar ventas"
+        },
+        {
+          path: "compras",
+          label: "Compras",
+          icon: <FaShoppingCart className="mr-2" />,
+          description: "Registrar y gestionar compras"
+        }
+      ]
+    },
+    {
+      category: "Reportes y Análisis",
+      items: [
+        {
+          path: "analisis-rentabilidad",
+          label: "Análisis Rentabilidad",
+          icon: <FaChartLine className="mr-2" />,
+          description: "Analizar rentabilidad por proveedor"
+        },
+        {
+          path: "reportes",
+          label: "Reportes Financieros",
+          icon: <FaChartPie className="mr-2" />,
+          description: "Reportes detallados y métricas"
+        }
+      ]
+    },
     {
       path: "todos-usuarios",
       label: "Usuarios",
-      icon: <FaUsers className="mr-2" />
-    },
-    {
-      path: "todos-productos",
-      label: "Productos",
-      icon: <FaBoxOpen className="mr-2" />
-    },
-    {
-      path: "reportes-financieros",
-      label: "Reportes",
-      icon: <FaChartPie className="mr-2" />
-    },
-    {
-      path: "clientes",
-      label: "Clientes",
-      icon: <FaUserFriends className="mr-2" />
-    },
-    {
-      path: "presupuestos",
-      label: "Presupuestos",
-      icon: <FaFileInvoiceDollar className="mr-2" />
-    },
-    {
-      path: "proveedores",
-      label: "Proveedores",
-      icon: <FaTruck className="mr-2" />
-    },
-    {
-      path: "analisis-rentabilidad",
-      label: "Análisis Rentabilidad",
-      icon: <FaChartLine className="mr-2" />
+      icon: <FaUsers className="mr-2" />,
+      description: "Gestionar usuarios del sistema"
     }
   ];
+
+  const renderNavItem = (item) => (
+    <Link
+      key={item.path}
+      to={item.path}
+      className={`flex items-center px-4 py-3 rounded-lg transition-colors duration-200 mb-1
+        ${isActive(item.path) 
+          ? 'bg-blue-100 text-blue-700 border-r-4 border-blue-500' 
+          : 'text-gray-700 hover:bg-gray-100'
+        }
+        ${!sidebarOpen && 'md:justify-center md:px-2'}`
+      }
+    >
+      <div className="flex items-center w-full">
+        {item.icon}
+        <div className={`${!sidebarOpen && 'md:hidden'}`}>
+          <div className="font-medium">{item.label}</div>
+          {item.description && sidebarOpen && (
+            <div className="text-xs text-gray-500">{item.description}</div>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+
+  const renderCategorySection = (category) => (
+    <div key={category.category} className={`mb-4 ${!sidebarOpen && 'md:hidden'}`}>
+      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-4">
+        {category.category}
+      </h3>
+      <div className="space-y-1">
+        {category.items.map(renderNavItem)}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -129,7 +222,7 @@ const AdminPanel = () => {
         <aside 
           className={`bg-white border-r border-gray-200 transition-all duration-300 ${
             sidebarOpen ? 'w-64' : 'w-0 -ml-64 md:ml-0 md:w-16'
-          } fixed md:static h-full z-30 shadow-lg md:shadow-none`}
+          } fixed md:static h-full z-30 shadow-lg md:shadow-none overflow-y-auto`}
         >
           <div className="p-4 flex flex-col h-full">
             {/* Perfil del administrador */}
@@ -158,32 +251,22 @@ const AdminPanel = () => {
 
             {/* Navegación */}
             <nav className="flex-1 mt-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center px-4 py-3 rounded-lg transition-colors duration-200 mb-1
-                    ${isActive(item.path) 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'text-gray-700 hover:bg-gray-100'
-                    }
-                    ${!sidebarOpen && 'md:justify-center md:px-2'}`
-                  }
-                >
-                  <div className="flex items-center">
-                    {item.icon}
-                    <span className={`${!sidebarOpen && 'md:hidden'}`}>{item.label}</span>
-                  </div>
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                if (item.category) {
+                  return renderCategorySection(item);
+                } else {
+                  return renderNavItem(item);
+                }
+              })}
             </nav>
 
             {/* Botón para ir a la tienda */}
             <div className={`mt-auto mb-2 ${!sidebarOpen && 'md:hidden'}`}>
               <Link
                 to="/"
-                className="block w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded text-center text-sm transition-colors"
+                className="block w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded text-center text-sm transition-colors flex items-center justify-center"
               >
+                <FaHome className="mr-2" />
                 Ir a la tienda
               </Link>
             </div>
@@ -195,9 +278,7 @@ const AdminPanel = () => {
                 className="flex justify-center items-center w-10 h-10 mx-auto bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors"
                 title="Ir a la tienda"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                </svg>
+                <FaHome className="h-5 w-5" />
               </Link>
             </div>
           </div>
