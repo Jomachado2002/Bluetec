@@ -29,6 +29,23 @@ const getProductBySlug = require('../controller/product/getProductBySlug');
 const { updateProductFinanceController, getProductFinanceController } = require('../controller/product/updateProductFinance');
 const { getMarginReportController, getCategoryProfitabilityController } = require('../controller/reports/financialReportsController');
 
+const { 
+    bancardConfirmController,
+    createPaymentController,
+    getTransactionStatusController
+} = require('../controller/bancard/bancardController');
+router.post("/bancard/confirm", bancardConfirmController);
+router.post("/bancard/create-payment", createPaymentController);
+router.get("/bancard/status/:transactionId", getTransactionStatusController);
+
+router.get("/bancard/health", (req, res) => {
+    res.status(200).json({
+        message: "Bancard endpoint funcionando correctamente",
+        timestamp: new Date().toISOString(),
+        success: true,
+        error: false
+    });
+});
 // ===== CONTROLADORES DE CLIENTES =====
 const { 
     createClientController, 
