@@ -1,4 +1,4 @@
-// backend/controller/bancard/bancardController.js - VERSIÓN COMPLETA PARA TU PROYECTO
+// backend/controller/bancard/bancardController.js - VERSIÓN ACTUALIZADA
 const crypto = require('crypto');
 const axios = require('axios');
 const { 
@@ -7,13 +7,12 @@ const {
     parseAmount,
     generateSingleBuyToken,
     generateShopProcessId,
+    generateAlternativeShopProcessId, // ✅ Nueva función alternativa
     getBancardBaseUrl
 } = require('../../helpers/bancardUtils');
 
 /**
  * Controlador para recibir confirmaciones de Bancard
- * URL que debe estar configurada en el portal de Bancard:
- * https://bluetec-la5004ayd-jomachado2002s-projects.vercel.app/api/bancard/confirm
  */
 const bancardConfirmController = async (req, res) => {
     const startTime = Date.now();
@@ -123,7 +122,6 @@ const bancardConfirmController = async (req, res) => {
 
 /**
  * Controlador para crear un nuevo pago con Bancard
- * Este reemplaza tu implementación actual que estaba incompleta
  */
 const createPaymentController = async (req, res) => {
     try {
@@ -175,8 +173,10 @@ const createPaymentController = async (req, res) => {
         const finalReturnUrl = return_url || `${process.env.FRONTEND_URL}/pago-exitoso`;
         const finalCancelUrl = cancel_url || `${process.env.FRONTEND_URL}/pago-cancelado`;
 
-        // Generar ID único para la transacción
+        // ✅ GENERAR ID ÚNICO MEJORADO
         const shopProcessId = generateShopProcessId();
+        
+        console.log("🆔 Shop Process ID generado:", shopProcessId);
         
         // Formatear el monto
         const formattedAmount = Number(amount).toFixed(2);
@@ -191,6 +191,7 @@ const createPaymentController = async (req, res) => {
         console.log("   🏷️ Descripción:", description);
         console.log("   🔙 Return URL:", finalReturnUrl);
         console.log("   ❌ Cancel URL:", finalCancelUrl);
+        console.log("   🔐 Token:", token);
 
         // Preparar payload para Bancard según su documentación
         const payload = {
@@ -232,25 +233,6 @@ const createPaymentController = async (req, res) => {
             console.log("✅ Pago creado exitosamente en Bancard");
             
             // TODO: Guardar la transacción en tu base de datos
-            // Puedes usar tus modelos existentes o crear uno nuevo para transacciones
-            /*
-            const transactionData = {
-                shop_process_id: shopProcessId,
-                bancard_process_id: response.data.process_id,
-                amount: formattedAmount,
-                currency: currency,
-                description: description,
-                status: 'pending',
-                customer_info: customer_info,
-                items: items,
-                created_at: new Date(),
-                return_url: finalReturnUrl,
-                cancel_url: finalCancelUrl
-            };
-            
-            // Guardar usando tu modelo preferido
-            // await TransactionModel.create(transactionData);
-            */
 
             res.json({
                 message: "Pago creado exitosamente",
@@ -271,6 +253,51 @@ const createPaymentController = async (req, res) => {
             });
         } else {
             console.error("❌ Error en respuesta de Bancard:", response.data);
+            
+            // ✅ SI HAY ERROR DE SHOP_PROCESS_ID DUPLICADO, INTENTAR CON ALTERNATIVO
+            if (response.data.messages && response.data.messages.some(msg => 
+                msg.dsc && msg.dsc.includes('Shop process has already been taken'))) {
+                
+                console.log("🔄 Shop process ID duplicado, intentando con ID alternativo...");
+                
+                // Generar ID alternativo
+                const alternativeId = generateAlternativeShopProcessId();
+                const alternativeToken = generateSingleBuyToken(alternativeId, formattedAmount, currency);
+                
+                payload.operation.shop_process_id = alternativeId;
+                payload.operation.token = alternativeToken;
+                
+                console.log("🔄 Reintentando con ID alternativo:", alternativeId);
+                
+                const retryResponse = await axios.post(bancardUrl, payload, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'BlueTec-eCommerce/1.0'
+                    },
+                    timeout: 30000
+                });
+                
+                if (retryResponse.data.status === 'success') {
+                    console.log("✅ Pago creado exitosamente con ID alternativo");
+                    
+                    return res.json({
+                        message: "Pago creado exitosamente",
+                        success: true,
+                        error: false,
+                        data: {
+                            shop_process_id: alternativeId,
+                            process_id: retryResponse.data.process_id,
+                            amount: formattedAmount,
+                            currency: currency,
+                            description: description,
+                            iframe_url: `${getBancardBaseUrl()}/checkout/new/${retryResponse.data.process_id}`,
+                            return_url: finalReturnUrl,
+                            cancel_url: finalCancelUrl
+                        }
+                    });
+                }
+            }
+            
             res.status(400).json({
                 message: "Error al crear el pago en Bancard",
                 success: false,

@@ -1,4 +1,4 @@
-// backend/helpers/bancardUtils.js
+// backend/helpers/bancardUtils.js - VERSIÓN COMPLETA CORREGIDA
 const crypto = require('crypto');
 
 /**
@@ -77,13 +77,25 @@ const verifyConfirmationToken = (receivedToken, shopProcessId, amount, currency 
 };
 
 /**
- * Genera un ID único para shop_process_id
+ * ✅ FUNCIÓN MEJORADA - Genera un ID único para shop_process_id
+ * Ahora incluye más entropía para evitar duplicados
  * @returns {string} ID único
  */
 const generateShopProcessId = () => {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 10000);
-    return `BT${timestamp}${random}`;
+    // Usar múltiples fuentes de aleatoriedad
+    const randomBytes1 = crypto.randomBytes(8).toString('hex'); // 16 chars
+    const randomBytes2 = crypto.randomBytes(4).toString('hex'); // 8 chars  
+    const timestamp = Date.now().toString(36); // Base36 es más corto
+    const random1 = Math.floor(Math.random() * 999999).toString(36);
+    const random2 = Math.floor(Math.random() * 999999).toString(36);
+    
+    // Combinar todo y tomar solo 20 caracteres para que sea manejable
+    const fullId = `BT${randomBytes1}${timestamp}${random1}${randomBytes2}${random2}`;
+    const finalId = fullId.substring(0, 24); // Mantener longitud razonable
+    
+    console.log('🆔 Generando shop_process_id COMPLETAMENTE ALEATORIO:', finalId);
+    
+    return finalId;
 };
 
 /**
@@ -94,9 +106,9 @@ const getBancardBaseUrl = () => {
     const environment = process.env.BANCARD_ENVIRONMENT || 'staging';
     
     if (environment === 'production') {
-        return process.env.BANCARD_BASE_URL_PRODUCTION;
+        return process.env.BANCARD_BASE_URL_PRODUCTION || 'https://vpos.infonet.com.py';
     } else {
-        return process.env.BANCARD_BASE_URL_STAGING;
+        return process.env.BANCARD_BASE_URL_STAGING || 'https://vpos.infonet.com.py:8888';
     }
 };
 
@@ -158,13 +170,38 @@ const parseAmount = (amountStr) => {
     return parseFloat(amountStr || '0');
 };
 
+/**
+ * ✅ NUEVA FUNCIÓN - Generar UUID v4 simple para casos críticos
+ * @returns {string} UUID único
+ */
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
+/**
+ * ✅ NUEVA FUNCIÓN - Generar shop_process_id usando timestamp + UUID
+ * Alternativa si sigue habiendo problemas de duplicados
+ * @returns {string} ID único garantizado
+ */
+const generateAlternativeShopProcessId = () => {
+    const timestamp = Date.now();
+    const uuid = generateUUID().replace(/-/g, '').substring(0, 8);
+    return `BT${timestamp}${uuid}`;
+};
+
 module.exports = {
     generateSingleBuyToken,
     generateConfirmToken,
     verifyConfirmationToken,
     generateShopProcessId,
+    generateAlternativeShopProcessId, // ✅ Nueva función alternativa
     getBancardBaseUrl,
     validateBancardConfig,
     formatAmount,
-    parseAmount
+    parseAmount,
+    generateUUID
 };
