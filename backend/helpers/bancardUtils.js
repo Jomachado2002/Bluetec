@@ -1,4 +1,4 @@
-// backend/helpers/bancardUtils.js - VERSIÓN COMPLETA CORREGIDA
+// backend/helpers/bancardUtils.js - VERSIÓN CORREGIDA PARA IDS ÚNICOS
 const crypto = require('crypto');
 
 /**
@@ -77,25 +77,106 @@ const verifyConfirmationToken = (receivedToken, shopProcessId, amount, currency 
 };
 
 /**
- * ✅ FUNCIÓN MEJORADA - Genera un ID único para shop_process_id
- * Ahora incluye más entropía para evitar duplicados
- * @returns {string} ID único
+ * ✅ FUNCIÓN ULTRA MEJORADA - Genera un ID GARANTIZADO ÚNICO
+ * Usa múltiples fuentes de entropía y timestamps de alta precisión
+ * @returns {string} ID único garantizado
  */
 const generateShopProcessId = () => {
-    // Usar múltiples fuentes de aleatoriedad
+    // Timestamp con alta precisión (nanosegundos)
+    const hrTime = process.hrtime.bigint();
+    const timestamp = Date.now();
+    
+    // Múltiples fuentes de aleatoriedad criptográficamente seguras
     const randomBytes1 = crypto.randomBytes(8).toString('hex'); // 16 chars
-    const randomBytes2 = crypto.randomBytes(4).toString('hex'); // 8 chars  
-    const timestamp = Date.now().toString(36); // Base36 es más corto
-    const random1 = Math.floor(Math.random() * 999999).toString(36);
-    const random2 = Math.floor(Math.random() * 999999).toString(36);
+    const randomBytes2 = crypto.randomBytes(6).toString('hex'); // 12 chars
+    const randomBytes3 = crypto.randomBytes(4).toString('hex'); // 8 chars
     
-    // Combinar todo y tomar solo 20 caracteres para que sea manejable
-    const fullId = `BT${randomBytes1}${timestamp}${random1}${randomBytes2}${random2}`;
-    const finalId = fullId.substring(0, 24); // Mantener longitud razonable
+    // Generar números aleatorios adicionales
+    const random1 = Math.floor(Math.random() * 999999999).toString(36);
+    const random2 = Math.floor(Math.random() * 999999999).toString(36);
     
-    console.log('🆔 Generando shop_process_id COMPLETAMENTE ALEATORIO:', finalId);
+    // Convertir hrTime a string hexadecimal único
+    const hrTimeHex = hrTime.toString(16).slice(-8);
+    
+    // Combinar TODAS las fuentes de entropía
+    const entropy = `${timestamp}${hrTimeHex}${randomBytes1}${random1}${randomBytes2}${random2}${randomBytes3}`;
+    
+    // Crear hash único del entropy combinado
+    const uniqueHash = crypto.createHash('sha256').update(entropy).digest('hex').slice(0, 16);
+    
+    // Construir ID final con prefijo y sufijo únicos
+    const finalId = `BT${timestamp.toString(36)}${uniqueHash}${randomBytes3}`.substring(0, 32);
+    
+    console.log('🆔 Generando shop_process_id ULTRA ÚNICO:', {
+        finalId,
+        length: finalId.length,
+        timestamp,
+        hrTime: hrTime.toString(),
+        entropy: entropy.substring(0, 50) + '...'
+    });
     
     return finalId;
+};
+
+/**
+ * ✅ FUNCIÓN ALTERNATIVA CON UUID REAL
+ * Usa UUID v4 real para máxima garantía
+ * @returns {string} ID único basado en UUID
+ */
+const generateAlternativeShopProcessId = () => {
+    // Generar UUID v4 real
+    const uuid = crypto.randomUUID();
+    
+    // Timestamp para contexto adicional
+    const timestamp = Date.now();
+    
+    // Combinar UUID con timestamp y prefijo
+    const processId = `BT${timestamp}${uuid.replace(/-/g, '').substring(0, 12)}`;
+    
+    console.log('🔄 Generando shop_process_id ALTERNATIVO:', {
+        processId,
+        uuid,
+        timestamp
+    });
+    
+    return processId;
+};
+
+/**
+ * ✅ FUNCIÓN DE EMERGENCIA - Para casos extremos
+ * Usa todas las fuentes disponibles + timestamp de microsegundos
+ * @returns {string} ID de emergencia garantizado único
+ */
+const generateEmergencyShopProcessId = () => {
+    // Timestamp con microsegundos
+    const now = new Date();
+    const timestamp = now.getTime();
+    const microseconds = now.getUTCMilliseconds();
+    
+    // Bytes aleatorios criptográficos
+    const randomBytes = crypto.randomBytes(16).toString('hex');
+    
+    // Número aleatorio adicional
+    const randomNumber = Math.floor(Math.random() * 999999999999);
+    
+    // Proceso ID (si está disponible)
+    const processId = process.pid || Math.floor(Math.random() * 9999);
+    
+    // Combinar todo y crear hash
+    const combined = `${timestamp}${microseconds}${randomBytes}${randomNumber}${processId}`;
+    const hash = crypto.createHash('sha256').update(combined).digest('hex');
+    
+    // Crear ID final
+    const emergencyId = `BTEMR${timestamp}${hash.substring(0, 16)}`;
+    
+    console.log('🚨 Generando shop_process_id DE EMERGENCIA:', {
+        emergencyId,
+        timestamp,
+        microseconds,
+        processId
+    });
+    
+    return emergencyId;
 };
 
 /**
@@ -171,10 +252,16 @@ const parseAmount = (amountStr) => {
 };
 
 /**
- * ✅ NUEVA FUNCIÓN - Generar UUID v4 simple para casos críticos
+ * ✅ NUEVA FUNCIÓN - Generar UUID v4 compatible con Node.js más antiguos
  * @returns {string} UUID único
  */
 const generateUUID = () => {
+    // Si está disponible crypto.randomUUID (Node.js 15+)
+    if (crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    
+    // Fallback para versiones más antiguas
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         const r = Math.random() * 16 | 0;
         const v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -182,23 +269,13 @@ const generateUUID = () => {
     });
 };
 
-/**
- * ✅ NUEVA FUNCIÓN - Generar shop_process_id usando timestamp + UUID
- * Alternativa si sigue habiendo problemas de duplicados
- * @returns {string} ID único garantizado
- */
-const generateAlternativeShopProcessId = () => {
-    const timestamp = Date.now();
-    const uuid = generateUUID().replace(/-/g, '').substring(0, 8);
-    return `BT${timestamp}${uuid}`;
-};
-
 module.exports = {
     generateSingleBuyToken,
     generateConfirmToken,
     verifyConfirmationToken,
     generateShopProcessId,
-    generateAlternativeShopProcessId, // ✅ Nueva función alternativa
+    generateAlternativeShopProcessId,
+    generateEmergencyShopProcessId, // ✅ Nueva función de emergencia
     getBancardBaseUrl,
     validateBancardConfig,
     formatAmount,

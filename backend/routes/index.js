@@ -1,4 +1,4 @@
-// backend/routes/index.js - VERSIÓN COMPLETA CON BANCARD INTEGRADO
+// backend/routes/index.js - VERSIÓN CORREGIDA
 const express = require('express');
 const router = express.Router();
 
@@ -33,6 +33,7 @@ const { getMarginReportController, getCategoryProfitabilityController } = requir
 const { 
     bancardConfirmController,
     createPaymentController,
+    testBancardSimpleController, // ✅ AGREGADO EL IMPORT FALTANTE
     getTransactionStatusController,
     bancardHealthController
 } = require('../controller/bancard/bancardController');
@@ -118,6 +119,7 @@ router.get("/bancard/confirm", (req, res) => {
     });
 });
 router.post("/bancard/create-payment", createPaymentController);
+router.post("/bancard/test-simple", testBancardSimpleController); // ✅ MOVIDO A LA SECCIÓN CORRECTA
 router.get("/bancard/status/:transactionId", getTransactionStatusController);
 router.get("/bancard/health", bancardHealthController);
 
