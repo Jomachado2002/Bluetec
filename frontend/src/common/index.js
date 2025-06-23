@@ -90,6 +90,40 @@ const SummaryApi = {
     },
 
     // ===========================================
+    // BANCARD - PAGOS ONLINE
+    // ===========================================
+    bancard: {
+        createPayment: {
+            url: `${backendDomain}/api/bancard/create-payment`,
+            method: 'post'
+        },
+        confirmPayment: {
+            url: `${backendDomain}/api/bancard/confirm`,
+            method: 'post'
+        },
+        getTransactionStatus: {
+            url: `${backendDomain}/api/bancard/status`,
+            method: 'get'
+        },
+        healthCheck: {
+            url: `${backendDomain}/api/bancard/health`,
+            method: 'get'
+        },
+        configCheck: {
+            url: `${backendDomain}/api/bancard/config-check`,
+            method: 'get'
+        },
+        testPayment: {
+            url: `${backendDomain}/api/bancard/test-payment`,
+            method: 'post'
+        },
+        connectionTest: {
+            url: `${backendDomain}/api/bancard/connection-test`,
+            method: 'get'
+        }
+    },
+
+    // ===========================================
     // FINANZAS DE PRODUCTOS
     // ===========================================
     productFinance: {

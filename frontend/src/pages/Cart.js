@@ -2,14 +2,17 @@ import React, { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Context from '../context';
 import displayINRCurrency from '../helpers/displayCurrency';
-import { MdDelete, MdShoppingCart, MdPictureAsPdf, MdDownload, MdWhatsapp } from "react-icons/md";
-import { FaArrowLeft, FaTrash } from "react-icons/fa";
+import { MdDelete, MdShoppingCart, MdDownload, MdWhatsapp } from "react-icons/md";
+import { FaArrowLeft, FaTrash, FaCreditCard } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import logo from '../helpers/logo.png';
 import { toast } from 'react-toastify';
 import { localCartHelper } from '../helpers/addToCart';
 import { trackWhatsAppContact, trackPDFDownload } from '../components/MetaPixelTracker';
+
+// ✅ IMPORTAR EL COMPONENTE DE BANCARD
+import BancardPayButton from '../components/BancardPayButton';
 
 const Cart = () => {
     const [data, setData] = useState([]);
@@ -18,8 +21,10 @@ const Cart = () => {
         name: '',
         phone: '',
         email: '',
+        address: ''
     });
     const [showCustomerForm, setShowCustomerForm] = useState(false);
+    const [showPaymentSection, setShowPaymentSection] = useState(false);
     const context = useContext(Context);
 
     // Función simplificada para cargar datos directamente desde localStorage
@@ -31,7 +36,6 @@ const Cart = () => {
             const cartItems = localCartHelper.getCart();
             console.log("Datos de carrito cargados:", cartItems);
             
-            // Ya no es necesario hacer peticiones adicionales
             setData(cartItems);
             
         } catch (error) {
@@ -90,7 +94,6 @@ const Cart = () => {
             localCartHelper.removeItem(id);
             fetchData();
             
-            // Actualizar contador global del carrito
             if (context.fetchUserAddToCart) {
                 context.fetchUserAddToCart();
             }
@@ -108,7 +111,6 @@ const Cart = () => {
             localCartHelper.clearCart();
             fetchData();
             
-            // Actualizar contador global del carrito
             if (context.fetchUserAddToCart) {
                 context.fetchUserAddToCart();
             }
@@ -124,7 +126,7 @@ const Cart = () => {
     const totalQty = data.reduce((previousValue, currentValue) => 
         previousValue + currentValue.quantity, 0);
     
-    // Calcular precio total - adaptado para el nuevo formato con validación
+    // Calcular precio total
     const totalPrice = data.reduce((prev, curr) => {
         if (curr?.productId?.sellingPrice) {
             return prev + (curr.quantity * curr.productId.sellingPrice);
@@ -132,8 +134,41 @@ const Cart = () => {
         return prev;
     }, 0);
 
-    // Definir validProducts aquí para evitar el error de inicialización
+    // Definir validProducts
     const validProducts = data.filter(isValidProduct);
+
+    // ✅ FUNCIONES PARA BANCARD
+    const handlePaymentStart = () => {
+        console.log('Iniciando pago con Bancard...');
+        toast.info('Iniciando proceso de pago...');
+    };
+
+    const handlePaymentSuccess = (paymentData) => {
+        console.log('Pago exitoso:', paymentData);
+        toast.success('Redirigiendo a Bancard...');
+        
+        // Opcional: guardar datos del pago
+        sessionStorage.setItem('payment_in_progress', JSON.stringify({
+            ...paymentData,
+            customer: customerData,
+            timestamp: Date.now()
+        }));
+    };
+
+    const handlePaymentError = (error) => {
+        console.error('Error en el pago:', error);
+        toast.error('Error al procesar el pago. Intenta nuevamente.');
+    };
+
+    // Función para verificar si hay datos de cliente válidos para el pago
+    const hasValidCustomerDataForPayment = () => {
+        return customerData.name.trim() && customerData.email.trim() && customerData.phone.trim();
+    };
+
+    // Función para verificar si hay datos mínimos para presupuesto
+    const hasValidCustomerDataForBudget = () => {
+        return customerData.name.trim();
+    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -143,10 +178,22 @@ const Cart = () => {
         }));
     };
 
-    // Generar PDF mejorado
+    // Preparar datos del carrito para Bancard
+    const prepareBancardItems = () => {
+        return validProducts.map(product => ({
+            _id: product._id,
+            name: product.productId.productName,
+            productId: product.productId,
+            quantity: product.quantity,
+            unitPrice: product.productId.sellingPrice,
+            total: product.quantity * product.productId.sellingPrice
+        }));
+    };
+
+    // Generar PDF
     const generatePDF = () => {
-        if (!customerData.name) {
-            toast.error("Por favor ingrese el nombre del cliente");
+        if (!hasValidCustomerDataForBudget()) {
+            toast.error("Por favor ingrese al menos el nombre del cliente");
             return;
         }
     
@@ -348,8 +395,8 @@ const Cart = () => {
 
     // Función para enviar presupuesto por WhatsApp
     const sendToWhatsApp = () => {
-        if (!customerData.name) {
-            toast.error("Por favor ingrese el nombre del cliente");
+        if (!hasValidCustomerDataForBudget()) {
+            toast.error("Por favor ingrese al menos el nombre del cliente");
             return;
         }
 
@@ -397,24 +444,22 @@ const Cart = () => {
 
     const toggleCustomerForm = () => {
         setShowCustomerForm(!showCustomerForm);
+        if (!showCustomerForm) {
+            setShowPaymentSection(false);
+        }
+    };
+
+    const togglePaymentSection = () => {
+        if (!hasValidCustomerDataForPayment()) {
+            toast.error("Para proceder al pago, completa: nombre, email y teléfono");
+            return;
+        }
+        setShowPaymentSection(!showPaymentSection);
     };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Botones para debug - solo visibles en desarrollo */}
-                {process.env.NODE_ENV === 'development' && (
-                    <div className="flex gap-2 mb-4">
-                        <button onClick={() => console.log("Carrito actual:", localCartHelper.getCart())} 
-                                className="px-3 py-1 bg-gray-200 rounded text-sm">
-                            Debug: Ver carrito en consola
-                        </button>
-                        <button onClick={clearCart} 
-                                className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm">
-                            Limpiar carrito
-                        </button>
-                    </div>
-                )}
                 
                 {/* Encabezado del carrito */}
                 <div className="flex flex-col sm:flex-row items-center justify-between mb-8">
@@ -584,23 +629,24 @@ const Cart = () => {
                                     </div>
                                 </div>
 
-                                {/* Información del cliente para presupuesto */}
+                                {/* Botón principal de acción */}
                                 <div className="mt-8">
                                     <button 
                                         onClick={toggleCustomerForm}
                                         className="w-full text-center bg-[#2A3190] text-white py-3 rounded-lg hover:bg-[#1e236b] transition-all duration-300 shadow-md flex items-center justify-center gap-2 mb-4"
                                     >
-                                        <MdPictureAsPdf className="text-xl" />
-                                        <span>{showCustomerForm ? 'Ocultar formulario' : 'Solicitar presupuesto'}</span>
+                                        <FaCreditCard className="text-xl" />
+                                        <span>{showCustomerForm ? 'Ocultar opciones' : 'Finalizar compra'}</span>
                                     </button>
 
+                                    {/* Formulario de datos del cliente */}
                                     {showCustomerForm && (
-                                        <div className="space-y-3 bg-blue-50 p-5 rounded-lg mt-4 mb-4 border border-blue-100">
-                                            <h3 className="font-semibold text-[#2A3190]">Datos para el presupuesto</h3>
+                                        <div className="space-y-4 bg-blue-50 p-5 rounded-lg border border-blue-100">
+                                            <h3 className="font-semibold text-[#2A3190]">Datos del cliente</h3>
                                             
                                             <div>
                                                 <label className="block text-gray-700 text-sm font-medium mb-1">
-                                                    Nombre del cliente *
+                                                    Nombre completo *
                                                 </label>
                                                 <input
                                                     type="text"
@@ -615,21 +661,7 @@ const Cart = () => {
                                             
                                             <div>
                                                 <label className="block text-gray-700 text-sm font-medium mb-1">
-                                                    Teléfono (opcional)
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="phone"
-                                                    value={customerData.phone}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
-                                                    placeholder="Número de contacto"
-                                                />
-                                            </div>
-                                            
-                                            <div>
-                                                <label className="block text-gray-700 text-sm font-medium mb-1">
-                                                    Email (opcional)
+                                                    Email *
                                                 </label>
                                                 <input
                                                     type="email"
@@ -637,27 +669,98 @@ const Cart = () => {
                                                     value={customerData.email}
                                                     onChange={handleInputChange}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
-                                                    placeholder="Correo electrónico"
+                                                    placeholder="tu@email.com"
+                                                />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-gray-700 text-sm font-medium mb-1">
+                                                    Teléfono *
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    name="phone"
+                                                    value={customerData.phone}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
+                                                    placeholder="+595 XXX XXXXXX"
                                                 />
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-3 pt-3 mt-2">
-                                                <button
-                                                    onClick={generatePDF}
-                                                    className="bg-[#2A3190] text-white py-2.5 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md"
-                                                >
-                                                    <MdDownload className="text-lg" />
-                                                    <span>Descargar PDF</span>
-                                                </button>
-                                                
-                                                <button
-                                                    onClick={sendToWhatsApp}
-                                                    className="bg-[#25D366] text-white py-2.5 rounded-lg hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md"
-                                                >
-                                                    <MdWhatsapp className="text-lg" />
-                                                    <span>Enviar WhatsApp</span>
-                                                </button>
+                                            <div>
+                                                <label className="block text-gray-700 text-sm font-medium mb-1">
+                                                    Dirección (opcional)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="address"
+                                                    value={customerData.address}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
+                                                    placeholder="Dirección de entrega"
+                                                />
                                             </div>
+
+                                            {/* Opciones de presupuesto */}
+                                            <div className="border-t border-blue-200 pt-4">
+                                                <h4 className="font-medium text-[#2A3190] mb-3">📋 Solicitar presupuesto</h4>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        onClick={generatePDF}
+                                                        disabled={!hasValidCustomerDataForBudget()}
+                                                        className="bg-[#2A3190] text-white py-2.5 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        <MdDownload className="text-lg" />
+                                                        <span>PDF</span>
+                                                    </button>
+                                                    
+                                                    <button
+                                                        onClick={sendToWhatsApp}
+                                                        disabled={!hasValidCustomerDataForBudget()}
+                                                        className="bg-[#25D366] text-white py-2.5 rounded-lg hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        <MdWhatsapp className="text-lg" />
+                                                        <span>WhatsApp</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Opciones de pago */}
+                                            <div className="border-t border-blue-200 pt-4">
+                                                <h4 className="font-medium text-[#2A3190] mb-3">💳 Pagar ahora</h4>
+                                                
+                                                {hasValidCustomerDataForPayment() ? (
+                                                    <button
+                                                        onClick={togglePaymentSection}
+                                                        className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2 font-medium shadow-md"
+                                                    >
+                                                        <FaCreditCard />
+                                                        <span>{showPaymentSection ? 'Ocultar pago' : 'Proceder al pago'}</span>
+                                                    </button>
+                                                ) : (
+                                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                                        <p className="text-yellow-800 text-sm">
+                                                            ⚠️ Para proceder al pago, completa: nombre, email y teléfono
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Sección de pago con Bancard */}
+                                    {showPaymentSection && hasValidCustomerDataForPayment() && (
+                                        <div className="bg-green-50 p-5 rounded-lg border border-green-200 mt-4">
+                                            <h3 className="font-semibold text-green-800 mb-4">💳 Pagar con Bancard</h3>
+                                            <BancardPayButton
+                                                cartItems={prepareBancardItems()}
+                                                totalAmount={totalPrice}
+                                                customerData={customerData}
+                                                onPaymentStart={handlePaymentStart}
+                                                onPaymentSuccess={handlePaymentSuccess}
+                                                onPaymentError={handlePaymentError}
+                                                disabled={validProducts.length === 0}
+                                            />
                                         </div>
                                     )}
                                 </div>

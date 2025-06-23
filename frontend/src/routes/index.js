@@ -1,4 +1,4 @@
-// frontend/src/router/index.js - ACTUALIZACIÓN
+// frontend/src/routes/index.js - CORREGIDO
 import { createBrowserRouter } from "react-router-dom"
 import App from "../App"
 import Home from "../pages/Home"
@@ -16,7 +16,11 @@ import MobileCategoriesPage from "../pages/MobileCategoriesPage"
 import ResetPassword from "../pages/ResetPassword"
 import Nosotros from "../pages/Nosotros"
 
-// ✅ IMPORTAR EL NUEVO COMPONENTE
+// ✅ SOLO IMPORTAR COMPONENTES DE PÁGINAS DE BANCARD (NO BancardPayment)
+import PaymentSuccess from "../pages/PaymentSuccess"
+import PaymentCancelled from "../pages/PaymentCancelled"
+
+// Importar el nuevo componente de dashboard
 import AdminDashboard from "../pages/AdminDashboard"
 
 // Importar páginas financieras
@@ -89,13 +93,23 @@ const router = createBrowserRouter([
                 element: <SearchProduct />
             },
             
-            // ✅ Panel de admin separado
+            // ✅ RUTAS PARA BANCARD (SOLO PÁGINAS DE RESULTADO)
+            {
+                path: "pago-exitoso",
+                element: <PaymentSuccess />
+            },
+            {
+                path: "pago-cancelado",
+                element: <PaymentCancelled />
+            },
+            
+            // Panel de admin separado
             {
                 path: "panel-admin",
                 element: <AdminPanel />,
                 children: [
                     {
-                        path: "",  // ✅ USAR EL NUEVO COMPONENTE
+                        path: "",
                         element: <AdminDashboard />
                     },
                     {
@@ -106,7 +120,7 @@ const router = createBrowserRouter([
                         path: "todos-productos",
                         element: <AllProducts />
                     },
-                    // ✅ RUTAS FINANCIERAS
+                    // Rutas financieras
                     {
                         path: "dashboard",
                         element: <FinancialDashboard />
