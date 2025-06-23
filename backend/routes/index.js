@@ -1,4 +1,4 @@
-// backend/routes/index.js - VERSIÓN CORREGIDA PARA VERCEL
+// backend/routes/index.js - VERSIÓN COMPLETA CON BANCARD INTEGRADO
 const express = require('express');
 const router = express.Router();
 
@@ -29,23 +29,14 @@ const getProductBySlug = require('../controller/product/getProductBySlug');
 const { updateProductFinanceController, getProductFinanceController } = require('../controller/product/updateProductFinance');
 const { getMarginReportController, getCategoryProfitabilityController } = require('../controller/reports/financialReportsController');
 
+// ===== CONTROLADORES DE BANCARD =====
 const { 
     bancardConfirmController,
     createPaymentController,
-    getTransactionStatusController
+    getTransactionStatusController,
+    bancardHealthController
 } = require('../controller/bancard/bancardController');
-router.post("/bancard/confirm", bancardConfirmController);
-router.post("/bancard/create-payment", createPaymentController);
-router.get("/bancard/status/:transactionId", getTransactionStatusController);
 
-router.get("/bancard/health", (req, res) => {
-    res.status(200).json({
-        message: "Bancard endpoint funcionando correctamente",
-        timestamp: new Date().toISOString(),
-        success: true,
-        error: false
-    });
-});
 // ===== CONTROLADORES DE CLIENTES =====
 const { 
     createClientController, 
@@ -112,6 +103,109 @@ const {
     getAccountStatementController,
     getYearlyMetricsController
 } = require('../controller/dashboard/dashboardController');
+
+// ===========================================
+// RUTAS DE BANCARD (PAGOS)
+// ===========================================
+router.post("/bancard/confirm", bancardConfirmController);
+router.post("/bancard/create-payment", createPaymentController);
+router.get("/bancard/status/:transactionId", getTransactionStatusController);
+router.get("/bancard/health", bancardHealthController);
+
+// ===== ENDPOINT DE VERIFICACIÓN DE CONFIGURACIÓN BANCARD =====
+router.get("/bancard/config-check", (req, res) => {
+    const { validateBancardConfig } = require('../helpers/bancardUtils');
+    const validation = validateBancardConfig();
+    
+    res.json({
+        message: "Verificación de configuración de Bancard",
+        success: validation.isValid,
+        error: !validation.isValid,
+        data: {
+            isValid: validation.isValid,
+            errors: validation.errors,
+            environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+            hasPublicKey: !!process.env.BANCARD_PUBLIC_KEY,
+            hasPrivateKey: !!process.env.BANCARD_PRIVATE_KEY,
+            publicKeyLength: process.env.BANCARD_PUBLIC_KEY ? process.env.BANCARD_PUBLIC_KEY.length : 0,
+            privateKeyLength: process.env.BANCARD_PRIVATE_KEY ? process.env.BANCARD_PRIVATE_KEY.length : 0,
+            baseUrl: validation.config?.baseUrl,
+            confirmationUrl: process.env.BANCARD_CONFIRMATION_URL
+        }
+    });
+});
+
+// ===== ENDPOINT DE PRUEBA PARA BANCARD =====
+router.post("/bancard/test-payment", (req, res) => {
+    try {
+        console.log("🧪 Endpoint de prueba para Bancard");
+        
+        // Datos de prueba según documentación de Bancard
+        const testPayment = {
+            amount: "10000.00", // 10,000 guaraníes
+            currency: "PYG",
+            description: "Pago de prueba - BlueTec",
+            return_url: `${process.env.FRONTEND_URL || 'https://www.bluetec.com.py'}/pago-exitoso`,
+            cancel_url: `${process.env.FRONTEND_URL || 'https://www.bluetec.com.py'}/pago-cancelado`,
+            iva_amount: "909.09" // IVA del 10%
+        };
+        
+        // Simular request para el controlador
+        req.body = testPayment;
+        
+        // Llamar al controlador de creación de pago
+        createPaymentController(req, res);
+        
+    } catch (error) {
+        console.error("❌ Error en test de pago:", error);
+        res.status(500).json({
+            message: "Error en test de pago",
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
+});
+
+// ===== ENDPOINT DE TEST DE CONECTIVIDAD =====
+router.get("/bancard/connection-test", async (req, res) => {
+    try {
+        const axios = require('axios');
+        const { getBancardBaseUrl } = require('../helpers/bancardUtils');
+        
+        // Test simple de conectividad
+        const testUrl = `${getBancardBaseUrl()}/vpos/api/0.3/`;
+        
+        const response = await axios.get(testUrl, {
+            timeout: 10000,
+            validateStatus: () => true // Aceptar cualquier status code
+        });
+        
+        res.json({
+            message: "Test de conexión con Bancard",
+            success: true,
+            error: false,
+            data: {
+                url: testUrl,
+                status: response.status,
+                reachable: response.status < 500,
+                environment: process.env.BANCARD_ENVIRONMENT || 'staging'
+            }
+        });
+        
+    } catch (error) {
+        res.json({
+            message: "Test de conexión con Bancard",
+            success: false,
+            error: true,
+            data: {
+                error: error.message,
+                reachable: false,
+                environment: process.env.BANCARD_ENVIRONMENT || 'staging'
+            }
+        });
+    }
+});
 
 // ===========================================
 // RUTAS DE USUARIO
@@ -224,14 +318,16 @@ router.get("/finanzas/estado-cuenta", authToken, getAccountStatementController);
 router.get("/finanzas/metricas-anuales", authToken, getYearlyMetricsController);
 
 // ===========================================
-// RUTA DE SALUD PARA VERCEL
+// RUTAS DE SALUD Y MONITOREO
 // ===========================================
 router.get("/health", (req, res) => {
     res.status(200).json({
         message: "API funcionando correctamente",
         timestamp: new Date().toISOString(),
         success: true,
-        error: false
+        error: false,
+        environment: process.env.NODE_ENV || 'development',
+        version: "1.0.0"
     });
 });
 
