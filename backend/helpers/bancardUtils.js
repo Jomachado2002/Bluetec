@@ -1,4 +1,4 @@
-// backend/helpers/bancardUtils.js - VERSIÓN CORREGIDA PARA IDS ÚNICOS
+// backend/helpers/bancardUtils.js - VERSIÓN CORREGIDA
 const crypto = require('crypto');
 
 /**
@@ -15,45 +15,52 @@ const crypto = require('crypto');
 const generateSingleBuyToken = (shopProcessId, amount, currency = 'PYG') => {
     const privateKey = process.env.BANCARD_PRIVATE_KEY;
     
-    // Formatear el monto con 2 decimales
+    // ✅ IMPORTANTE: Formatear el monto EXACTAMENTE como lo requiere Bancard
     const formattedAmount = Number(amount).toFixed(2);
     
-    // Crear string para el hash: private_key + shop_process_id + amount + currency
+    // ✅ ORDEN CORRECTO: private_key + shop_process_id + amount + currency
     const hashString = `${privateKey}${shopProcessId}${formattedAmount}${currency}`;
     
-    console.log('🔐 Generando token para:', {
+    console.log('🔐 Generando token MD5 para Bancard:', {
+        privateKey: privateKey ? `${privateKey.substring(0, 10)}...` : 'NO CONFIGURADA',
         shopProcessId,
         amount: formattedAmount,
         currency,
-        hashString: hashString.substring(0, 20) + '...' // Solo mostrar inicio por seguridad
+        hashString: `${hashString.substring(0, 20)}...` // Solo mostrar inicio por seguridad
     });
     
-    // Generar MD5
-    const token = crypto.createHash('md5').update(hashString).digest('hex');
+    // ✅ Generar MD5
+    const token = crypto.createHash('md5').update(hashString, 'utf8').digest('hex');
+    
+    console.log('🔐 Token generado:', token);
     
     return token;
 };
 
 /**
- * Genera el token MD5 para confirmación de Bancard
- * @param {string} shopProcessId - ID único de la transacción
- * @param {number} amount - Monto en guaraníes
- * @param {string} currency - Moneda (PYG)
- * @returns {string} Token MD5 para confirmación
+ * Genera un ID de proceso único (SOLO NÚMEROS como requiere Bancard)
+ * @returns {number} ID único numérico
  */
-const generateConfirmToken = (shopProcessId, amount, currency = 'PYG') => {
-    const privateKey = process.env.BANCARD_PRIVATE_KEY;
+const generateShopProcessId = () => {
+    // ✅ NUEVA ESTRATEGIA: Usar microsegundos + PID + aleatorio
+    const now = Date.now();
+    const microseconds = process.hrtime ? process.hrtime.bigint() : BigInt(now * 1000);
+    const pid = process.pid || Math.floor(Math.random() * 9999);
+    const random = Math.floor(Math.random() * 99999);
     
-    // Formatear el monto con 2 decimales
-    const formattedAmount = Number(amount).toFixed(2);
+    // Crear ID único basado en timestamp + microsegundos + random
+    const uniquePart = Number(microseconds.toString().slice(-8)); // Últimos 8 dígitos de microsegundos
+    const shopProcessId = Number(`${now.toString().slice(-6)}${uniquePart.toString().slice(-4)}${random.toString().slice(-3)}`);
     
-    // Para confirmación: private_key + shop_process_id + "confirm" + amount + currency
-    const hashString = `${privateKey}${shopProcessId}confirm${formattedAmount}${currency}`;
+    console.log('🆔 Generando shop_process_id ULTRA ÚNICO:', {
+        shopProcessId,
+        timestamp: now,
+        microseconds: microseconds.toString(),
+        random,
+        pid
+    });
     
-    // Generar MD5
-    const token = crypto.createHash('md5').update(hashString).digest('hex');
-    
-    return token;
+    return shopProcessId;
 };
 
 /**
@@ -65,118 +72,20 @@ const generateConfirmToken = (shopProcessId, amount, currency = 'PYG') => {
  * @returns {boolean} True si el token es válido
  */
 const verifyConfirmationToken = (receivedToken, shopProcessId, amount, currency = 'PYG') => {
-    const expectedToken = generateConfirmToken(shopProcessId, amount, currency);
+    const privateKey = process.env.BANCARD_PRIVATE_KEY;
+    const formattedAmount = Number(amount).toFixed(2);
     
-    console.log('🔍 Verificando token:', {
+    // ✅ Para confirmación: private_key + shop_process_id + "confirm" + amount + currency
+    const hashString = `${privateKey}${shopProcessId}confirm${formattedAmount}${currency}`;
+    const expectedToken = crypto.createHash('md5').update(hashString, 'utf8').digest('hex');
+    
+    console.log('🔍 Verificando token de confirmación:', {
         received: receivedToken,
         expected: expectedToken,
         match: receivedToken === expectedToken
     });
     
     return receivedToken === expectedToken;
-};
-
-/**
- * ✅ FUNCIÓN ULTRA MEJORADA - Genera un ID GARANTIZADO ÚNICO
- * Usa múltiples fuentes de entropía y timestamps de alta precisión
- * @returns {string} ID único garantizado
- */
-const generateShopProcessId = () => {
-    // Timestamp con alta precisión (nanosegundos)
-    const hrTime = process.hrtime.bigint();
-    const timestamp = Date.now();
-    
-    // Múltiples fuentes de aleatoriedad criptográficamente seguras
-    const randomBytes1 = crypto.randomBytes(8).toString('hex'); // 16 chars
-    const randomBytes2 = crypto.randomBytes(6).toString('hex'); // 12 chars
-    const randomBytes3 = crypto.randomBytes(4).toString('hex'); // 8 chars
-    
-    // Generar números aleatorios adicionales
-    const random1 = Math.floor(Math.random() * 999999999).toString(36);
-    const random2 = Math.floor(Math.random() * 999999999).toString(36);
-    
-    // Convertir hrTime a string hexadecimal único
-    const hrTimeHex = hrTime.toString(16).slice(-8);
-    
-    // Combinar TODAS las fuentes de entropía
-    const entropy = `${timestamp}${hrTimeHex}${randomBytes1}${random1}${randomBytes2}${random2}${randomBytes3}`;
-    
-    // Crear hash único del entropy combinado
-    const uniqueHash = crypto.createHash('sha256').update(entropy).digest('hex').slice(0, 16);
-    
-    // Construir ID final con prefijo y sufijo únicos
-    const finalId = `BT${timestamp.toString(36)}${uniqueHash}${randomBytes3}`.substring(0, 32);
-    
-    console.log('🆔 Generando shop_process_id ULTRA ÚNICO:', {
-        finalId,
-        length: finalId.length,
-        timestamp,
-        hrTime: hrTime.toString(),
-        entropy: entropy.substring(0, 50) + '...'
-    });
-    
-    return finalId;
-};
-
-/**
- * ✅ FUNCIÓN ALTERNATIVA CON UUID REAL
- * Usa UUID v4 real para máxima garantía
- * @returns {string} ID único basado en UUID
- */
-const generateAlternativeShopProcessId = () => {
-    // Generar UUID v4 real
-    const uuid = crypto.randomUUID();
-    
-    // Timestamp para contexto adicional
-    const timestamp = Date.now();
-    
-    // Combinar UUID con timestamp y prefijo
-    const processId = `BT${timestamp}${uuid.replace(/-/g, '').substring(0, 12)}`;
-    
-    console.log('🔄 Generando shop_process_id ALTERNATIVO:', {
-        processId,
-        uuid,
-        timestamp
-    });
-    
-    return processId;
-};
-
-/**
- * ✅ FUNCIÓN DE EMERGENCIA - Para casos extremos
- * Usa todas las fuentes disponibles + timestamp de microsegundos
- * @returns {string} ID de emergencia garantizado único
- */
-const generateEmergencyShopProcessId = () => {
-    // Timestamp con microsegundos
-    const now = new Date();
-    const timestamp = now.getTime();
-    const microseconds = now.getUTCMilliseconds();
-    
-    // Bytes aleatorios criptográficos
-    const randomBytes = crypto.randomBytes(16).toString('hex');
-    
-    // Número aleatorio adicional
-    const randomNumber = Math.floor(Math.random() * 999999999999);
-    
-    // Proceso ID (si está disponible)
-    const processId = process.pid || Math.floor(Math.random() * 9999);
-    
-    // Combinar todo y crear hash
-    const combined = `${timestamp}${microseconds}${randomBytes}${randomNumber}${processId}`;
-    const hash = crypto.createHash('sha256').update(combined).digest('hex');
-    
-    // Crear ID final
-    const emergencyId = `BTEMR${timestamp}${hash.substring(0, 16)}`;
-    
-    console.log('🚨 Generando shop_process_id DE EMERGENCIA:', {
-        emergencyId,
-        timestamp,
-        microseconds,
-        processId
-    });
-    
-    return emergencyId;
 };
 
 /**
@@ -187,9 +96,9 @@ const getBancardBaseUrl = () => {
     const environment = process.env.BANCARD_ENVIRONMENT || 'staging';
     
     if (environment === 'production') {
-        return process.env.BANCARD_BASE_URL_PRODUCTION || 'https://vpos.infonet.com.py';
+        return 'https://vpos.infonet.com.py';
     } else {
-        return process.env.BANCARD_BASE_URL_STAGING || 'https://vpos.infonet.com.py:8888';
+        return 'https://vpos.infonet.com.py:8888';
     }
 };
 
@@ -212,13 +121,13 @@ const validateBancardConfig = () => {
         errors.push('BANCARD_CONFIRMATION_URL no está configurada');
     }
     
-    // Validar formato de las claves
+    // ✅ Validar formato de las claves según documentación
     if (process.env.BANCARD_PUBLIC_KEY && process.env.BANCARD_PUBLIC_KEY.length !== 32) {
-        errors.push('BANCARD_PUBLIC_KEY debe tener 32 caracteres');
+        errors.push('BANCARD_PUBLIC_KEY debe tener exactamente 32 caracteres');
     }
     
     if (process.env.BANCARD_PRIVATE_KEY && process.env.BANCARD_PRIVATE_KEY.length !== 40) {
-        errors.push('BANCARD_PRIVATE_KEY debe tener 40 caracteres');
+        errors.push('BANCARD_PRIVATE_KEY debe tener exactamente 40 caracteres');
     }
     
     return {
@@ -226,6 +135,7 @@ const validateBancardConfig = () => {
         errors,
         config: {
             publicKey: process.env.BANCARD_PUBLIC_KEY,
+            privateKey: process.env.BANCARD_PRIVATE_KEY ? `${process.env.BANCARD_PRIVATE_KEY.substring(0, 10)}...` : null,
             environment: process.env.BANCARD_ENVIRONMENT || 'staging',
             baseUrl: getBancardBaseUrl(),
             confirmationUrl: process.env.BANCARD_CONFIRMATION_URL
@@ -251,34 +161,12 @@ const parseAmount = (amountStr) => {
     return parseFloat(amountStr || '0');
 };
 
-/**
- * ✅ NUEVA FUNCIÓN - Generar UUID v4 compatible con Node.js más antiguos
- * @returns {string} UUID único
- */
-const generateUUID = () => {
-    // Si está disponible crypto.randomUUID (Node.js 15+)
-    if (crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    
-    // Fallback para versiones más antiguas
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
-
 module.exports = {
     generateSingleBuyToken,
-    generateConfirmToken,
     verifyConfirmationToken,
     generateShopProcessId,
-    generateAlternativeShopProcessId,
-    generateEmergencyShopProcessId, // ✅ Nueva función de emergencia
     getBancardBaseUrl,
     validateBancardConfig,
     formatAmount,
-    parseAmount,
-    generateUUID
+    parseAmount
 };

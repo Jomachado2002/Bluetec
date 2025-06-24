@@ -1,4 +1,4 @@
-// backend/routes/index.js - VERSIÓN CORREGIDA
+// backend/routes/index.js - VERSIÓN CORREGIDA COMPLETA
 const express = require('express');
 const router = express.Router();
 
@@ -29,13 +29,14 @@ const getProductBySlug = require('../controller/product/getProductBySlug');
 const { updateProductFinanceController, getProductFinanceController } = require('../controller/product/updateProductFinance');
 const { getMarginReportController, getCategoryProfitabilityController } = require('../controller/reports/financialReportsController');
 
-// ===== CONTROLADORES DE BANCARD =====
+// ===== CONTROLADORES DE BANCARD - ✅ CORREGIDO =====
 const { 
     bancardConfirmController,
     createPaymentController,
-    testBancardSimpleController, // ✅ AGREGADO EL IMPORT FALTANTE
+    testBancardSimpleController,
     getTransactionStatusController,
-    bancardHealthController
+    bancardHealthController,
+    rollbackPaymentController // ✅ AGREGADO EL IMPORT FALTANTE
 } = require('../controller/bancard/bancardController');
 
 // ===== CONTROLADORES DE CLIENTES =====
@@ -106,7 +107,7 @@ const {
 } = require('../controller/dashboard/dashboardController');
 
 // ===========================================
-// RUTAS DE BANCARD (PAGOS)
+// RUTAS DE BANCARD (PAGOS) - ✅ ORGANIZADAS
 // ===========================================
 router.post("/bancard/confirm", bancardConfirmController);
 router.get("/bancard/confirm", (req, res) => {
@@ -119,9 +120,13 @@ router.get("/bancard/confirm", (req, res) => {
     });
 });
 router.post("/bancard/create-payment", createPaymentController);
-router.post("/bancard/test-simple", testBancardSimpleController); // ✅ MOVIDO A LA SECCIÓN CORRECTA
+router.post("/bancard/test-simple", testBancardSimpleController);
 router.get("/bancard/status/:transactionId", getTransactionStatusController);
 router.get("/bancard/health", bancardHealthController);
+
+// ✅ NUEVAS RUTAS DE BANCARD
+router.post("/bancard/rollback", rollbackPaymentController);
+router.get("/bancard/confirm-status/:transactionId", getTransactionStatusController);
 
 // ===== ENDPOINT DE VERIFICACIÓN DE CONFIGURACIÓN BANCARD =====
 router.get("/bancard/config-check", (req, res) => {

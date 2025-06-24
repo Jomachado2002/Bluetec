@@ -90,7 +90,7 @@ const SummaryApi = {
     },
 
     // ===========================================
-    // BANCARD - PAGOS ONLINE
+    // BANCARD - PAGOS ONLINE - ✅ COMPLETADO
     // ===========================================
     bancard: {
         createPayment: {
@@ -119,6 +119,15 @@ const SummaryApi = {
         },
         connectionTest: {
             url: `${backendDomain}/api/bancard/connection-test`,
+            method: 'get'
+        },
+        // ✅ NUEVAS RUTAS AGREGADAS
+        rollback: {
+            url: `${backendDomain}/api/bancard/rollback`,
+            method: 'post'
+        },
+        confirmStatus: {
+            url: `${backendDomain}/api/bancard/confirm-status`,
             method: 'get'
         }
     },
