@@ -1,4 +1,4 @@
-// frontend/src/routes/index.js - CORREGIDO
+// frontend/src/routes/index.js - ACTUALIZADO CON TRANSACCIONES BANCARD
 import { createBrowserRouter } from "react-router-dom"
 import App from "../App"
 import Home from "../pages/Home"
@@ -16,9 +16,12 @@ import MobileCategoriesPage from "../pages/MobileCategoriesPage"
 import ResetPassword from "../pages/ResetPassword"
 import Nosotros from "../pages/Nosotros"
 
-// ✅ SOLO IMPORTAR COMPONENTES DE PÁGINAS DE BANCARD (NO BancardPayment)
+// ✅ PÁGINAS DE BANCARD
 import PaymentSuccess from "../pages/PaymentSuccess"
 import PaymentCancelled from "../pages/PaymentCancelled"
+
+// ✅ NUEVA PÁGINA DE TRANSACCIONES BANCARD
+import BancardTransactions from "../pages/BancardTransactions"
 
 // Importar el nuevo componente de dashboard
 import AdminDashboard from "../pages/AdminDashboard"
@@ -93,7 +96,7 @@ const router = createBrowserRouter([
                 element: <SearchProduct />
             },
             
-            // ✅ RUTAS PARA BANCARD (SOLO PÁGINAS DE RESULTADO)
+            // ✅ RUTAS PARA BANCARD
             {
                 path: "pago-exitoso",
                 element: <PaymentSuccess />
@@ -120,6 +123,13 @@ const router = createBrowserRouter([
                         path: "todos-productos",
                         element: <AllProducts />
                     },
+                    
+                    // ✅ NUEVA RUTA PARA TRANSACCIONES BANCARD
+                    {
+                        path: "transacciones-bancard",
+                        element: <BancardTransactions />
+                    },
+                    
                     // Rutas financieras
                     {
                         path: "dashboard",

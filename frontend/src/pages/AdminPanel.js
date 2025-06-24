@@ -1,3 +1,4 @@
+// frontend/src/pages/AdminPanel.js - ACTUALIZADO CON TRANSACCIONES BANCARD
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { CiUser } from 'react-icons/ci';
@@ -19,8 +20,10 @@ import {
   FaPlus, 
   FaMoneyBillWave, 
   FaShoppingCart,
-  FaTachometerAlt, // ✅ Cambiar FaDashboard por FaTachometerAlt
-  FaHome
+  FaTachometerAlt,
+  FaHome,
+  FaCreditCard, // ✅ NUEVO ICONO PARA BANCARD
+  FaUndo // ✅ ICONO PARA ROLLBACKS
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import SummaryApi from '../common';
@@ -68,12 +71,12 @@ const AdminPanel = () => {
     return location.pathname.includes(path);
   };
 
-  // Menú de navegación administrativa actualizado
+  // ✅ MENÚ ACTUALIZADO CON TRANSACCIONES BANCARD
   const navItems = [
     {
       path: "dashboard",
       label: "Dashboard",
-      icon: <FaTachometerAlt className="mr-2" />, // ✅ Cambiar aquí también
+      icon: <FaTachometerAlt className="mr-2" />,
       description: "Vista general del sistema"
     },
     {
@@ -119,6 +122,17 @@ const AdminPanel = () => {
           label: "Compras",
           icon: <FaShoppingCart className="mr-2" />,
           description: "Registrar y gestionar compras"
+        }
+      ]
+    },
+    {
+      category: "Pagos Online", // ✅ NUEVA CATEGORÍA
+      items: [
+        {
+          path: "transacciones-bancard",
+          label: "Transacciones Bancard",
+          icon: <FaCreditCard className="mr-2" />,
+          description: "Gestionar pagos online y rollbacks"
         }
       ]
     },
@@ -238,7 +252,7 @@ const AdminPanel = () => {
               <p className="text-xs text-gray-500">{user?.role}</p>
             </div>
 
-            {/* Ícono pequeño cuando sidebar está colapsado (solo visible en md+) */}
+            {/* Ícono pequeño cuando sidebar está colapsado */}
             <div className={`hidden md:flex md:flex-col md:items-center mb-6 ${sidebarOpen && 'md:hidden'}`}>
               <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
                 {user?.profilePic ? (

@@ -1,3 +1,4 @@
+// frontend/src/common/index.js - ACTUALIZADO CON TRANSACCIONES BANCARD
 const backendDomain = process.env.REACT_APP_BACKEND_URL;
 
 const SummaryApi = {
@@ -90,7 +91,7 @@ const SummaryApi = {
     },
 
     // ===========================================
-    // BANCARD - PAGOS ONLINE - ✅ COMPLETADO
+    // BANCARD - PAGOS ONLINE - ✅ COMPLETADO Y MEJORADO
     // ===========================================
     bancard: {
         createPayment: {
@@ -121,7 +122,6 @@ const SummaryApi = {
             url: `${backendDomain}/api/bancard/connection-test`,
             method: 'get'
         },
-        // ✅ NUEVAS RUTAS AGREGADAS
         rollback: {
             url: `${backendDomain}/api/bancard/rollback`,
             method: 'post'
@@ -129,6 +129,30 @@ const SummaryApi = {
         confirmStatus: {
             url: `${backendDomain}/api/bancard/confirm-status`,
             method: 'get'
+        },
+        
+        // ✅ NUEVAS RUTAS PARA GESTIÓN DE TRANSACCIONES
+        transactions: {
+            getAll: {
+                url: `${backendDomain}/api/bancard/transactions`,
+                method: 'get'
+            },
+            getById: {
+                url: `${backendDomain}/api/bancard/transactions`, // + /:transactionId
+                method: 'get'
+            },
+            rollback: {
+                url: `${backendDomain}/api/bancard/transactions`, // + /:transactionId/rollback
+                method: 'post'
+            },
+            checkStatus: {
+                url: `${backendDomain}/api/bancard/transactions`, // + /:transactionId/status
+                method: 'get'
+            },
+            create: {
+                url: `${backendDomain}/api/bancard/transactions`,
+                method: 'post'
+            }
         }
     },
 

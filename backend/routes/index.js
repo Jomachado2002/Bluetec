@@ -1,4 +1,4 @@
-// backend/routes/index.js - VERSIÓN CORREGIDA COMPLETA
+// backend/routes/index.js - VERSIÓN ACTUALIZADA CON BANCARD TRANSACTIONS
 const express = require('express');
 const router = express.Router();
 
@@ -29,15 +29,24 @@ const getProductBySlug = require('../controller/product/getProductBySlug');
 const { updateProductFinanceController, getProductFinanceController } = require('../controller/product/updateProductFinance');
 const { getMarginReportController, getCategoryProfitabilityController } = require('../controller/reports/financialReportsController');
 
-// ===== CONTROLADORES DE BANCARD - ✅ CORREGIDO =====
+// ===== CONTROLADORES DE BANCARD =====
 const { 
     bancardConfirmController,
     createPaymentController,
     testBancardSimpleController,
     getTransactionStatusController,
     bancardHealthController,
-    rollbackPaymentController // ✅ AGREGADO EL IMPORT FALTANTE
+    rollbackPaymentController
 } = require('../controller/bancard/bancardController');
+
+// ✅ NUEVOS CONTROLADORES DE TRANSACCIONES BANCARD
+const {
+    getAllBancardTransactionsController,
+    getBancardTransactionByIdController,
+    rollbackBancardTransactionController,
+    checkBancardTransactionStatusController,
+    createBancardTransactionController
+} = require('../controller/bancard/bancardTransactionsController');
 
 // ===== CONTROLADORES DE CLIENTES =====
 const { 
@@ -107,7 +116,7 @@ const {
 } = require('../controller/dashboard/dashboardController');
 
 // ===========================================
-// RUTAS DE BANCARD (PAGOS) - ✅ ORGANIZADAS
+// RUTAS DE BANCARD (PAGOS) - ✅ MEJORADAS
 // ===========================================
 router.post("/bancard/confirm", bancardConfirmController);
 router.get("/bancard/confirm", (req, res) => {
@@ -123,10 +132,14 @@ router.post("/bancard/create-payment", createPaymentController);
 router.post("/bancard/test-simple", testBancardSimpleController);
 router.get("/bancard/status/:transactionId", getTransactionStatusController);
 router.get("/bancard/health", bancardHealthController);
-
-// ✅ NUEVAS RUTAS DE BANCARD
 router.post("/bancard/rollback", rollbackPaymentController);
-router.get("/bancard/confirm-status/:transactionId", getTransactionStatusController);
+
+// ✅ NUEVAS RUTAS PARA GESTIÓN DE TRANSACCIONES BANCARD
+router.get("/bancard/transactions", authToken, getAllBancardTransactionsController);
+router.get("/bancard/transactions/:transactionId", authToken, getBancardTransactionByIdController);
+router.post("/bancard/transactions/:transactionId/rollback", authToken, rollbackBancardTransactionController);
+router.get("/bancard/transactions/:transactionId/status", authToken, checkBancardTransactionStatusController);
+router.post("/bancard/transactions", authToken, createBancardTransactionController);
 
 // ===== ENDPOINT DE VERIFICACIÓN DE CONFIGURACIÓN BANCARD =====
 router.get("/bancard/config-check", (req, res) => {
@@ -156,20 +169,16 @@ router.post("/bancard/test-payment", (req, res) => {
     try {
         console.log("🧪 Endpoint de prueba para Bancard");
         
-        // Datos de prueba según documentación de Bancard
         const testPayment = {
-            amount: "10000.00", // 10,000 guaraníes
+            amount: "10000.00",
             currency: "PYG",
             description: "Pago de prueba - BlueTec",
             return_url: `${process.env.FRONTEND_URL || 'https://www.bluetec.com.py'}/pago-exitoso`,
             cancel_url: `${process.env.FRONTEND_URL || 'https://www.bluetec.com.py'}/pago-cancelado`,
-            iva_amount: "909.09" // IVA del 10%
+            iva_amount: "909.09"
         };
         
-        // Simular request para el controlador
         req.body = testPayment;
-        
-        // Llamar al controlador de creación de pago
         createPaymentController(req, res);
         
     } catch (error) {
@@ -189,12 +198,11 @@ router.get("/bancard/connection-test", async (req, res) => {
         const axios = require('axios');
         const { getBancardBaseUrl } = require('../helpers/bancardUtils');
         
-        // Test simple de conectividad
         const testUrl = `${getBancardBaseUrl()}/vpos/api/0.3/`;
         
         const response = await axios.get(testUrl, {
             timeout: 10000,
-            validateStatus: () => true // Aceptar cualquier status code
+            validateStatus: () => true
         });
         
         res.json({
@@ -230,8 +238,6 @@ router.post("/registro", userSignUpController);
 router.post("/iniciar-sesion", userSignInController);
 router.get("/detalles-usuario", authToken, userDetailsController);
 router.get("/cerrar-sesion", userLogout);
-
-// Admin panel
 router.get("/todos-usuarios", authToken, allUsers);
 router.post("/actualizar-usuario", authToken, updateUser);
 
