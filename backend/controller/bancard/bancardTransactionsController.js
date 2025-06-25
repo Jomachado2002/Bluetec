@@ -1,6 +1,7 @@
-// backend/controller/bancard/bancardTransactionsController.js
+// backend/controller/bancard/bancardTransactionsController.js - VERSIÓN CORREGIDA
 const BancardTransactionModel = require('../../models/bancardTransactionModel');
-const SaleModel = require('../../models/saleModel');
+// ✅ QUITAR REFERENCIA A SALE TEMPORALMENTE
+// const SaleModel = require('../../models/saleModel');
 const crypto = require('crypto');
 const axios = require('axios');
 const uploadProductPermission = require('../../helpers/permission');
@@ -10,7 +11,7 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ OBTENER TODAS LAS TRANSACCIONES BANCARD
+ * ✅ OBTENER TODAS LAS TRANSACCIONES BANCARD - SIN POPULATE SALE
  */
 const getAllBancardTransactionsController = async (req, res) => {
     try {
@@ -62,9 +63,9 @@ const getAllBancardTransactionsController = async (req, res) => {
         // Paginación
         const skip = (page - 1) * limit;
 
+        // ✅ SIN POPULATE POR AHORA
         const transactions = await BancardTransactionModel
             .find(query)
-            .populate('sale_id', 'saleNumber totalAmount paymentStatus')
             .populate('rollback_by', 'name email')
             .sort(sort)
             .skip(skip)
@@ -99,7 +100,7 @@ const getAllBancardTransactionsController = async (req, res) => {
 };
 
 /**
- * ✅ OBTENER DETALLES DE UNA TRANSACCIÓN
+ * ✅ OBTENER DETALLES DE UNA TRANSACCIÓN - SIN POPULATE SALE
  */
 const getBancardTransactionByIdController = async (req, res) => {
     try {
@@ -114,9 +115,9 @@ const getBancardTransactionByIdController = async (req, res) => {
 
         const { transactionId } = req.params;
 
+        // ✅ SIN POPULATE POR AHORA
         const transaction = await BancardTransactionModel
             .findById(transactionId)
-            .populate('sale_id')
             .populate('rollback_by', 'name email')
             .populate('created_by', 'name email');
 
@@ -147,7 +148,7 @@ const getBancardTransactionByIdController = async (req, res) => {
 };
 
 /**
- * ✅ HACER ROLLBACK DE UNA TRANSACCIÓN
+ * ✅ HACER ROLLBACK DE UNA TRANSACCIÓN - CORREGIDO
  */
 const rollbackBancardTransactionController = async (req, res) => {
     try {
@@ -214,8 +215,8 @@ const rollbackBancardTransactionController = async (req, res) => {
             operation: {
                 token: token,
                 shop_process_id: transaction.shop_process_id
-            },
-            test_client: process.env.BANCARD_ENVIRONMENT === 'staging'
+            }
+            // ✅ SIN test_client según instrucciones de Bancard
         };
 
         console.log("📤 Payload de rollback:", JSON.stringify(payload, null, 2));
@@ -242,13 +243,13 @@ const rollbackBancardTransactionController = async (req, res) => {
                 status: 'rolled_back'
             });
 
-            // ✅ ACTUALIZAR VENTA RELACIONADA SI EXISTE
-            if (transaction.sale_id) {
-                await SaleModel.findByIdAndUpdate(transaction.sale_id, {
-                    paymentStatus: 'cancelled',
-                    notes: `${transaction.notes || ''}\n\nPago reversado: ${reason || 'Sin razón especificada'}`
-                });
-            }
+            // ✅ COMENTAR ACTUALIZACIÓN DE SALE TEMPORALMENTE
+            // if (transaction.sale_id) {
+            //     await SaleModel.findByIdAndUpdate(transaction.sale_id, {
+            //         paymentStatus: 'cancelled',
+            //         notes: `${transaction.notes || ''}\n\nPago reversado: ${reason || 'Sin razón especificada'}`
+            //     });
+            // }
 
             console.log("✅ Rollback exitoso");
 
@@ -312,7 +313,7 @@ const rollbackBancardTransactionController = async (req, res) => {
 };
 
 /**
- * ✅ CONSULTAR ESTADO DE TRANSACCIÓN EN BANCARD
+ * ✅ CONSULTAR ESTADO DE TRANSACCIÓN EN BANCARD - CORREGIDO
  */
 const checkBancardTransactionStatusController = async (req, res) => {
     try {
@@ -346,7 +347,7 @@ const checkBancardTransactionStatusController = async (req, res) => {
             });
         }
 
-        // Generar token para consulta
+        // ✅ USAR EL shop_process_id DE LA TRANSACCIÓN, NO null
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${transaction.shop_process_id}get_confirmation`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
@@ -354,9 +355,11 @@ const checkBancardTransactionStatusController = async (req, res) => {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
                 token: token,
-                shop_process_id: transaction.shop_process_id
+                shop_process_id: transaction.shop_process_id // ✅ USAR VALOR REAL, NO null
             }
         };
+
+        console.log("📤 Payload de consulta:", JSON.stringify(payload, null, 2));
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/single_buy/confirmations`;
         

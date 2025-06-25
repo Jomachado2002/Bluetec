@@ -1,4 +1,4 @@
-// backend/routes/index.js - VERSIÓN ACTUALIZADA CON BANCARD TRANSACTIONS
+// backend/routes/index.js - VERSIÓN CORREGIDA SIN testBancardSimpleController
 const express = require('express');
 const router = express.Router();
 
@@ -29,11 +29,11 @@ const getProductBySlug = require('../controller/product/getProductBySlug');
 const { updateProductFinanceController, getProductFinanceController } = require('../controller/product/updateProductFinance');
 const { getMarginReportController, getCategoryProfitabilityController } = require('../controller/reports/financialReportsController');
 
-// ===== CONTROLADORES DE BANCARD =====
+// ===== CONTROLADORES DE BANCARD ===== 
+// ✅ QUITAR testBancardSimpleController QUE YA NO EXISTE
 const { 
     bancardConfirmController,
     createPaymentController,
-    testBancardSimpleController,
     getTransactionStatusController,
     bancardHealthController,
     rollbackPaymentController
@@ -116,7 +116,7 @@ const {
 } = require('../controller/dashboard/dashboardController');
 
 // ===========================================
-// RUTAS DE BANCARD (PAGOS) - ✅ MEJORADAS
+// RUTAS DE BANCARD (PAGOS) - ✅ CORREGIDAS
 // ===========================================
 router.post("/bancard/confirm", bancardConfirmController);
 router.get("/bancard/confirm", (req, res) => {
@@ -129,7 +129,8 @@ router.get("/bancard/confirm", (req, res) => {
     });
 });
 router.post("/bancard/create-payment", createPaymentController);
-router.post("/bancard/test-simple", testBancardSimpleController);
+// ✅ QUITAR ESTA LÍNEA QUE CAUSA EL ERROR:
+// router.post("/bancard/test-simple", testBancardSimpleController);
 router.get("/bancard/status/:transactionId", getTransactionStatusController);
 router.get("/bancard/health", bancardHealthController);
 router.post("/bancard/rollback", rollbackPaymentController);
@@ -164,7 +165,7 @@ router.get("/bancard/config-check", (req, res) => {
     });
 });
 
-// ===== ENDPOINT DE PRUEBA PARA BANCARD =====
+// ===== ENDPOINT DE PRUEBA PARA BANCARD - SIMPLIFICADO =====
 router.post("/bancard/test-payment", (req, res) => {
     try {
         console.log("🧪 Endpoint de prueba para Bancard");
@@ -173,8 +174,6 @@ router.post("/bancard/test-payment", (req, res) => {
             amount: "10000.00",
             currency: "PYG",
             description: "Pago de prueba - BlueTec",
-            return_url: `${process.env.FRONTEND_URL || 'https://www.bluetec.com.py'}/pago-exitoso`,
-            cancel_url: `${process.env.FRONTEND_URL || 'https://www.bluetec.com.py'}/pago-cancelado`,
             iva_amount: "909.09"
         };
         

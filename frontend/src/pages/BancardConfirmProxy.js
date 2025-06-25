@@ -11,18 +11,47 @@ const BancardConfirmProxy = () => {
     const processConfirmation = async () => {
       try {
         console.log('🔄 === PROXY BANCARD CONFIRMACIÓN ===');
+        console.log('🌐 URL completa:', window.location.href);
+        console.log('📋 Search params:', window.location.search);
         
         // Obtener todos los parámetros de Bancard
         const params = Object.fromEntries(searchParams);
-        console.log('📋 Parámetros de Bancard:', params);
+        console.log('📋 Parámetros extraídos:', params);
 
-        // Construir el objeto operation según documentación Bancard
+        // ✅ VERIFICAR SI TENEMOS PARÁMETROS VÁLIDOS
+        const hasValidParams = params.shop_process_id || 
+                              params.operation_id || 
+                              params.authorization_number ||
+                              Object.keys(params).length > 0;
+
+        if (!hasValidParams) {
+          console.log('❌ No hay parámetros válidos de Bancard');
+          setStatus('error');
+          setTimeout(() => {
+            navigate('/pago-cancelado?error=no_params');
+          }, 2000);
+          return;
+        }
+
+        // ✅ BUSCAR TRANSACCIÓN EN LOCALSTORAGE PRIMERO
+        let transactionData = null;
+        try {
+          const savedPayment = sessionStorage.getItem('bancard_payment');
+          if (savedPayment) {
+            transactionData = JSON.parse(savedPayment);
+            console.log('💾 Datos de transacción recuperados:', transactionData);
+          }
+        } catch (e) {
+          console.log('⚠️ No se pudieron recuperar datos de transacción');
+        }
+
+        // ✅ CONSTRUIR OPERATION OBJECT MEJORADO
         const operation = {
           token: params.token || '',
-          shop_process_id: params.shop_process_id || '',
+          shop_process_id: params.shop_process_id || transactionData?.shop_process_id || '',
           response: params.response || (params.response_code === '00' ? 'S' : 'N'),
           response_details: params.response_details || '',
-          amount: params.amount || '',
+          amount: params.amount || transactionData?.amount || '',
           currency: params.currency || 'PYG',
           authorization_number: params.authorization_number || '',
           ticket_number: params.ticket_number || '',
@@ -42,38 +71,68 @@ const BancardConfirmProxy = () => {
 
         console.log('📤 Enviando al backend:', operation);
 
-        // Enviar al backend real según documentación
+        // ✅ ENVIAR AL BACKEND REAL
         const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
         
-        const response = await fetch(`${backendUrl}/api/bancard/confirm`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ operation })
-        });
+        try {
+          const response = await fetch(`${backendUrl}/api/bancard/confirm`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ operation })
+          });
 
-        if (response.ok) {
-          console.log('✅ Backend confirmó correctamente');
-        } else {
-          console.warn('⚠️ Backend respondió con error:', response.status);
+          console.log('📥 Backend response status:', response.status);
+          
+          if (response.ok) {
+            console.log('✅ Backend confirmó correctamente');
+          } else {
+            console.warn('⚠️ Backend respondió con error:', response.status);
+          }
+        } catch (backendError) {
+          console.error('❌ Error comunicándose con backend:', backendError);
+          // Continuar con el flujo aunque falle el backend
         }
 
-        // Determinar éxito según documentación Bancard
+        // ✅ DETERMINAR ÉXITO BASADO EN MÚLTIPLES FACTORES
         const isSuccess = (operation.response === 'S' && operation.response_code === '00') ||
-                         params.status === 'success';
+                         params.status === 'success' ||
+                         params.response_code === '00' ||
+                         (params.authorization_number && params.ticket_number);
 
-        console.log('🎯 Resultado del pago:', isSuccess ? 'EXITOSO' : 'FALLIDO');
+        console.log('🎯 Análisis de resultado:', {
+          response: operation.response,
+          response_code: operation.response_code,
+          authorization_number: operation.authorization_number,
+          isSuccess
+        });
+
+        // ✅ CONSTRUIR URL DE DESTINO CON TODOS LOS PARÁMETROS
+        const destinationParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (value) destinationParams.append(key, value);
+        });
+
+        // Agregar datos de transacción si existen
+        if (transactionData) {
+          if (!destinationParams.has('shop_process_id')) {
+            destinationParams.append('shop_process_id', transactionData.shop_process_id);
+          }
+          if (!destinationParams.has('amount')) {
+            destinationParams.append('amount', transactionData.amount);
+          }
+        }
 
         if (isSuccess) {
           setStatus('success');
           setTimeout(() => {
-            navigate(`/pago-exitoso?${searchParams.toString()}`);
+            navigate(`/pago-exitoso?${destinationParams.toString()}`);
           }, 1500);
         } else {
           setStatus('failed');
           setTimeout(() => {
-            navigate(`/pago-cancelado?${searchParams.toString()}`);
+            navigate(`/pago-cancelado?${destinationParams.toString()}`);
           }, 1500);
         }
 

@@ -227,7 +227,7 @@ const BancardPayButton = ({
   };
 
   // ✅ PROCESAR PAGO CON BANCARD
-  const processPayment = async () => {
+ const processPayment = async () => {
     if (!validateForm()) {
       return;
     }
@@ -247,9 +247,6 @@ const BancardPayButton = ({
         throw new Error('REACT_APP_BACKEND_URL no está configurada. Verifica tu archivo .env.local');
       }
 
-      // ✅ CONFIGURAR URLs CORRECTAS PARA BANCARD
-      const frontendUrl = 'https://www.bluetec.com.py'; // Tu dominio frontend
-      
       // Preparar datos para el backend
       const paymentRequest = {
         amount: totalAmount.toFixed(2),
@@ -261,10 +258,8 @@ const BancardPayButton = ({
           quantity: item.quantity,
           unitPrice: item.productId?.sellingPrice || item.unitPrice || 0,
           total: (item.productId?.sellingPrice || item.unitPrice || 0) * item.quantity
-        })),
-        // ✅ URLs CORRECTAS SEGÚN TU ARQUITECTURA
-        return_url: `${frontendUrl}/pago-exitoso`,
-        cancel_url: `${frontendUrl}/pago-cancelado`
+        }))
+        // ✅ NO ENVIAR return_url NI cancel_url - EL BACKEND LOS MANEJA
       };
 
       console.log('📤 Enviando solicitud de pago:', paymentRequest);
