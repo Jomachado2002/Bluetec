@@ -1,4 +1,4 @@
-// frontend/src/routes/index.js - ACTUALIZADO CON TRANSACCIONES BANCARD
+// frontend/src/routes/index.js - AGREGAR SOLO ESTAS LÍNEAS
 import { createBrowserRouter } from "react-router-dom"
 import App from "../App"
 import Home from "../pages/Home"
@@ -19,6 +19,9 @@ import Nosotros from "../pages/Nosotros"
 // ✅ PÁGINAS DE BANCARD
 import PaymentSuccess from "../pages/PaymentSuccess"
 import PaymentCancelled from "../pages/PaymentCancelled"
+
+// ✅ NUEVO PROXY PARA BANCARD
+import BancardConfirmProxy from "../pages/BancardConfirmProxy"
 
 // ✅ NUEVA PÁGINA DE TRANSACCIONES BANCARD
 import BancardTransactions from "../pages/BancardTransactions"
@@ -104,6 +107,16 @@ const router = createBrowserRouter([
             {
                 path: "pago-cancelado",
                 element: <PaymentCancelled />
+            },
+            
+            // ✅ NUEVAS RUTAS PROXY PARA BANCARD - CRÍTICAS
+            {
+                path: "api/bancard/confirm",
+                element: <BancardConfirmProxy />
+            },
+            {
+                path: "api/bancard/confirm-payment",
+                element: <BancardConfirmProxy />
             },
             
             // Panel de admin separado

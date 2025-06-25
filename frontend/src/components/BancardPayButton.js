@@ -247,25 +247,9 @@ const BancardPayButton = ({
         throw new Error('REACT_APP_BACKEND_URL no está configurada. Verifica tu archivo .env.local');
       }
 
-      // ✅ VERIFICAR CONEXIÓN CON BACKEND PRIMERO
-      console.log('🔍 Verificando conexión con backend...');
-      try {
-        const healthResponse = await fetch(`${backendUrl}/api/bancard/health`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-        
-        if (!healthResponse.ok) {
-          throw new Error(`Backend no disponible (${healthResponse.status})`);
-        }
-        
-        const healthData = await healthResponse.json();
-        console.log('✅ Backend disponible:', healthData);
-      } catch (healthError) {
-        console.error('❌ Error de conexión con backend:', healthError);
-        throw new Error('No se puede conectar con el servidor. Verifica que el backend esté ejecutándose en el puerto 8080.');
-      }
-
+      // ✅ CONFIGURAR URLs CORRECTAS PARA BANCARD
+      const frontendUrl = 'https://www.bluetec.com.py'; // Tu dominio frontend
+      
       // Preparar datos para el backend
       const paymentRequest = {
         amount: totalAmount.toFixed(2),
@@ -277,7 +261,10 @@ const BancardPayButton = ({
           quantity: item.quantity,
           unitPrice: item.productId?.sellingPrice || item.unitPrice || 0,
           total: (item.productId?.sellingPrice || item.unitPrice || 0) * item.quantity
-        }))
+        })),
+        // ✅ URLs CORRECTAS SEGÚN TU ARQUITECTURA
+        return_url: `${frontendUrl}/pago-exitoso`,
+        cancel_url: `${frontendUrl}/pago-cancelado`
       };
 
       console.log('📤 Enviando solicitud de pago:', paymentRequest);
@@ -354,7 +341,6 @@ const BancardPayButton = ({
       onPaymentError(error);
     }
   };
-
   // ✅ CERRAR IFRAME
   const closeIframe = () => {
     setShowIframe(false);

@@ -271,12 +271,13 @@ const bancardConfirmController = async (req, res) => {
         console.log("📅 Timestamp:", new Date().toISOString());
         console.log("🌐 IP origen:", req.ip || req.connection.remoteAddress);
         console.log("📋 Headers:", JSON.stringify(req.headers, null, 2));
-        console.log("📦 Body:", JSON.stringify(req.body, null, 2));
+        console.log("📦 Body completo:", JSON.stringify(req.body, null, 2));
 
         const { operation } = req.body;
 
         if (!operation) {
             console.log("❌ ERROR: No se recibió información de la operación");
+            // ✅ SIEMPRE RESPONDER SUCCESS A BANCARD SEGÚN DOCUMENTACIÓN
             return res.status(200).json({ status: "success" });
         }
 
@@ -320,6 +321,7 @@ const bancardConfirmController = async (req, res) => {
         // ✅ VERIFICAR TOKEN DE CONFIRMACIÓN SI ESTÁ PRESENTE
         if (token && shop_process_id && amount && currency) {
             try {
+                const { verifyConfirmationToken } = require('../../helpers/bancardUtils');
                 const isValidToken = verifyConfirmationToken(token, shop_process_id, amount, currency);
                 if (isValidToken) {
                     console.log("✅ Token de confirmación VÁLIDO");
@@ -331,7 +333,7 @@ const bancardConfirmController = async (req, res) => {
             }
         }
 
-        // ✅ PROCESAR SEGÚN EL RESULTADO
+        // ✅ PROCESAR SEGÚN EL RESULTADO - EXACTO A LA DOCUMENTACIÓN
         if (response === 'S' && response_code === '00') {
             console.log("✅ ✅ PAGO APROBADO EXITOSAMENTE ✅ ✅");
             console.log("   🎫 Número de autorización:", authorization_number);
@@ -368,12 +370,6 @@ const bancardConfirmController = async (req, res) => {
                     console.error("⚠️ Error actualizando transacción en BD:", updateError);
                 }
             }
-            
-            // ✅ AQUÍ PUEDES AGREGAR TU LÓGICA DE NEGOCIO:
-            // - Actualizar inventario
-            // - Enviar email de confirmación
-            // - Crear orden de entrega
-            // - Enviar notificaciones
             
         } else if (response === 'N' || response_code !== '00') {
             console.log("❌ ❌ PAGO RECHAZADO ❌ ❌");
@@ -434,7 +430,7 @@ const bancardConfirmController = async (req, res) => {
         console.log(`⏱️ Tiempo de procesamiento: ${processingTime}ms`);
         console.log("🔔 ============================================");
 
-        // ✅ SIEMPRE RESPONDER CON ÉXITO A BANCARD (ESTO ES CRÍTICO)
+        // ✅ SIEMPRE RESPONDER CON ÉXITO A BANCARD (ESTO ES CRÍTICO SEGÚN DOCUMENTACIÓN)
         res.status(200).json({
             status: "success"
         });
