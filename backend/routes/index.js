@@ -600,4 +600,328 @@ router.get("/health", (req, res) => {
     });
 });
 
+// ===== IMPORTAR NUEVOS CONTROLADORES =====
+const { 
+    getUserProfileController,
+    updateUserProfileController,
+    uploadProfileImageController,
+    changePasswordController
+} = require('../controller/user/userProfile');
+
+const {
+    createCardController,
+    getUserCardsController,
+    chargeWithTokenController
+} = require('../controller/bancard/bancardCardsController');
+
+// ===== NUEVAS RUTAS DE PERFIL DE USUARIO =====
+// Obtener perfil del usuario
+router.get("/perfil", authToken, getUserProfileController);
+
+// Actualizar perfil del usuario
+router.put("/perfil", authToken, updateUserProfileController);
+
+// Subir imagen de perfil
+router.post("/perfil/imagen", authToken, uploadProfileImageController);
+
+// Cambiar contraseña
+router.post("/perfil/cambiar-contrasena", authToken, changePasswordController);
+
+// ===== NUEVAS RUTAS PARA GESTIÓN DE TARJETAS BANCARD =====
+// Catastrar nueva tarjeta
+router.post("/bancard/tarjetas", authToken, createCardController);
+
+// Obtener tarjetas de un usuario
+router.get("/bancard/tarjetas/:user_id", authToken, getUserCardsController);
+
+// Pagar con alias token
+router.post("/bancard/pago-con-token", authToken, chargeWithTokenController);
+
+// ===== RUTAS ADICIONALES PARA COMPLETAR LA CERTIFICACIÓN =====
+// Eliminar tarjeta (usando el controlador existente con adaptación)
+router.delete("/bancard/tarjetas/:user_id", authToken, async (req, res) => {
+    try {
+        const { user_id } = req.params;
+        const { alias_token } = req.body;
+        
+        if (!alias_token) {
+            return res.status(400).json({
+                message: "alias_token es requerido",
+                success: false,
+                error: true
+            });
+        }
+
+        // Validar configuración
+        const { validateBancardConfig, getBancardBaseUrl } = require('../helpers/bancardUtils');
+        const configValidation = validateBancardConfig();
+        if (!configValidation.isValid) {
+            return res.status(500).json({
+                message: "Error de configuración del sistema",
+                success: false,
+                error: true
+            });
+        }
+
+        // Generar token para eliminar tarjeta
+        const crypto = require('crypto');
+        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}delete_card${user_id}${alias_token}`;
+        const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
+
+        const payload = {
+            public_key: process.env.BANCARD_PUBLIC_KEY,
+            operation: {
+                token: token,
+                alias_token: alias_token
+            }
+            // SIN test_client para certificación
+        };
+
+        console.log("📤 Payload para eliminar tarjeta:", JSON.stringify(payload, null, 2));
+
+        const axios = require('axios');
+        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/users/${user_id}/cards`;
+        
+        const response = await axios.delete(bancardUrl, {
+            data: payload,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'BlueTec-eCommerce/1.0'
+            },
+            timeout: 30000
+        });
+
+        console.log("📥 Respuesta de eliminación:", response.status, JSON.stringify(response.data, null, 2));
+
+        res.json({
+            message: "Tarjeta eliminada exitosamente",
+            success: true,
+            error: false,
+            data: response.data
+        });
+
+    } catch (error) {
+        console.error("❌ Error eliminando tarjeta:", error);
+        res.status(500).json({
+            message: "Error al eliminar tarjeta",
+            success: false,
+            error: true,
+            details: error.response?.data || error.message
+        });
+    }
+});
+
+// ===== ENDPOINTS DE PRUEBA PARA CERTIFICACIÓN BANCARD =====
+
+// Test de catastro de tarjeta
+router.post("/bancard/test-catastro", async (req, res) => {
+    try {
+        console.log("🧪 === TEST DE CATASTRO BANCARD ===");
+        
+        const testData = {
+            card_id: Math.floor(Math.random() * 100000) + 11000, // ID único
+            user_id: 1, // Usuario de prueba
+            user_cell_phone: "12345678",
+            user_mail: "example@mail.com",
+            return_url: `${process.env.FRONTEND_URL}/mis-tarjetas`
+        };
+
+        // Usar el controlador existente
+        req.body = testData;
+        await createCardController(req, res);
+        
+    } catch (error) {
+        console.error("❌ Error en test de catastro:", error);
+        res.status(500).json({
+            message: "Error en test de catastro",
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
+});
+
+// Test de listar tarjetas
+router.get("/bancard/test-listar/:user_id", async (req, res) => {
+    try {
+        console.log("🧪 === TEST DE LISTAR TARJETAS ===");
+        
+        // Usar el controlador existente
+        await getUserCardsController(req, res);
+        
+    } catch (error) {
+        console.error("❌ Error en test de listar:", error);
+        res.status(500).json({
+            message: "Error en test de listar tarjetas",
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
+});
+
+// Test de pago con token
+router.post("/bancard/test-pago-token", async (req, res) => {
+    try {
+        console.log("🧪 === TEST DE PAGO CON TOKEN ===");
+        
+        const { alias_token } = req.body;
+        
+        if (!alias_token) {
+            return res.status(400).json({
+                message: "alias_token es requerido para el test",
+                success: false,
+                error: true,
+                example: { alias_token: "token-de-prueba" }
+            });
+        }
+
+        const testPaymentData = {
+            shop_process_id: Math.floor(Math.random() * 1000000) + 600000,
+            amount: "151241.00",
+            currency: "PYG",
+            alias_token: alias_token,
+            number_of_payments: 1,
+            description: "Test de pago con token BlueTec",
+            return_url: `${process.env.FRONTEND_URL}/pago-exitoso`
+        };
+
+        // Usar el controlador existente
+        req.body = testPaymentData;
+        await chargeWithTokenController(req, res);
+        
+    } catch (error) {
+        console.error("❌ Error en test de pago con token:", error);
+        res.status(500).json({
+            message: "Error en test de pago con token",
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
+});
+
+// ===== ENDPOINT DE VERIFICACIÓN DE CERTIFICACIÓN COMPLETA =====
+router.get("/bancard/verificar-certificacion-completa", (req, res) => {
+    const { validateBancardConfig, getBancardBaseUrl } = require('../helpers/bancardUtils');
+    const validation = validateBancardConfig();
+    
+    res.json({
+        message: "Verificación completa de certificación Bancard",
+        success: validation.isValid,
+        error: !validation.isValid,
+        data: {
+            configuration_valid: validation.isValid,
+            configuration_errors: validation.errors || [],
+            environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+            base_url: getBancardBaseUrl(),
+            
+            // ✅ ENDPOINTS IMPLEMENTADOS
+            endpoints_implemented: {
+                // Pagos ocasionales
+                create_payment: "✅ Implementado",
+                confirmation: "✅ Implementado", 
+                rollback: "✅ Implementado",
+                get_confirmation: "✅ Implementado",
+                
+                // Gestión de tarjetas (NUEVO)
+                card_register: "✅ Implementado",
+                list_cards: "✅ Implementado", 
+                delete_card: "✅ Implementado",
+                payment_with_token: "✅ Implementado"
+            },
+            
+            // ✅ CHECKLIST DE CERTIFICACIÓN
+            certification_checklist: {
+                "Recibir creación de pago": "✅ Implementado",
+                "Confirmamos correctamente al comercio": "✅ Implementado",
+                "Recibir rollback": "✅ Implementado", 
+                "Recibimos pedido de confirmación del comercio": "✅ Implementado",
+                "Solicitud de catastro": "✅ NUEVO - Implementado",
+                "Catastro de tarjeta": "✅ NUEVO - Implementado",
+                "Recibir tarjetas del usuario": "✅ NUEVO - Implementado",
+                "Eliminar tarjeta del usuario": "✅ NUEVO - Implementado",
+                "Pago con alias token": "✅ NUEVO - Implementado"
+            },
+            
+            // ✅ URLS DE TEST
+            test_endpoints: {
+                test_catastro: `${process.env.FRONTEND_URL || 'https://tu-dominio.com'}/api/bancard/test-catastro`,
+                test_listar: `${process.env.FRONTEND_URL || 'https://tu-dominio.com'}/api/bancard/test-listar/1`,
+                test_pago_token: `${process.env.FRONTEND_URL || 'https://tu-dominio.com'}/api/bancard/test-pago-token`,
+                test_rollback: `${process.env.FRONTEND_URL || 'https://tu-dominio.com'}/api/bancard/test-rollback`
+            },
+
+            // ✅ DATOS DE PRUEBA SUGERIDOS
+            test_data: {
+                catastro: {
+                    card_id: 11129,
+                    user_id: 1,
+                    user_cell_phone: "12345678", 
+                    user_mail: "example@mail.com"
+                },
+                cedula_valida: {
+                    visa_mastercard: "6587520",
+                    bancard: "9661000"
+                },
+                telefono_zimple: "0981123456",
+                codigo_otp_zimple: "1234"
+            }
+        }
+    });
+});
+
+// ===== ENDPOINT PARA ESTADÍSTICAS DE USO =====
+router.get("/bancard/estadisticas", authToken, async (req, res) => {
+    try {
+        const BancardTransactionModel = require('../models/bancardTransactionModel');
+        
+        // Obtener estadísticas básicas
+        const stats = await Promise.all([
+            BancardTransactionModel.countDocuments({ status: 'approved' }),
+            BancardTransactionModel.countDocuments({ status: 'pending' }),
+            BancardTransactionModel.countDocuments({ status: 'rejected' }),
+            BancardTransactionModel.countDocuments({ is_rolled_back: true }),
+            BancardTransactionModel.aggregate([
+                { $match: { status: 'approved' } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ])
+        ]);
+
+        const totalApproved = stats[4][0]?.total || 0;
+
+        res.json({
+            message: "Estadísticas de Bancard",
+            success: true,
+            error: false,
+            data: {
+                transactions: {
+                    approved: stats[0],
+                    pending: stats[1], 
+                    rejected: stats[2],
+                    rolled_back: stats[3]
+                },
+                revenue: {
+                    total_approved: totalApproved,
+                    currency: 'PYG'
+                },
+                integration_status: {
+                    payments: "✅ Activo",
+                    cards: "✅ Activo", 
+                    rollbacks: "✅ Activo"
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error obteniendo estadísticas:", error);
+        res.status(500).json({
+            message: "Error al obtener estadísticas",
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
+});
+
 module.exports = router;
