@@ -273,18 +273,19 @@ const createPaymentController = async (req, res) => {
 
         // ✅ PAYLOAD SIN test_client SEGÚN REQUERIMIENTO DE BANCARD
         const payload = {
-            public_key: process.env.BANCARD_PUBLIC_KEY,
-            operation: {
-                token: token,
-                shop_process_id: shopProcessId,
-                amount: formattedAmount,
-                currency: currency,
-                description: description.substring(0, 20),
-                return_url: confirmationUrl,
-                cancel_url: confirmationUrl
-            }
+                public_key: process.env.BANCARD_PUBLIC_KEY,
+                operation: {
+                    token: token,
+                    shop_process_id: shopProcessId,
+                    amount: formattedAmount,
+                    currency: currency,
+                    description: description.substring(0, 20),
+                    return_url: return_url || `${process.env.FRONTEND_URL}/pago-exitoso`,     // ✅ FRONTEND
+                    cancel_url: cancel_url || `${process.env.FRONTEND_URL}/pago-cancelado`   // ✅ FRONTEND
+                }
+            };
             // ✅ NO INCLUIR test_client PARA CERTIFICACIÓN
-        };
+       
 
         if (formattedIvaAmount) {
             payload.operation.iva_amount = formattedIvaAmount;
