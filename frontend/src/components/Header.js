@@ -10,10 +10,20 @@ import { setUserDetails } from '../store/userSlice';
 import ROLE from '../common/role';
 import Context from '../context';
 import productCategory from '../helpers/productCategory';
-import { FaWhatsapp, FaInfoCircle, FaBars, FaPhone } from "react-icons/fa";
+import { 
+  FaWhatsapp, 
+  FaInfoCircle, 
+  FaBars, 
+  FaPhone, 
+  FaUser, 
+  FaUserShield, 
+  FaSignInAlt, 
+  FaSignOutAlt,
+  FaCreditCard,
+  FaHeart,
+  FaCog
+} from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
-import { Cpu } from 'lucide-react';
-
 
 // Función scrollTop - se mantiene igual
 const scrollTop = () => {
@@ -60,9 +70,11 @@ const Header = () => {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(null);
   const [activeSubcategories, setActiveSubcategories] = useState([]);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  // ✅ NUEVO: Estado para el dropdown del usuario
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const context = useContext(Context);
   const navigate = useNavigate();
-  const location = useLocation(); // Usar useLocation para detectar la ruta actual
+  const location = useLocation();
   const searchInput = location;
   const URLSearch = new URLSearchParams(searchInput?.search);
   const searchQuery = URLSearch.getAll("q");
@@ -73,9 +85,25 @@ const Header = () => {
   // Referencias para el menú y overlay
   const menuRef = useRef(null);
   const overlayRef = useRef(null);
+  // ✅ NUEVO: Referencia para el dropdown del usuario
+  const userDropdownRef = useRef(null);
 
   // Verificar si estamos en una ruta de administración
   const isAdminRoute = location.pathname.includes('/panel-admin');
+
+  // ✅ NUEVO: Efecto para cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setUserDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Detectar scroll para efectos - ahora SIEMPRE se declara antes de cualquier return
   useEffect(() => {
@@ -128,12 +156,11 @@ const Header = () => {
     
     const contentElement = document.querySelector('.content-wrapper');
     if (contentElement && showMobileSearch) {
-      contentElement.style.paddingTop = '0'; // Eliminado el padding
+      contentElement.style.paddingTop = '0';
     } else if (contentElement) {
-      contentElement.style.paddingTop = '0'; // Eliminado el padding
+      contentElement.style.paddingTop = '0';
     }
     
-    // Ajustar todos los elementos principales para reducir el espacio
     const mainSection = document.querySelector('.container');
     if (mainSection) {
       mainSection.style.paddingTop = showMobileSearch ? '3rem' : '0';
@@ -156,6 +183,7 @@ const Header = () => {
     if (data.success) {
       toast.success(data.message);
       dispatch(setUserDetails(null));
+      setUserDropdownOpen(false); // Cerrar dropdown al logout
     }
     if (data.error) {
       toast.error(data.message);
@@ -171,13 +199,32 @@ const Header = () => {
   const toggleCategoryMenu = () => setCategoryMenuOpen(!categoryMenuOpen);
   const toggleDesktopMenu = () => {
     setDesktopMenuOpen(!desktopMenuOpen);
-    setActiveCategoryIndex(null); // Reset category selection on toggle
+    setActiveCategoryIndex(null);
   };
   const toggleProfileMenu = () => setProfileMenuOpen(!profileMenuOpen);
   const toggleMobileSearch = () => setShowMobileSearch(!showMobileSearch);
+  
+  // ✅ NUEVO: Función para toggle del dropdown de usuario
+  const toggleUserDropdown = () => setUserDropdownOpen(!userDropdownOpen);
 
   const handleCategoryClick = (index) => {
     setActiveCategoryIndex(index);
+  };
+
+  // ✅ NUEVO: Función para manejar clic en icono de usuario
+  const handleUserIconClick = () => {
+    if (!user) {
+      // Si no está logueado, ir a login
+      navigate('/iniciar-sesion');
+    } else if (user.role === ROLE.ADMIN) {
+      // Si es admin, ir al panel
+      navigate('/panel-admin');
+      scrollTop();
+    } else {
+      // Si es usuario general, ir al perfil
+      navigate('/mi-perfil');
+      scrollTop();
+    }
   };
 
   // Nueva función para gestionar la navegación con recarga
@@ -185,7 +232,6 @@ const Header = () => {
     navigate(url);
     scrollTop();
     
-    // Pequeño delay para asegurar que la navegación se complete
     setTimeout(() => {
       window.location.reload();
     }, 10);
@@ -220,10 +266,137 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Área derecha: Botón hamburguesa y carrito */}
+          {/* Área derecha: Icono de usuario, Botón hamburguesa y carrito */}
           <div className="flex items-center space-x-4">
+            {/* ✅ NUEVO: Icono de usuario con dropdown */}
+            <div className="relative" ref={userDropdownRef}>
+              {!user ? (
+                // Si no está logueado, mostrar icono de login
+                <button
+                  onClick={handleUserIconClick}
+                  className="flex items-center space-x-2 text-white hover:text-blue-200 transition-colors px-3 py-2 rounded-lg hover:bg-blue-800 border border-blue-700"
+                  title="Iniciar Sesión"
+                >
+                  <FaSignInAlt className="text-xl" />
+                  <span className="font-medium">Iniciar Sesión</span>
+                </button>
+              ) : (
+                // Si está logueado, mostrar dropdown con opciones
+                <>
+                  <button
+                    onClick={toggleUserDropdown}
+                    className="flex items-center space-x-2 text-white hover:text-blue-200 transition-colors px-3 py-2 rounded-lg hover:bg-blue-800 border border-blue-700"
+                  >
+                    {user.role === ROLE.ADMIN ? (
+                      <FaUserShield className="text-xl" />
+                    ) : (
+                      <FaUser className="text-xl" />
+                    )}
+                    <span className="font-medium">{user.name}</span>
+                    <svg 
+                      className={`w-4 h-4 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`}
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown del usuario */}
+                  {userDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[200]">
+                      {/* Información del usuario */}
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          {user.role === ROLE.ADMIN ? 'Administrador' : 'Usuario General'}
+                        </p>
+                      </div>
+
+                      {/* Opciones del menú */}
+                      <div className="py-1">
+                        {user.role === ROLE.ADMIN ? (
+                          <Link
+                            to="/panel-admin"
+                            onClick={() => {
+                              setUserDropdownOpen(false);
+                              scrollTop();
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            <FaUserShield className="mr-3 text-blue-600" />
+                            Panel de Administración
+                          </Link>
+                        ) : (
+                          <>
+                            <Link
+                              to="/mi-perfil"
+                              onClick={() => {
+                                setUserDropdownOpen(false);
+                                scrollTop();
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              <FaUser className="mr-3 text-blue-600" />
+                              Mi Perfil
+                            </Link>
+                            <Link
+                              to="/mi-perfil?tab=cards"
+                              onClick={() => {
+                                setUserDropdownOpen(false);
+                                scrollTop();
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              <FaCreditCard className="mr-3 text-green-600" />
+                              Mis Tarjetas
+                            </Link>
+                            <Link
+                              to="/mi-perfil?tab=favorites"
+                              onClick={() => {
+                                setUserDropdownOpen(false);
+                                scrollTop();
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              <FaHeart className="mr-3 text-red-600" />
+                              Favoritos
+                            </Link>
+                            <Link
+                              to="/mi-perfil?tab=settings"
+                              onClick={() => {
+                                setUserDropdownOpen(false);
+                                scrollTop();
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              <FaCog className="mr-3 text-gray-600" />
+                              Configuración
+                            </Link>
+                          </>
+                        )}
+                        
+                        {/* Separador */}
+                        <div className="border-t border-gray-100 my-1"></div>
+                        
+                        {/* Logout */}
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <FaSignOutAlt className="mr-3" />
+                          Cerrar Sesión
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
             {/* Botón de menú hamburguesa */}
-          
             <button 
               onClick={toggleDesktopMenu}
               className="relative z-[150] flex items-center space-x-2 text-white hover:text-blue-200 transition-colors px-3 py-2 rounded-lg hover:bg-blue-800 border border-blue-700"
@@ -343,7 +516,7 @@ const Header = () => {
                   </nav>
                 </div>
                 
-                {/* Panel de subcategorías derecho - solo se muestra si hay una categoría seleccionada */}
+                {/* Panel de subcategorías derecho */}
                 <div className="flex-1 py-4 px-6 overflow-y-auto bg-white h-full">
                   {activeCategoryIndex !== null && activeSubcategories.length > 0 ? (
                     <>
@@ -388,7 +561,6 @@ const Header = () => {
                       </div>
                     </>
                   ) : (
-                    // Contenido por defecto cuando no hay categoría seleccionada
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
                       <div className="text-3xl font-bold text-blue-800 mb-4">BlueTec</div>
                       <h2 className="text-xl font-bold text-gray-800 mb-2">Tecnología a tu alcance</h2>
@@ -436,7 +608,7 @@ const Header = () => {
         </div>
       </header>
 
-      {/* Barra de búsqueda móvil expandible - Ahora fuera del header para mejor manejo */}
+      {/* Barra de búsqueda móvil expandible */}
       {showMobileSearch && (
         <div className="lg:hidden fixed top-12 left-0 right-0 z-[90] px-4 py-1 bg-[#002060] shadow-md">
           <div className="flex items-center w-full border rounded-full shadow-md focus-within:shadow-lg pl-3 pr-2 bg-white">
@@ -457,7 +629,7 @@ const Header = () => {
           </div>
         </div>
       )}
-
+      
       {/* Menú lateral de categorías para móvil */}
       <div
         className={`fixed top-0 left-0 h-screen bg-white w-80 shadow-lg transform ${

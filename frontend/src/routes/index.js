@@ -1,4 +1,4 @@
-// frontend/src/routes/index.js - AGREGAR SOLO ESTAS LÍNEAS
+// frontend/src/routes/index.js - ACTUALIZADO CON PERFIL DE USUARIO
 import { createBrowserRouter } from "react-router-dom"
 import App from "../App"
 import Home from "../pages/Home"
@@ -16,14 +16,13 @@ import MobileCategoriesPage from "../pages/MobileCategoriesPage"
 import ResetPassword from "../pages/ResetPassword"
 import Nosotros from "../pages/Nosotros"
 
+// ✅ NUEVA PÁGINA DE PERFIL DE USUARIO
+import UserProfilePage from "../pages/UserProfilePage"
+
 // ✅ PÁGINAS DE BANCARD
 import PaymentSuccess from "../pages/PaymentSuccess"
 import PaymentCancelled from "../pages/PaymentCancelled"
-
-// ✅ NUEVO PROXY PARA BANCARD
 import BancardConfirmProxy from "../pages/BancardConfirmProxy"
-
-// ✅ NUEVA PÁGINA DE TRANSACCIONES BANCARD
 import BancardTransactions from "../pages/BancardTransactions"
 
 // Importar el nuevo componente de dashboard
@@ -42,7 +41,6 @@ import ProfitabilityAnalysis from "../pages/ProfitabilityAnalysis"
 import NewProfitabilityAnalysis from "../pages/NewProfitabilityAnalysis"
 import SupplierPriceComparison from "../pages/SupplierPriceComparison"
 import ProfitabilityAnalysisDetails from "../pages/ProfitabilityAnalysisDetails"
-
 import SalesManagement from "../pages/SalesManagement"
 import PurchaseManagement from "../pages/PurchaseManagement"
 import SaleDetails from "../pages/SaleDetails"
@@ -99,6 +97,12 @@ const router = createBrowserRouter([
                 element: <SearchProduct />
             },
             
+            // ✅ NUEVA RUTA PARA PERFIL DE USUARIO
+            {
+                path: "mi-perfil",
+                element: <UserProfilePage />
+            },
+            
             // ✅ RUTAS PARA BANCARD
             {
                 path: "pago-exitoso",
@@ -109,7 +113,7 @@ const router = createBrowserRouter([
                 element: <PaymentCancelled />
             },
             
-            // ✅ NUEVAS RUTAS PROXY PARA BANCARD - CRÍTICAS
+            // ✅ RUTAS PROXY PARA BANCARD - CRÍTICAS
             {
                 path: "api/bancard/confirm",
                 element: <BancardConfirmProxy />
@@ -137,7 +141,7 @@ const router = createBrowserRouter([
                         element: <AllProducts />
                     },
                     
-                    // ✅ NUEVA RUTA PARA TRANSACCIONES BANCARD
+                    // ✅ RUTA PARA TRANSACCIONES BANCARD
                     {
                         path: "transacciones-bancard",
                         element: <BancardTransactions />

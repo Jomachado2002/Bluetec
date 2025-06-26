@@ -1,4 +1,3 @@
-// frontend/src/common/index.js - ACTUALIZADO CON TRANSACCIONES BANCARD
 const backendDomain = process.env.REACT_APP_BACKEND_URL;
 
 const SummaryApi = {
@@ -36,6 +35,67 @@ const SummaryApi = {
     resetPassword: {
         url: `${backendDomain}/api/restablecer-contrasena`,
         method: 'post'
+    },
+
+    // ===========================================
+    // ✅ GESTIÓN DE PERFIL DE USUARIO - NUEVO
+    // ===========================================
+    profile: {
+        getProfile: {
+            url: `${backendDomain}/api/perfil`,
+            method: 'get'
+        },
+        updateProfile: {
+            url: `${backendDomain}/api/perfil`,
+            method: 'put'
+        },
+        uploadImage: {
+            url: `${backendDomain}/api/perfil/imagen`,
+            method: 'post'
+        },
+        changePassword: {
+            url: `${backendDomain}/api/perfil/cambiar-contrasena`,
+            method: 'post'
+        }
+    },
+
+    // ===========================================
+    // ✅ GESTIÓN DE TARJETAS BANCARD - NUEVO
+    // ===========================================
+    bancardCards: {
+        // Catastrar nueva tarjeta
+        registerCard: {
+            url: `${backendDomain}/api/bancard/tarjetas`,
+            method: 'post'
+        },
+        // Obtener tarjetas de un usuario
+        getUserCards: {
+            url: `${backendDomain}/api/bancard/tarjetas`, // + /:user_id
+            method: 'get'
+        },
+        // Eliminar tarjeta
+        deleteCard: {
+            url: `${backendDomain}/api/bancard/tarjetas`, // + /:user_id
+            method: 'delete'
+        },
+        // Pagar con alias token
+        payWithToken: {
+            url: `${backendDomain}/api/bancard/pago-con-token`,
+            method: 'post'
+        },
+        // Endpoints de prueba para certificación
+        testRegister: {
+            url: `${backendDomain}/api/bancard/test-catastro`,
+            method: 'post'
+        },
+        testList: {
+            url: `${backendDomain}/api/bancard/test-listar`, // + /:user_id
+            method: 'get'
+        },
+        testPayment: {
+            url: `${backendDomain}/api/bancard/test-pago-token`,
+            method: 'post'
+        }
     },
 
     // ===========================================
@@ -126,12 +186,8 @@ const SummaryApi = {
             url: `${backendDomain}/api/bancard/rollback`,
             method: 'post'
         },
-        confirmStatus: {
-            url: `${backendDomain}/api/bancard/confirm-status`,
-            method: 'get'
-        },
         
-        // ✅ NUEVAS RUTAS PARA GESTIÓN DE TRANSACCIONES
+        // ✅ RUTAS PARA GESTIÓN DE TRANSACCIONES
         transactions: {
             getAll: {
                 url: `${backendDomain}/api/bancard/transactions`,
@@ -152,6 +208,30 @@ const SummaryApi = {
             create: {
                 url: `${backendDomain}/api/bancard/transactions`,
                 method: 'post'
+            }
+        },
+
+        // ✅ NUEVOS ENDPOINTS PARA CERTIFICACIÓN
+        certification: {
+            verify: {
+                url: `${backendDomain}/api/bancard/verificar-certificacion-completa`,
+                method: 'get'
+            },
+            testRollback: {
+                url: `${backendDomain}/api/bancard/test-rollback`,
+                method: 'post'
+            },
+            manualRollbackTest: {
+                url: `${backendDomain}/api/bancard/manual-rollback-test`,
+                method: 'post'
+            },
+            simulateConfirmation: {
+                url: `${backendDomain}/api/bancard/simulate-confirmation`,
+                method: 'post'
+            },
+            statistics: {
+                url: `${backendDomain}/api/bancard/estadisticas`,
+                method: 'get'
             }
         }
     },
