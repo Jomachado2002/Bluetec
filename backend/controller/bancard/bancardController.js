@@ -60,7 +60,34 @@ const bancardConfirmController = async (req, res) => {
         });
     }
 };
-
+const bancardConfirmGetController = (req, res) => {
+    try {
+        console.log("🔍 === GET REQUEST A CONFIRMACIÓN BANCARD ===");
+        console.log("Query params:", req.query);
+        console.log("Headers:", req.headers);
+        console.log("URL completa:", req.originalUrl);
+        console.log("IP origen:", req.ip);
+        
+        // Bancard hace GET para verificar conectividad
+        res.status(200).json({
+            status: "success",
+            message: "Endpoint de confirmación activo y funcionando",
+            timestamp: new Date().toISOString(),
+            service: "bancard-confirmation",
+            method: "GET",
+            ready: true,
+            environment: process.env.BANCARD_ENVIRONMENT || 'staging'
+        });
+        
+    } catch (error) {
+        console.error("❌ Error en GET confirmación:", error);
+        res.status(200).json({
+            status: "success",
+            message: "Endpoint funcionando",
+            timestamp: new Date().toISOString()
+        });
+    }
+};
 /**
  * ✅ NUEVA FUNCIÓN PARA PROCESAR EN BACKGROUND
  */
@@ -583,6 +610,7 @@ const bancardHealthController = (req, res) => {
 };
 
 module.exports = {
+    bancardConfirmGetController, 
     bancardConfirmController,
     createPaymentController,
     getTransactionStatusController,

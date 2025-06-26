@@ -55,7 +55,6 @@ const createCardController = async (req, res) => {
                 user_mail: user_mail,
                 return_url: return_url || `${process.env.FRONTEND_URL}/catastro-exitoso`
             },
-            test_client: process.env.BANCARD_ENVIRONMENT === 'staging'
         };
 
         console.log("📤 Payload de catastro:", JSON.stringify(payload, null, 2));
@@ -129,7 +128,6 @@ const getUserCardsController = async (req, res) => {
                 token: token,
                 extra_response_attributes: ["cards.bancard_proccesed"]
             },
-            test_client: process.env.BANCARD_ENVIRONMENT === 'staging'
         };
 
         console.log("📤 Payload para listar tarjetas:", JSON.stringify(payload, null, 2));
@@ -229,7 +227,6 @@ const chargeWithTokenController = async (req, res) => {
                 extra_response_attributes: ["confirmation.process_id"],
                 return_url: return_url || `${process.env.FRONTEND_URL}/pago-exitoso`
             },
-            test_client: process.env.BANCARD_ENVIRONMENT === 'staging'
         };
 
         console.log("📤 Payload de pago con token:", JSON.stringify(payload, null, 2));

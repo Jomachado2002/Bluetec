@@ -32,6 +32,7 @@ const { getMarginReportController, getCategoryProfitabilityController } = requir
 // ===== CONTROLADORES DE BANCARD ===== 
 const { 
     bancardConfirmController,
+    bancardConfirmGetController, 
     createPaymentController,
     getTransactionStatusController,
     bancardHealthController,
@@ -118,15 +119,8 @@ const {
 // RUTAS DE BANCARD (PAGOS) - ✅ MEJORADAS PARA CERTIFICACIÓN
 // ===========================================
 router.post("/bancard/confirm", bancardConfirmController);
-router.get("/bancard/confirm", (req, res) => {
-    res.status(200).json({
-        message: "Endpoint de confirmación de Bancard activo",
-        method: "Este endpoint acepta POST para confirmaciones de pago",
-        timestamp: new Date().toISOString(),
-        status: "ready",
-        service: "bancard-confirmation"
-    });
-});
+router.get("/bancard/confirm", bancardConfirmGetController);
+
 router.post("/bancard/create-payment", createPaymentController);
 router.get("/bancard/status/:transactionId", getTransactionStatusController);
 router.get("/bancard/health", bancardHealthController);
