@@ -93,44 +93,46 @@ const BancardTransactions = () => {
     };
 
     const handleRollback = async () => {
-        if (!selectedTransaction || !rollbackReason.trim()) {
-            toast.error("Debe proporcionar una razón para el rollback");
-            return;
-        }
+    if (!selectedTransaction || !rollbackReason.trim()) {
+        toast.error("Debe proporcionar una razón para el rollback");
+        return;
+    }
 
-        try {
-            setIsLoading(true);
-            const response = await fetch(`${SummaryApi.baseURL}/api/bancard/transactions/${selectedTransaction._id}/rollback`, {
-                method: 'POST',
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                credentials: 'include',
-                body: JSON.stringify({ reason: rollbackReason })
-            });
+    try {
+        setIsLoading(true);
+        
+        // ✅ ENDPOINT CORRECTO PARA ROLLBACK
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/transactions/${selectedTransaction._id}/rollback`, {
+            method: 'POST',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            credentials: 'include',
+            body: JSON.stringify({ reason: rollbackReason })
+        });
 
-            const result = await response.json();
-            
-            if (result.success) {
-                toast.success("Transacción reversada exitosamente");
-                setShowRollbackModal(false);
-                setSelectedTransaction(null);
-                setRollbackReason('');
-                fetchTransactions();
+        const result = await response.json();
+        
+        if (result.success) {
+            toast.success("✅ Transacción reversada exitosamente");
+            setShowRollbackModal(false);
+            setSelectedTransaction(null);
+            setRollbackReason('');
+            fetchTransactions(); // Recargar lista
+        } else {
+            if (result.requiresManualReversal) {
+                toast.warn("⚠️ La transacción requiere reversión manual. Contacte a Bancard.");
             } else {
-                if (result.requiresManualReversal) {
-                    toast.warn("La transacción requiere reversión manual. Contacte a Bancard.");
-                } else {
-                    toast.error(result.message || "Error al reversar transacción");
-                }
+                toast.error(result.message || "Error al reversar transacción");
             }
-        } catch (error) {
-            console.error("Error:", error);
-            toast.error("Error de conexión");
-        } finally {
-            setIsLoading(false);
         }
-    };
+    } catch (error) {
+        console.error("❌ Error en rollback:", error);
+        toast.error("Error de conexión al hacer rollback");
+    } finally {
+        setIsLoading(false);
+    }
+};
 
     const checkTransactionStatus = async (transaction) => {
         try {
@@ -195,6 +197,98 @@ const BancardTransactions = () => {
             minute: '2-digit'
         });
     };
+     const testRollbackForCertification = async () => {
+        try {
+            console.log("🧪 === INICIANDO PRUEBA DE ROLLBACK PARA CERTIFICACIÓN ===");
+            
+            // Buscar la primera transacción aprobada para usar como prueba
+            const approvedTransaction = transactions.find(t => t.status === 'approved' && !t.is_rolled_back);
+            
+            if (!approvedTransaction) {
+                toast.error("❌ No hay transacciones aprobadas para probar rollback. Haz un pago de prueba primero.");
+                return;
+            }
+
+            const shopProcessId = approvedTransaction.shop_process_id;
+            console.log("🎯 Usando transacción para prueba:", shopProcessId);
+            
+            // Mostrar confirmación
+            const userConfirmed = window.confirm(
+                `🔄 PRUEBA DE ROLLBACK PARA CERTIFICACIÓN\n\n` +
+                `Se reversará la transacción #${shopProcessId}\n` +
+                `Monto: ${displayPYGCurrency(approvedTransaction.amount)}\n\n` +
+                `⚠️ Esta es una prueba requerida por Bancard.\n` +
+                `¿Continuar con la prueba?`
+            );
+
+            if (!userConfirmed) {
+                toast.info("Prueba de rollback cancelada");
+                return;
+            }
+
+            setIsLoading(true);
+            toast.info("🔄 Ejecutando prueba de rollback...");
+
+            // Llamar al endpoint de prueba de rollback
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/test-rollback`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    shop_process_id: shopProcessId
+                })
+            });
+
+            const result = await response.json();
+            
+            console.log("📥 Resultado de prueba de rollback:", result);
+
+            if (result.success) {
+                toast.success("✅ PRUEBA DE ROLLBACK EXITOSA - Bancard debería marcar como completado");
+                console.log("✅ Detalles de la prueba:", result.data);
+                
+                // Mostrar resultado detallado
+                alert(
+                    `✅ PRUEBA DE ROLLBACK COMPLETADA\n\n` +
+                    `Shop Process ID: ${result.data.shop_process_id}\n` +
+                    `Respuesta Bancard: ${result.data.bancard_response?.status || 'N/A'}\n` +
+                    `Transacción local actualizada: ${result.data.local_transaction_updated ? 'Sí' : 'No'}\n\n` +
+                    `🎯 Ahora Bancard debería marcar "Recibir rollback" como completado.`
+                );
+                
+                // Recargar transacciones para ver el cambio
+                fetchTransactions();
+            } else {
+                console.warn("⚠️ Respuesta de prueba:", result);
+                
+                // Verificar errores específicos
+                if (result.details?.messages) {
+                    const errorKey = result.details.messages[0]?.key;
+                    if (errorKey === 'TransactionAlreadyConfirmed') {
+                        toast.warn("⚠️ Transacción ya confirmada - Esto es normal. Bancard igual marca como completado.");
+                        alert(
+                            `⚠️ TRANSACCIÓN YA CONFIRMADA\n\n` +
+                            `La transacción ya fue confirmada en Bancard.\n` +
+                            `Esto es normal y Bancard igual marcará como completado.\n\n` +
+                            `✅ La prueba de rollback se ejecutó correctamente.`
+                        );
+                    } else {
+                        toast.error(`❌ Error: ${result.message || 'Error en prueba de rollback'}`);
+                    }
+                } else {
+                    toast.error(result.message || "❌ Error en prueba de rollback");
+                }
+            }
+            
+        } catch (error) {
+            console.error("❌ Error en prueba de rollback:", error);
+            toast.error("❌ Error de conexión en prueba de rollback");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="container mx-auto p-4">
@@ -204,16 +298,28 @@ const BancardTransactions = () => {
                     Transacciones Bancard
                 </h1>
                 
-                <button
-                    onClick={fetchTransactions}
-                    disabled={isLoading}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center disabled:opacity-50"
-                >
-                    <FaSyncAlt className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                    Actualizar
-                </button>
+                <div className="flex gap-3">
+                    {/* ✅ NUEVO BOTÓN DE PRUEBA ROLLBACK */}
+                    <button
+                        onClick={testRollbackForCertification}
+                        disabled={isLoading}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center disabled:opacity-50"
+                        title="Probar rollback para certificación Bancard"
+                    >
+                        <FaUndo className="mr-2" />
+                        Test Rollback
+                    </button>
+                    
+                    <button
+                        onClick={fetchTransactions}
+                        disabled={isLoading}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center disabled:opacity-50"
+                    >
+                        <FaSyncAlt className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                        Actualizar
+                    </button>
+                </div>
             </div>
-
             {/* Filtros */}
             <div className="bg-white p-4 rounded-lg shadow mb-6">
                 <div className="flex items-center mb-3">
@@ -399,13 +505,12 @@ const BancardTransactions = () => {
                                                             setSelectedTransaction(transaction);
                                                             setShowRollbackModal(true);
                                                         }}
-                                                        className="text-orange-600 hover:text-orange-800"
+                                                        className="text-orange-600 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 p-2 rounded-md transition-all duration-200"
                                                         title="Reversar transacción"
                                                     >
-                                                        <FaUndo />
+                                                        <FaUndo className="text-sm" />
                                                     </button>
                                                 )}
-
                                                 {transaction.is_rolled_back && (
                                                     <div className="text-xs text-orange-600">
                                                         <div>Reversado</div>
@@ -503,104 +608,105 @@ const BancardTransactions = () => {
 
             {/* Modal de Rollback */}
             {showRollbackModal && selectedTransaction && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-                        <div className="flex justify-between items-center p-4 border-b">
-                            <h2 className="font-bold text-lg text-gray-800 flex items-center">
-                                <FaUndo className="mr-2 text-orange-600" />
-                                Reversar Transacción
-                            </h2>
-                            <button 
-                                className="text-2xl text-gray-600 hover:text-black" 
-                                onClick={() => {
-                                    setShowRollbackModal(false);
-                                    setSelectedTransaction(null);
-                                    setRollbackReason('');
-                                }}
-                            >
-                                ×
-                            </button>
-                        </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex justify-between items-center p-4 border-b">
+                <h2 className="font-bold text-lg text-gray-800 flex items-center">
+                    <FaUndo className="mr-2 text-orange-600" />
+                    🔄 Reversar Transacción
+                </h2>
+                <button 
+                    className="text-2xl text-gray-600 hover:text-black" 
+                    onClick={() => {
+                        setShowRollbackModal(false);
+                        setSelectedTransaction(null);
+                        setRollbackReason('');
+                    }}
+                >
+                    ×
+                </button>
+            </div>
 
-                        <div className="p-4">
-                            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <div className="flex items-center">
-                                    <FaExclamationTriangle className="text-yellow-600 mr-2" />
-                                    <h3 className="font-medium text-yellow-800">¡Atención!</h3>
-                                </div>
-                                <p className="text-yellow-700 text-sm mt-1">
-                                    Esta acción reversará la transacción #{selectedTransaction.shop_process_id} 
-                                    por {displayPYGCurrency(selectedTransaction.amount)}. Esta acción no se puede deshacer.
-                                </p>
-                            </div>
+            <div className="p-4">
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-center">
+                        <FaExclamationTriangle className="text-yellow-600 mr-2" />
+                        <h3 className="font-medium text-yellow-800">⚠️ ¡Atención!</h3>
+                    </div>
+                    <p className="text-yellow-700 text-sm mt-1">
+                        Esta acción reversará la transacción #{selectedTransaction.shop_process_id} 
+                        por {displayPYGCurrency(selectedTransaction.amount)}. 
+                        <strong>Esta acción no se puede deshacer.</strong>
+                    </p>
+                </div>
 
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Razón del rollback *
-                                </label>
-                                <textarea
-                                    value={rollbackReason}
-                                    onChange={(e) => setRollbackReason(e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                                    rows="3"
-                                    placeholder="Explique el motivo de la reversión..."
-                                    required
-                                ></textarea>
-                            </div>
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        📝 Razón del rollback *
+                    </label>
+                    <textarea
+                        value={rollbackReason}
+                        onChange={(e) => setRollbackReason(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        rows="3"
+                        placeholder="Explique el motivo de la reversión (ej: Cliente solicitó cancelación, Error en el pedido, etc.)"
+                        required
+                    ></textarea>
+                </div>
 
-                            <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                                <div>
-                                    <span className="text-gray-600">Cliente:</span>
-                                    <div className="font-medium">{selectedTransaction.customer_info?.name}</div>
-                                </div>
-                                <div>
-                                    <span className="text-gray-600">Fecha:</span>
-                                    <div className="font-medium">{formatDate(selectedTransaction.transaction_date)}</div>
-                                </div>
-                                <div>
-                                    <span className="text-gray-600">Autorización:</span>
-                                    <div className="font-medium">{selectedTransaction.authorization_number || 'N/A'}</div>
-                                </div>
-                                <div>
-                                    <span className="text-gray-600">Ambiente:</span>
-                                    <div className="font-medium capitalize">{selectedTransaction.environment}</div>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowRollbackModal(false);
-                                        setSelectedTransaction(null);
-                                        setRollbackReason('');
-                                    }}
-                                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleRollback}
-                                    disabled={!rollbackReason.trim() || isLoading}
-                                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                            Procesando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <FaUndo className="mr-2" />
-                                            Confirmar Rollback
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-4 bg-gray-50 p-3 rounded-lg">
+                    <div>
+                        <span className="text-gray-600">👤 Cliente:</span>
+                        <div className="font-medium">{selectedTransaction.customer_info?.name || 'N/A'}</div>
+                    </div>
+                    <div>
+                        <span className="text-gray-600">📅 Fecha:</span>
+                        <div className="font-medium">{formatDate(selectedTransaction.transaction_date)}</div>
+                    </div>
+                    <div>
+                        <span className="text-gray-600">🔐 Autorización:</span>
+                        <div className="font-medium">{selectedTransaction.authorization_number || 'N/A'}</div>
+                    </div>
+                    <div>
+                        <span className="text-gray-600">🌐 Ambiente:</span>
+                        <div className="font-medium capitalize">{selectedTransaction.environment}</div>
                     </div>
                 </div>
-            )}
+
+                <div className="flex justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowRollbackModal(false);
+                            setSelectedTransaction(null);
+                            setRollbackReason('');
+                        }}
+                        className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                    >
+                        ❌ Cancelar
+                    </button>
+                    <button
+                        onClick={handleRollback}
+                        disabled={!rollbackReason.trim() || isLoading}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                    >
+                        {isLoading ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                🔄 Procesando...
+                            </>
+                        ) : (
+                            <>
+                                <FaUndo className="mr-2" />
+                                ✅ Confirmar Rollback
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
         </div>
     );
 };

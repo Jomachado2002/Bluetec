@@ -335,7 +335,39 @@ router.post("/bancard/test-rollback", async (req, res) => {
         });
     }
 });
+router.post("/bancard/manual-rollback-test", async (req, res) => {
+    try {
+        console.log("🧪 === PRUEBA MANUAL DE ROLLBACK PARA CERTIFICACIÓN ===");
+        
+        const { shop_process_id, reason = "Prueba manual de rollback para certificación Bancard" } = req.body;
+        
+        if (!shop_process_id) {
+            return res.status(400).json({
+                message: "shop_process_id es requerido",
+                success: false,
+                error: true,
+                example: { shop_process_id: "123456789", reason: "Motivo del rollback" }
+            });
+        }
 
+        // Usar el controlador existente de rollback
+        const { rollbackPaymentController } = require('../controller/bancard/bancardController');
+        
+        // Simular request con datos de rollback
+        req.body = { shop_process_id, reason };
+        
+        await rollbackPaymentController(req, res);
+        
+    } catch (error) {
+        console.error("❌ Error en prueba de rollback:", error);
+        res.status(500).json({
+            message: "Error en prueba de rollback",
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
+});
 // ===== ENDPOINT PARA VERIFICAR CERTIFICACIÓN =====
 router.get("/bancard/verify-certification", (req, res) => {
     const { validateBancardConfig, getBancardBaseUrl } = require('../helpers/bancardUtils');
