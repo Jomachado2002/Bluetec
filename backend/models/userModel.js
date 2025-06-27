@@ -1,4 +1,4 @@
-// backend/models/userModel.js - VERSIÓN ACTUALIZADA
+// backend/models/userModel.js - VERSIÓN CON BANCARD USER ID MEJORADO
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
         default: 'GENERAL'
     },
     
-    // ✅ NUEVOS CAMPOS PARA PERFIL
+    // ✅ CAMPOS PARA PERFIL
     address: {
         street: {
             type: String,
@@ -71,9 +71,9 @@ const userSchema = new mongoose.Schema({
         default: null,
     },
     
-    // ✅ CAMPOS ADICIONALES PARA BANCARD
+    // ✅ CAMPOS PARA BANCARD - MEJORADOS
     bancardUserId: {
-        type: Number, // ID único para Bancard
+        type: Number, // ID único numérico para Bancard
         unique: true,
         sparse: true // Permite valores null/undefined únicos
     },
@@ -98,21 +98,25 @@ const userSchema = new mongoose.Schema({
     }
     
 }, {
-    timestamps: true // Para incluir automáticamente createdAt y updatedAt
+    timestamps: true
 });
 
-// ✅ MIDDLEWARE PARA GENERAR bancardUserId AUTOMÁTICAMENTE
+// ✅ MIDDLEWARE MEJORADO PARA GENERAR bancardUserId
 userSchema.pre('save', async function(next) {
     // Solo generar bancardUserId si es un nuevo usuario y no tiene uno
     if (this.isNew && !this.bancardUserId) {
         try {
-            // Generar un ID único para Bancard (número entero)
+            console.log('🔄 Generando bancardUserId para nuevo usuario:', this.email);
+            
             let isUnique = false;
             let newBancardUserId;
+            let attempts = 0;
+            const maxAttempts = 10;
             
-            while (!isUnique) {
-                // Generar número entre 1000000 y 9999999 (7 dígitos)
-                newBancardUserId = Math.floor(1000000 + Math.random() * 9000000);
+            while (!isUnique && attempts < maxAttempts) {
+                // ✅ GENERAR NÚMERO ENTRE 100000 y 999999 (6 dígitos)
+                // Esto es más seguro y evita conflictos
+                newBancardUserId = Math.floor(100000 + Math.random() * 900000);
                 
                 // Verificar que no existe
                 const existingUser = await this.constructor.findOne({ 
@@ -121,17 +125,82 @@ userSchema.pre('save', async function(next) {
                 
                 if (!existingUser) {
                     isUnique = true;
+                } else {
+                    attempts++;
+                    console.log(`⚠️ bancardUserId ${newBancardUserId} ya existe, reintentando... (${attempts}/${maxAttempts})`);
                 }
             }
             
-            this.bancardUserId = newBancardUserId;
-            console.log(`✅ BancardUserId generado: ${newBancardUserId} para usuario: ${this.email}`);
+            if (isUnique) {
+                this.bancardUserId = newBancardUserId;
+                console.log(`✅ bancardUserId generado: ${newBancardUserId} para usuario: ${this.email}`);
+            } else {
+                console.error('❌ No se pudo generar bancardUserId único después de', maxAttempts, 'intentos');
+                // En caso de emergencia, usar timestamp
+                this.bancardUserId = parseInt(Date.now().toString().slice(-6));
+                console.log(`🆘 Usando bancardUserId de emergencia: ${this.bancardUserId}`);
+            }
         } catch (error) {
-            console.error('Error generando bancardUserId:', error);
+            console.error('❌ Error generando bancardUserId:', error);
+            // Fallback: usar timestamp truncado
+            this.bancardUserId = parseInt(Date.now().toString().slice(-6));
         }
     }
     next();
 });
+
+// ✅ MÉTODO ESTÁTICO PARA ASIGNAR bancardUserId A USUARIOS EXISTENTES
+userSchema.statics.assignBancardUserIds = async function() {
+    try {
+        console.log('🔄 Asignando bancardUserId a usuarios existentes...');
+        
+        const usersWithoutBancardId = await this.find({ 
+            bancardUserId: { $exists: false } 
+        });
+        
+        console.log(`📋 Encontrados ${usersWithoutBancardId.length} usuarios sin bancardUserId`);
+        
+        for (const user of usersWithoutBancardId) {
+            let isUnique = false;
+            let newBancardUserId;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!isUnique && attempts < maxAttempts) {
+                newBancardUserId = Math.floor(100000 + Math.random() * 900000);
+                
+                const existingUser = await this.findOne({ 
+                    bancardUserId: newBancardUserId 
+                });
+                
+                if (!existingUser) {
+                    isUnique = true;
+                } else {
+                    attempts++;
+                }
+            }
+            
+            if (isUnique) {
+                await this.findByIdAndUpdate(user._id, { 
+                    bancardUserId: newBancardUserId 
+                });
+                console.log(`✅ Asignado bancardUserId ${newBancardUserId} a ${user.email}`);
+            } else {
+                const emergencyId = parseInt(Date.now().toString().slice(-6));
+                await this.findByIdAndUpdate(user._id, { 
+                    bancardUserId: emergencyId 
+                });
+                console.log(`🆘 Asignado bancardUserId de emergencia ${emergencyId} a ${user.email}`);
+            }
+        }
+        
+        console.log('✅ Proceso de asignación completado');
+        return true;
+    } catch (error) {
+        console.error('❌ Error asignando bancardUserIds:', error);
+        return false;
+    }
+};
 
 // ✅ MÉTODOS VIRTUALES
 userSchema.virtual('fullAddress').get(function() {
@@ -165,6 +234,10 @@ userSchema.statics.findByEmail = function(email) {
 
 userSchema.statics.findActiveUsers = function() {
     return this.find({ isActive: true });
+};
+
+userSchema.statics.findByBancardUserId = function(bancardUserId) {
+    return this.findOne({ bancardUserId: parseInt(bancardUserId) });
 };
 
 // ✅ ÍNDICES PARA MEJORAR RENDIMIENTO

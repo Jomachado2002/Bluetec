@@ -1,4 +1,4 @@
-// backend/controller/bancard/bancardCardsController.js - VERSIÓN MEJORADA PARA CERTIFICACIÓN
+// backend/controller/bancard/bancardCardsController.js - VERSIÓN CORREGIDA
 const crypto = require('crypto');
 const axios = require('axios');
 const { 
@@ -7,11 +7,18 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ CATASTRAR NUEVA TARJETA - MEJORADO PARA CERTIFICACIÓN
+ * ✅ CATASTRAR NUEVA TARJETA - CORREGIDO PARA USUARIOS GENERALES
  */
 const createCardController = async (req, res) => {
     try {
-        console.log("💳 === INICIANDO CATASTRO DE TARJETA (CERTIFICACIÓN) ===");
+        console.log("💳 === INICIANDO CATASTRO DE TARJETA ===");
+        console.log("👤 Usuario del request:", {
+            userId: req.userId,
+            isAuthenticated: req.isAuthenticated,
+            userRole: req.userRole,
+            bancardUserId: req.bancardUserId,
+            user: req.user ? { name: req.user.name, email: req.user.email } : null
+        });
         
         const {
             card_id,
@@ -21,21 +28,42 @@ const createCardController = async (req, res) => {
             return_url
         } = req.body;
 
-        // ✅ VALIDACIONES MEJORADAS
-        if (!card_id || !user_id || !user_cell_phone || !user_mail) {
-            return res.status(400).json({
-                message: "Todos los campos son requeridos: card_id, user_id, user_cell_phone, user_mail",
+        // ✅ VALIDACIONES MEJORADAS PARA USUARIOS GENERALES
+        if (!req.isAuthenticated) {
+            return res.status(401).json({
+                message: "Debes iniciar sesión para registrar tarjetas",
                 success: false,
                 error: true,
-                requiredFields: ['card_id', 'user_id', 'user_cell_phone', 'user_mail']
+                redirectTo: "/iniciar-sesion"
             });
         }
 
-        // Validar formato de email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(user_mail)) {
+        if (req.userRole !== 'GENERAL' && req.userRole !== 'ADMIN') {
+            return res.status(403).json({
+                message: "No tienes permisos para registrar tarjetas",
+                success: false,
+                error: true
+            });
+        }
+
+        // ✅ USAR DATOS DEL USUARIO AUTENTICADO
+        const finalCardId = card_id || Date.now();
+        const finalUserId = req.bancardUserId || req.user.bancardUserId;
+        const finalUserPhone = user_cell_phone || req.user.phone || "12345678";
+        const finalUserEmail = user_mail || req.user.email;
+
+        if (!finalUserId) {
             return res.status(400).json({
-                message: "El formato del email no es válido",
+                message: "Usuario no tiene ID de Bancard asignado",
+                success: false,
+                error: true,
+                details: "Contacta al administrador para configurar tu cuenta"
+            });
+        }
+
+        if (!finalUserEmail) {
+            return res.status(400).json({
+                message: "Email es requerido para registrar tarjetas",
                 success: false,
                 error: true
             });
@@ -55,29 +83,33 @@ const createCardController = async (req, res) => {
 
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN BANCARD
         // md5(private_key + card_id + user_id + "request_new_card")
-        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${card_id}${user_id}request_new_card`;
+        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${finalCardId}${finalUserId}request_new_card`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
         console.log("🔐 Token generado para catastro:", {
-            card_id,
-            user_id,
-            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...${card_id}${user_id}request_new_card`,
+            card_id: finalCardId,
+            user_id: finalUserId,
+            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...${finalCardId}${finalUserId}request_new_card`,
             token
         });
 
-        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN (SIN test_client PARA CERTIFICACIÓN)
+        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN BANCARD
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
                 token: token,
-                card_id: parseInt(card_id),
-                user_id: parseInt(user_id),
-                user_cell_phone: user_cell_phone.toString(),
-                user_mail: user_mail,
+                card_id: parseInt(finalCardId),
+                user_id: parseInt(finalUserId),
+                user_cell_phone: finalUserPhone.toString(),
+                user_mail: finalUserEmail,
                 return_url: return_url || `${process.env.FRONTEND_URL}/mi-perfil?tab=cards&status=registered`
             }
-            // ✅ SIN test_client para certificación
         };
+
+        // ✅ AGREGAR test_client PARA STAGING/TESTING
+        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
+            payload.test_client = true;
+        }
 
         console.log("📤 Payload de catastro:", JSON.stringify(payload, null, 2));
 
@@ -97,11 +129,16 @@ const createCardController = async (req, res) => {
 
         if (response.status === 200 && response.data.status === 'success') {
             res.json({
-                message: "Catastro iniciado exitosamente (CERTIFICACIÓN)",
+                message: "Catastro iniciado exitosamente",
                 success: true,
                 error: false,
                 data: response.data,
-                certification_mode: true
+                user_info: {
+                    userId: finalUserId,
+                    cardId: finalCardId,
+                    email: finalUserEmail,
+                    phone: finalUserPhone
+                }
             });
         } else {
             console.error("❌ Error en respuesta de Bancard:", response.data);
@@ -134,16 +171,39 @@ const createCardController = async (req, res) => {
 };
 
 /**
- * ✅ LISTAR TARJETAS DE UN USUARIO - MEJORADO
+ * ✅ LISTAR TARJETAS DE UN USUARIO - CORREGIDO
  */
 const getUserCardsController = async (req, res) => {
     try {
-        const { user_id } = req.params;
+        console.log("📋 === OBTENIENDO TARJETAS PARA USUARIO ===");
         
-        console.log("📋 === OBTENIENDO TARJETAS PARA USUARIO (CERTIFICACIÓN) ===");
-        console.log("👤 User ID:", user_id);
+        // ✅ USAR USER_ID DEL USUARIO AUTENTICADO
+        let targetUserId = req.params.user_id;
+        
+        // Si no se proporciona user_id, usar el del usuario autenticado
+        if (!targetUserId || targetUserId === 'me') {
+            if (!req.isAuthenticated) {
+                return res.status(401).json({
+                    message: "Debes iniciar sesión para ver tus tarjetas",
+                    success: false,
+                    error: true
+                });
+            }
+            targetUserId = req.bancardUserId || req.user.bancardUserId;
+        }
 
-        if (!user_id) {
+        // Verificar que el usuario solo pueda ver sus propias tarjetas (excepto admin)
+        if (req.userRole !== 'ADMIN' && targetUserId != (req.bancardUserId || req.user.bancardUserId)) {
+            return res.status(403).json({
+                message: "No puedes ver tarjetas de otros usuarios",
+                success: false,
+                error: true
+            });
+        }
+
+        console.log("👤 Target User ID:", targetUserId);
+
+        if (!targetUserId) {
             return res.status(400).json({
                 message: "user_id es requerido",
                 success: false,
@@ -163,28 +223,32 @@ const getUserCardsController = async (req, res) => {
 
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN
         // md5(private_key + user_id + "request_user_cards")
-        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${user_id}request_user_cards`;
+        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${targetUserId}request_user_cards`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
         console.log("🔐 Token generado para listar:", {
-            user_id,
-            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...${user_id}request_user_cards`,
+            user_id: targetUserId,
+            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...${targetUserId}request_user_cards`,
             token
         });
 
-        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN (SIN test_client PARA CERTIFICACIÓN)
+        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
                 token: token,
                 extra_response_attributes: ["cards.bancard_proccesed"]
             }
-            // ✅ SIN test_client para certificación
         };
+
+        // ✅ AGREGAR test_client PARA STAGING/TESTING
+        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
+            payload.test_client = true;
+        }
 
         console.log("📤 Payload para listar tarjetas:", JSON.stringify(payload, null, 2));
 
-        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/users/${user_id}/cards`;
+        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/users/${targetUserId}/cards`;
         console.log("🌐 URL de Bancard:", bancardUrl);
         
         const response = await axios.post(bancardUrl, payload, {
@@ -200,11 +264,11 @@ const getUserCardsController = async (req, res) => {
 
         if (response.status === 200) {
             res.json({
-                message: "Tarjetas obtenidas exitosamente (CERTIFICACIÓN)",
+                message: "Tarjetas obtenidas exitosamente",
                 success: true,
                 error: false,
                 data: response.data,
-                certification_mode: true
+                user_id: targetUserId
             });
         } else {
             res.status(response.status).json({
@@ -236,11 +300,11 @@ const getUserCardsController = async (req, res) => {
 };
 
 /**
- * ✅ PAGO CON ALIAS TOKEN - MEJORADO PARA CERTIFICACIÓN
+ * ✅ PAGO CON ALIAS TOKEN - CORREGIDO
  */
 const chargeWithTokenController = async (req, res) => {
     try {
-        console.log("💳 === PAGO CON ALIAS TOKEN (CERTIFICACIÓN) ===");
+        console.log("💳 === PAGO CON ALIAS TOKEN ===");
         
         const {
             shop_process_id,
@@ -253,6 +317,15 @@ const chargeWithTokenController = async (req, res) => {
             iva_amount,
             additional_data = ""
         } = req.body;
+
+        // ✅ VALIDACIONES PARA USUARIOS AUTENTICADOS
+        if (!req.isAuthenticated) {
+            return res.status(401).json({
+                message: "Debes iniciar sesión para realizar pagos",
+                success: false,
+                error: true
+            });
+        }
 
         // ✅ VALIDACIONES MEJORADAS
         if (!shop_process_id || !amount || !alias_token) {
@@ -297,7 +370,7 @@ const chargeWithTokenController = async (req, res) => {
             token
         });
 
-        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN (SIN test_client PARA CERTIFICACIÓN)
+        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
@@ -312,8 +385,12 @@ const chargeWithTokenController = async (req, res) => {
                 extra_response_attributes: ["confirmation.process_id"],
                 return_url: return_url || `${process.env.FRONTEND_URL}/mi-perfil?tab=cards&payment=success`
             }
-            // ✅ SIN test_client para certificación
         };
+
+        // ✅ AGREGAR test_client PARA STAGING/TESTING
+        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
+            payload.test_client = true;
+        }
 
         // Agregar IVA si se proporciona
         if (iva_amount) {
@@ -348,18 +425,16 @@ const chargeWithTokenController = async (req, res) => {
                     success: true,
                     error: false,
                     requires3DS: true,
-                    data: response.data,
-                    certification_mode: true
+                    data: response.data
                 });
             } else {
                 console.log("✅ Pago procesado directamente");
                 res.json({
-                    message: "Pago con token procesado exitosamente (CERTIFICACIÓN)",
+                    message: "Pago con token procesado exitosamente",
                     success: true,
                     error: false,
                     requires3DS: false,
-                    data: response.data,
-                    certification_mode: true
+                    data: response.data
                 });
             }
         } else {
@@ -392,17 +467,40 @@ const chargeWithTokenController = async (req, res) => {
 };
 
 /**
- * ✅ ELIMINAR TARJETA - NUEVO ENDPOINT MEJORADO
+ * ✅ ELIMINAR TARJETA - CORREGIDO
  */
 const deleteCardController = async (req, res) => {
     try {
-        console.log("🗑️ === ELIMINANDO TARJETA (CERTIFICACIÓN) ===");
+        console.log("🗑️ === ELIMINANDO TARJETA ===");
         
-        const { user_id } = req.params;
+        let targetUserId = req.params.user_id;
         const { alias_token } = req.body;
 
+        // ✅ VALIDACIONES DE AUTENTICACIÓN
+        if (!req.isAuthenticated) {
+            return res.status(401).json({
+                message: "Debes iniciar sesión para eliminar tarjetas",
+                success: false,
+                error: true
+            });
+        }
+
+        // Si no se proporciona user_id, usar el del usuario autenticado
+        if (!targetUserId || targetUserId === 'me') {
+            targetUserId = req.bancardUserId || req.user.bancardUserId;
+        }
+
+        // Verificar que el usuario solo pueda eliminar sus propias tarjetas (excepto admin)
+        if (req.userRole !== 'ADMIN' && targetUserId != (req.bancardUserId || req.user.bancardUserId)) {
+            return res.status(403).json({
+                message: "No puedes eliminar tarjetas de otros usuarios",
+                success: false,
+                error: true
+            });
+        }
+
         // Validaciones
-        if (!user_id || !alias_token) {
+        if (!targetUserId || !alias_token) {
             return res.status(400).json({
                 message: "user_id y alias_token son requeridos",
                 success: false,
@@ -423,29 +521,33 @@ const deleteCardController = async (req, res) => {
 
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN
         // md5(private_key + "delete_card" + user_id + alias_token)
-        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}delete_card${user_id}${alias_token}`;
+        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}delete_card${targetUserId}${alias_token}`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
         console.log("🔐 Token generado para eliminar:", {
-            user_id,
+            user_id: targetUserId,
             alias_token: `${alias_token.substring(0, 20)}...`,
-            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...delete_card${user_id}${alias_token.substring(0, 10)}...`,
+            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...delete_card${targetUserId}${alias_token.substring(0, 10)}...`,
             token
         });
 
-        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN (SIN test_client PARA CERTIFICACIÓN)
+        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
                 token: token,
                 alias_token: alias_token
             }
-            // ✅ SIN test_client para certificación
         };
+
+        // ✅ AGREGAR test_client PARA STAGING/TESTING
+        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
+            payload.test_client = true;
+        }
 
         console.log("📤 Payload para eliminar tarjeta:", JSON.stringify(payload, null, 2));
 
-        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/users/${user_id}/cards`;
+        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/users/${targetUserId}/cards`;
         console.log("🌐 URL de Bancard:", bancardUrl);
         
         const response = await axios.delete(bancardUrl, {
@@ -462,11 +564,11 @@ const deleteCardController = async (req, res) => {
 
         if (response.status === 200) {
             res.json({
-                message: "Tarjeta eliminada exitosamente (CERTIFICACIÓN)",
+                message: "Tarjeta eliminada exitosamente",
                 success: true,
                 error: false,
                 data: response.data,
-                certification_mode: true
+                user_id: targetUserId
             });
         } else {
             res.status(response.status).json({
