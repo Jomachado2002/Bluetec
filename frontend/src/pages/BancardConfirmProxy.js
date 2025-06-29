@@ -1,4 +1,5 @@
-// frontend/src/pages/BancardConfirmProxy.js
+// frontend/src/pages/BancardConfirmProxy.js - VERSIÓN CORREGIDA
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -6,74 +7,57 @@ const BancardConfirmProxy = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState('processing');
+  const [debugInfo, setDebugInfo] = useState({});
 
   useEffect(() => {
     const processConfirmation = async () => {
       try {
-        console.log('🔄 === PROXY BANCARD CONFIRMACIÓN ===');
+        console.log('🔄 === PROXY BANCARD CONFIRMACIÓN MEJORADO ===');
         console.log('🌐 URL completa:', window.location.href);
         console.log('📋 Search params:', window.location.search);
         
-        // Obtener todos los parámetros de Bancard
-        const params = Object.fromEntries(searchParams);
-        console.log('📋 Parámetros extraídos:', params);
-
-        // ✅ VERIFICAR SI TENEMOS PARÁMETROS VÁLIDOS
-        const hasValidParams = params.shop_process_id || 
-                              params.operation_id || 
-                              params.authorization_number ||
-                              Object.keys(params).length > 0;
-
-        if (!hasValidParams) {
-          console.log('❌ No hay parámetros válidos de Bancard');
-          setStatus('error');
-          setTimeout(() => {
-            navigate('/pago-cancelado?error=no_params');
-          }, 2000);
-          return;
+        // ✅ OBTENER TODOS LOS PARÁMETROS DE BANCARD
+        const allParams = {};
+        for (const [key, value] of searchParams.entries()) {
+          allParams[key] = value;
         }
+        
+        console.log('📋 Parámetros extraídos:', allParams);
+        setDebugInfo(allParams);
 
-        // ✅ BUSCAR TRANSACCIÓN EN LOCALSTORAGE PRIMERO
-        let transactionData = null;
-        try {
-          const savedPayment = sessionStorage.getItem('bancard_payment');
-          if (savedPayment) {
-            transactionData = JSON.parse(savedPayment);
-            console.log('💾 Datos de transacción recuperados:', transactionData);
-          }
-        } catch (e) {
-          console.log('⚠️ No se pudieron recuperar datos de transacción');
-        }
-
-        // ✅ CONSTRUIR OPERATION OBJECT MEJORADO
+        // ✅ CONSTRUIR OPERATION OBJECT PARA BACKEND
         const operation = {
-          token: params.token || '',
-          shop_process_id: params.shop_process_id || transactionData?.shop_process_id || '',
-          response: params.response || (params.response_code === '00' ? 'S' : 'N'),
-          response_details: params.response_details || '',
-          amount: params.amount || transactionData?.amount || '',
-          currency: params.currency || 'PYG',
-          authorization_number: params.authorization_number || '',
-          ticket_number: params.ticket_number || '',
-          response_code: params.response_code || '',
-          response_description: params.response_description || '',
-          extended_response_description: params.extended_response_description || '',
+          token: allParams.token || '',
+          shop_process_id: allParams.shop_process_id || allParams.operation_id || '',
+          response: allParams.response || (allParams.response_code === '00' ? 'S' : 'N'),
+          response_details: allParams.response_details || '',
+          amount: allParams.amount || '',
+          currency: allParams.currency || allParams.currency_id || 'PYG',
+          authorization_number: allParams.authorization_number || '',
+          ticket_number: allParams.ticket_number || '',
+          response_code: allParams.response_code || '',
+          response_description: allParams.response_description || '',
+          extended_response_description: allParams.extended_response_description || '',
           security_information: {
-            customer_ip: params.customer_ip || '',
-            card_source: params.card_source || '',
-            card_country: params.card_country || '',
-            version: params.version || '0.3',
-            risk_index: params.risk_index || '0'
+            customer_ip: allParams.customer_ip || '',
+            card_source: allParams.card_source || '',
+            card_country: allParams.card_country || '',
+            version: allParams.version || '0.3',
+            risk_index: allParams.risk_index || '0'
           },
-          iva_amount: params.iva_amount || '',
-          iva_ticket_number: params.iva_ticket_number || ''
+          iva_amount: allParams.iva_amount || '',
+          iva_ticket_number: allParams.iva_ticket_number || ''
         };
 
         console.log('📤 Enviando al backend:', operation);
 
-        // ✅ ENVIAR AL BACKEND REAL
-        const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
+        // ✅ ENVIAR AL BACKEND PARA PROCESAMIENTO
+        const backendUrl = process.env.REACT_APP_BACKEND_URL;
         
+        if (!backendUrl) {
+          throw new Error('Backend URL no configurada');
+        }
+
         try {
           const response = await fetch(`${backendUrl}/api/bancard/confirm`, {
             method: 'POST',
@@ -86,7 +70,8 @@ const BancardConfirmProxy = () => {
           console.log('📥 Backend response status:', response.status);
           
           if (response.ok) {
-            console.log('✅ Backend confirmó correctamente');
+            const result = await response.json();
+            console.log('✅ Backend confirmó correctamente:', result);
           } else {
             console.warn('⚠️ Backend respondió con error:', response.status);
           }
@@ -95,42 +80,48 @@ const BancardConfirmProxy = () => {
           // Continuar con el flujo aunque falle el backend
         }
 
-        // ✅ DETERMINAR ÉXITO BASADO EN MÚLTIPLES FACTORES
-        const isSuccess = (operation.response === 'S' && operation.response_code === '00') ||
-                         params.status === 'success' ||
-                         params.response_code === '00' ||
-                         (params.authorization_number && params.ticket_number);
+        // ✅ DETERMINAR ÉXITO BASADO EN PARÁMETROS DE BANCARD
+        const isSuccess = 
+          (operation.response === 'S' && operation.response_code === '00') ||
+          allParams.status === 'success' ||
+          (operation.authorization_number && operation.ticket_number) ||
+          (!operation.response_code && operation.shop_process_id); // Si no hay código, asumir éxito
 
         console.log('🎯 Análisis de resultado:', {
           response: operation.response,
           response_code: operation.response_code,
           authorization_number: operation.authorization_number,
+          status_param: allParams.status,
           isSuccess
         });
 
-        // ✅ CONSTRUIR URL DE DESTINO CON TODOS LOS PARÁMETROS
+        // ✅ CONSTRUIR PARÁMETROS PARA LA URL DE DESTINO
         const destinationParams = new URLSearchParams();
-        Object.entries(params).forEach(([key, value]) => {
-          if (value) destinationParams.append(key, value);
+        
+        // Pasar todos los parámetros relevantes
+        Object.entries(allParams).forEach(([key, value]) => {
+          if (value && value.toString().trim() !== '') {
+            destinationParams.append(key, value);
+          }
         });
 
-        // Agregar datos de transacción si existen
-        if (transactionData) {
-          if (!destinationParams.has('shop_process_id')) {
-            destinationParams.append('shop_process_id', transactionData.shop_process_id);
-          }
-          if (!destinationParams.has('amount')) {
-            destinationParams.append('amount', transactionData.amount);
-          }
+        // Asegurar que tenemos al menos el shop_process_id
+        if (!destinationParams.has('shop_process_id') && operation.shop_process_id) {
+          destinationParams.append('shop_process_id', operation.shop_process_id);
         }
 
+        // ✅ REDIRIGIR SEGÚN EL RESULTADO
         if (isSuccess) {
           setStatus('success');
+          console.log('✅ Pago exitoso, redirigiendo a success');
+          
           setTimeout(() => {
             navigate(`/pago-exitoso?${destinationParams.toString()}`);
           }, 1500);
         } else {
           setStatus('failed');
+          console.log('❌ Pago fallido, redirigiendo a cancelled');
+          
           setTimeout(() => {
             navigate(`/pago-cancelado?${destinationParams.toString()}`);
           }, 1500);
@@ -155,8 +146,21 @@ const BancardConfirmProxy = () => {
         {status === 'processing' && (
           <>
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#2A3190] mx-auto mb-4"></div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Procesando pago...</h2>
-            <p className="text-gray-600">Confirmando tu transacción con Bancard</p>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Procesando confirmación...</h2>
+            <p className="text-gray-600 mb-4">Verificando tu transacción con Bancard</p>
+            
+            {/* ✅ DEBUG INFO PARA DESARROLLO */}
+            {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
+              <div className="mt-4 p-3 bg-gray-100 rounded text-left text-xs">
+                <p className="font-semibold mb-2">Debug Info:</p>
+                {Object.entries(debugInfo).map(([key, value]) => (
+                  <p key={key} className="text-gray-600">
+                    <span className="font-medium">{key}:</span> {value}
+                  </p>
+                ))}
+              </div>
+            )}
+            
             <div className="mt-4 flex items-center justify-center gap-2 text-green-600">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
@@ -186,7 +190,7 @@ const BancardConfirmProxy = () => {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-red-800 mb-2">Pago no procesado</h2>
-            <p className="text-red-600">Redirigiendo...</p>
+            <p className="text-red-600">Redirigiendo a la página de error...</p>
           </>
         )}
 

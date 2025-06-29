@@ -1,4 +1,3 @@
-// frontend/src/components/user/CardManagementPage.js - VERSIÓN CORREGIDA
 import React, { useState, useEffect } from 'react';
 import { 
   FaCreditCard, 
@@ -25,7 +24,6 @@ const CardManagementPage = ({
   const [processId, setProcessId] = useState('');
   const [errors, setErrors] = useState({});
 
-  // ✅ CARGAR TARJETAS AL MONTAR EL COMPONENTE
   useEffect(() => {
     console.log('🔄 CardManagement mounted with user:', user);
     if (user?.id) {
@@ -61,13 +59,11 @@ const CardManagementPage = ({
     try {
       console.log('💳 Iniciando registro de tarjeta para usuario:', user);
       
-      // ✅ GENERAR card_id ÚNICO
       const cardId = Date.now() + Math.floor(Math.random() * 1000);
       
-      // ✅ PREPARAR DATOS PARA BANCARD
       const cardData = {
         card_id: cardId,
-        user_id: user.id, // Este debe ser el bancardUserId numérico
+        user_id: user.id,
         user_cell_phone: user.phone || '12345678',
         user_mail: user.email,
         return_url: `${window.location.origin}/mi-perfil?tab=cards&status=registered`
@@ -82,7 +78,8 @@ const CardManagementPage = ({
         setProcessId(result.data.process_id);
         setShowRegisterForm(false);
         setShowIframe(true);
-        loadBancardScript();
+        // ✅ CARGAR SCRIPT INMEDIATAMENTE
+        loadBancardScript(result.data.process_id);
       } else {
         console.error('❌ Error en catastro:', result);
         setErrors({ register: result.message || 'Error al iniciar registro' });
@@ -106,7 +103,7 @@ const CardManagementPage = ({
       const result = await onDeleteCard(user.id, aliasToken);
       if (result.success) {
         console.log('✅ Tarjeta eliminada exitosamente');
-        await fetchUserCards(); // Recargar la lista
+        await fetchUserCards();
       } else {
         setErrors({ delete: result.message || 'Error al eliminar tarjeta' });
       }
@@ -116,34 +113,50 @@ const CardManagementPage = ({
     }
   };
 
-  const loadBancardScript = () => {
+  // ✅ FUNCIÓN CORREGIDA SEGÚN DOCUMENTACIÓN BANCARD
+  const loadBancardScript = (processIdToUse) => {
     console.log('🔄 Cargando script de Bancard para catastro...');
     
     // Remover script anterior si existe
     const existingScript = document.getElementById('bancard-script');
     if (existingScript) {
       existingScript.remove();
+      console.log('🗑️ Script anterior removido');
     }
 
-    // ✅ DETERMINAR URL BASE SEGÚN AMBIENTE
+    // ✅ URL CORRECTA SEGÚN DOCUMENTACIÓN
     const environment = process.env.REACT_APP_BANCARD_ENVIRONMENT || 'staging';
     const baseUrl = environment === 'production' 
       ? 'https://vpos.infonet.com.py' 
       : 'https://vpos.infonet.com.py:8888';
 
-    // Crear nuevo script
+    const scriptUrl = `${baseUrl}/checkout/javascript/dist/bancard-checkout-4.0.0.js`;
+    console.log('📥 Cargando script desde:', scriptUrl);
+
     const script = document.createElement('script');
     script.id = 'bancard-script';
-    script.src = `${baseUrl}/checkout/javascript/dist/bancard-checkout-4.0.0.js`;
+    script.src = scriptUrl;
     script.async = true;
     
     script.onload = () => {
-      console.log('✅ Script de Bancard cargado para catastro');
-      setTimeout(initializeBancardIframe, 100);
+      console.log('✅ Script de Bancard cargado');
+      console.log('🔍 window.Bancard disponible:', !!window.Bancard);
+      
+      if (window.Bancard) {
+        console.log('🔍 Propiedades de Bancard:', Object.keys(window.Bancard));
+        console.log('🔍 Bancard.Cards disponible:', !!window.Bancard.Cards);
+        console.log('🔍 Bancard.Checkout disponible:', !!window.Bancard.Checkout);
+      }
+      
+      // ✅ INICIALIZAR INMEDIATAMENTE
+      setTimeout(() => {
+        initializeBancardIframe(processIdToUse);
+      }, 500); // Pequeño delay para asegurar carga completa
     };
     
-    script.onerror = () => {
-      console.error('❌ Error cargando script de Bancard');
+    script.onerror = (error) => {
+      console.error('❌ Error cargando script de Bancard:', error);
+      console.error('❌ URL que falló:', scriptUrl);
       setShowIframe(false);
       setRegisteringCard(false);
       setErrors({ iframe: 'Error cargando el sistema de registro. Intenta nuevamente.' });
@@ -152,55 +165,132 @@ const CardManagementPage = ({
     document.head.appendChild(script);
   };
 
-  const initializeBancardIframe = () => {
+  // ✅ FUNCIÓN DE INICIALIZACIÓN CORREGIDA
+  const initializeBancardIframe = (processIdToUse) => {
     try {
-      console.log('🎯 Inicializando iframe de catastro de Bancard...');
+      console.log('🎯 Inicializando iframe de catastro...');
+      console.log('🎯 Process ID a usar:', processIdToUse);
       
-      if (window.Bancard && window.Bancard.Cards) {
-        // ✅ ESTILOS PARA EL IFRAME DE CATASTRO
-        const styles = {
-          'input-background-color': '#ffffff',
-          'input-text-color': '#555555',
-          'input-border-color': '#cccccc',
-          'button-background-color': '#2A3190',
-          'button-text-color': '#ffffff',
-          'button-border-color': '#2A3190',
-          'form-background-color': '#ffffff',
-          'form-border-color': '#dddddd',
-          'header-background-color': '#f8f9fa',
-          'header-text-color': '#333333'
-        };
-
-        const container = document.getElementById('bancard-card-container');
-        if (container) {
-          container.innerHTML = '';
-          container.style.display = 'block';
-          container.style.minHeight = '500px';
-          container.style.width = '100%';
-          
-          try {
-            // ✅ CREAR IFRAME DE CATASTRO
-            window.Bancard.Cards.createForm('bancard-card-container', processId, styles);
-            console.log('✅ Iframe de catastro inicializado exitosamente');
-            
-            // ✅ ESCUCHAR MENSAJES DEL IFRAME
-            window.addEventListener('message', handleIframeMessage, false);
-            
-          } catch (iframeError) {
-            console.error('❌ Error creando iframe de catastro:', iframeError);
-            setErrors({ iframe: 'Error al cargar formulario de registro' });
-          }
-        } else {
-          console.error('❌ Contenedor bancard-card-container no encontrado');
-          setErrors({ iframe: 'Error en la configuración del formulario' });
-        }
-      } else {
-        console.log('⏳ Bancard.Cards no disponible, reintentando...');
-        setTimeout(initializeBancardIframe, 1000);
+      // ✅ VERIFICACIONES SEGÚN DOCUMENTACIÓN
+      console.log('🔍 Verificando window.Bancard:', !!window.Bancard);
+      
+      if (!window.Bancard) {
+        console.error('❌ window.Bancard no está definido');
+        setTimeout(() => initializeBancardIframe(processIdToUse), 1000);
+        return;
       }
+
+      // ✅ VERIFICAR DIFERENTES POSIBLES FUNCIONES
+      const hasCards = !!window.Bancard.Cards;
+      const hasCreateForm = !!window.Bancard.createForm;
+      const hasCheckout = !!window.Bancard.Checkout;
+      
+      console.log('🔍 Funciones disponibles:', {
+        'Bancard.Cards': hasCards,
+        'Bancard.createForm': hasCreateForm,
+        'Bancard.Checkout': hasCheckout,
+        'Todas las propiedades': Object.keys(window.Bancard)
+      });
+
+      // ✅ ESTILOS SEGÚN DOCUMENTACIÓN
+      const styles = {
+        'input-background-color': '#ffffff',
+        'input-text-color': '#555555',
+        'input-border-color': '#cccccc',
+        'button-background-color': '#2A3190',
+        'button-text-color': '#ffffff',
+        'button-border-color': '#2A3190',
+        'form-background-color': '#ffffff',
+        'form-border-color': '#dddddd',
+        'header-background-color': '#f8f9fa',
+        'header-text-color': '#333333'
+      };
+
+      const container = document.getElementById('bancard-card-container');
+      if (!container) {
+        console.error('❌ Contenedor bancard-card-container no encontrado');
+        setErrors({ iframe: 'Error en la configuración del formulario' });
+        return;
+      }
+
+      // Limpiar contenedor
+      container.innerHTML = '';
+      container.style.display = 'block';
+      container.style.minHeight = '500px';
+      container.style.width = '100%';
+      
+      console.log('📦 Contenedor preparado:', container);
+
+      // ✅ INTENTAR DIFERENTES MÉTODOS SEGÚN DOCUMENTACIÓN
+      let iframeCreated = false;
+
+      // Método 1: Bancard.Cards.createForm (según documentación página 26)
+      if (window.Bancard.Cards && window.Bancard.Cards.createForm) {
+        try {
+          console.log('🔄 Intentando Bancard.Cards.createForm...');
+          window.Bancard.Cards.createForm('bancard-card-container', processIdToUse, styles);
+          iframeCreated = true;
+          console.log('✅ Iframe creado con Bancard.Cards.createForm');
+        } catch (error) {
+          console.error('❌ Error con Bancard.Cards.createForm:', error);
+        }
+      }
+
+      // Método 2: Bancard.createForm (alternativo)
+      if (!iframeCreated && window.Bancard.createForm) {
+        try {
+          console.log('🔄 Intentando Bancard.createForm...');
+          window.Bancard.createForm('bancard-card-container', processIdToUse, styles);
+          iframeCreated = true;
+          console.log('✅ Iframe creado con Bancard.createForm');
+        } catch (error) {
+          console.error('❌ Error con Bancard.createForm:', error);
+        }
+      }
+
+      // Método 3: Bancard.Checkout.createForm (fallback)
+      if (!iframeCreated && window.Bancard.Checkout && window.Bancard.Checkout.createForm) {
+        try {
+          console.log('🔄 Intentando Bancard.Checkout.createForm...');
+          window.Bancard.Checkout.createForm('bancard-card-container', processIdToUse, styles);
+          iframeCreated = true;
+          console.log('✅ Iframe creado con Bancard.Checkout.createForm');
+        } catch (error) {
+          console.error('❌ Error con Bancard.Checkout.createForm:', error);
+        }
+      }
+
+      if (!iframeCreated) {
+        console.error('❌ No se pudo crear el iframe con ningún método');
+        console.error('❌ Funciones disponibles:', Object.keys(window.Bancard));
+        setErrors({ iframe: 'Error al cargar formulario de registro' });
+        return;
+      }
+
+      // ✅ VERIFICAR QUE EL IFRAME SE CREÓ
+      setTimeout(() => {
+        const iframe = container.querySelector('iframe');
+        if (iframe) {
+          console.log('✅ Iframe encontrado:', iframe);
+          iframe.style.width = '100%';
+          iframe.style.minHeight = '500px';
+          iframe.style.border = 'none';
+          
+          // ✅ ESCUCHAR MENSAJES DEL IFRAME
+          window.addEventListener('message', handleIframeMessage, false);
+          setRegisteringCard(false);
+        } else {
+          console.log('⚠️ No se encontró iframe después de 2 segundos');
+          console.log('⚠️ Contenido del contenedor:', container.innerHTML);
+          setErrors({ iframe: 'El formulario tardó en cargar. Intenta nuevamente.' });
+          setRegisteringCard(false);
+        }
+      }, 2000);
+      
     } catch (error) {
-      console.error('❌ Error inicializando iframe de catastro:', error);
+      console.error('❌ Error inicializando iframe:', error);
       setErrors({ iframe: 'Error al cargar formulario de registro' });
+      setRegisteringCard(false);
     }
   };
 
@@ -214,7 +304,7 @@ const CardManagementPage = ({
           console.log('✅ Tarjeta catastrada exitosamente');
           setTimeout(() => {
             closeIframe();
-            fetchUserCards(); // Recargar lista de tarjetas
+            fetchUserCards();
           }, 2000);
         } else if (event.data.status === 'add_new_card_fail') {
           console.log('❌ Error en catastro de tarjeta');
@@ -281,6 +371,16 @@ const CardManagementPage = ({
             </div>
           </div>
 
+          {/* ✅ LOADING STATE MEJORADO */}
+          {registeringCard && (
+            <div className="p-4 bg-yellow-50 border-b">
+              <div className="flex items-center gap-2 text-yellow-800">
+                <FaSpinner className="animate-spin" />
+                <span>Inicializando formulario de Bancard...</span>
+              </div>
+            </div>
+          )}
+
           {/* Contenedor del iframe */}
           <div className="p-4">
             <div 
@@ -292,24 +392,54 @@ const CardManagementPage = ({
                 backgroundColor: '#ffffff'
               }}
             >
+              {/* ✅ MENSAJE INICIAL MEJORADO */}
               <div className="p-4 text-center text-gray-500">
                 <FaSpinner className="animate-spin text-2xl mx-auto mb-2" />
-                <p>Cargando formulario de registro...</p>
+                <p>Cargando formulario de registro seguro...</p>
                 <p className="text-sm mt-2">
-                  Completa los datos de tu tarjeta de forma segura
+                  Conectando con Bancard...
                 </p>
+                
+                {/* ✅ DEBUG INFO EN DESARROLLO */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-4 text-xs text-left bg-gray-100 p-2 rounded">
+                    <p><strong>Debug Info:</strong></p>
+                    <p>Process ID: {processId}</p>
+                    <p>Environment: {process.env.REACT_APP_BANCARD_ENVIRONMENT || 'staging'}</p>
+                    <p>User ID: {user?.id}</p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Instrucciones */}
             <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <h4 className="font-medium text-yellow-800 mb-2">📝 Datos de prueba para testing:</h4>
+              <h4 className="font-medium text-yellow-800 mb-2">📝 Datos de prueba:</h4>
               <ul className="text-sm text-yellow-700 space-y-1">
                 <li>• <strong>Cédula válida Visa/MasterCard:</strong> 6587520</li>
                 <li>• <strong>Cédula válida Bancard:</strong> 9661000</li>
                 <li>• Completa los demás campos con datos reales de tu tarjeta</li>
               </ul>
             </div>
+
+            {/* ✅ BOTÓN DE REINTENTAR EN CASO DE ERROR */}
+            {Object.keys(errors).length > 0 && (
+              <div className="mt-4 text-center">
+                <button
+                  onClick={() => {
+                    console.log('🔄 Reintentando cargar iframe...');
+                    setErrors({});
+                    setRegisteringCard(true);
+                    setTimeout(() => {
+                      loadBancardScript(processId);
+                    }, 500);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Footer con información de seguridad */}

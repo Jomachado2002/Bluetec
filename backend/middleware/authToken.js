@@ -1,7 +1,8 @@
-// backend/middleware/authToken.js - VERSIÓN CORREGIDA PARA USUARIOS GENERALES
+// backend/middleware/authToken.js - VERSIÓN CORREGIDA PARA BANCARD
+
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const userModel = require('../models/userModel'); // ✅ AGREGAR IMPORT
+const userModel = require('../models/userModel');
 
 async function authToken(req, res, next) {
     try {
@@ -35,8 +36,47 @@ async function authToken(req, res, next) {
                         const user = await userModel.findById(decoded._id).select('-password');
                         
                         if (user) {
+                            // ✅ ASEGURAR QUE EL USUARIO TENGA bancardUserId
+                            if (!user.bancardUserId) {
+                                console.log('⚠️ Usuario sin bancardUserId, generando...');
+                                
+                                let isUnique = false;
+                                let newBancardUserId;
+                                let attempts = 0;
+                                const maxAttempts = 5;
+                                
+                                while (!isUnique && attempts < maxAttempts) {
+                                    newBancardUserId = Math.floor(100000 + Math.random() * 900000);
+                                    
+                                    const existingUser = await userModel.findOne({ 
+                                        bancardUserId: newBancardUserId 
+                                    });
+                                    
+                                    if (!existingUser) {
+                                        isUnique = true;
+                                    } else {
+                                        attempts++;
+                                    }
+                                }
+                                
+                                if (isUnique) {
+                                    await userModel.findByIdAndUpdate(user._id, { 
+                                        bancardUserId: newBancardUserId 
+                                    });
+                                    user.bancardUserId = newBancardUserId;
+                                    console.log(`✅ bancardUserId ${newBancardUserId} asignado a ${user.email}`);
+                                } else {
+                                    const emergencyId = parseInt(Date.now().toString().slice(-6));
+                                    await userModel.findByIdAndUpdate(user._id, { 
+                                        bancardUserId: emergencyId 
+                                    });
+                                    user.bancardUserId = emergencyId;
+                                    console.log(`🆘 bancardUserId de emergencia ${emergencyId} asignado a ${user.email}`);
+                                }
+                            }
+                            
                             req.userId = decoded._id;
-                            req.user = user; // ✅ AGREGAR OBJETO USER COMPLETO
+                            req.user = user; // ✅ OBJETO USER COMPLETO
                             req.isAuthenticated = true;
                             req.userRole = user.role;
                             req.bancardUserId = user.bancardUserId; // ✅ ID NUMÉRICO PARA BANCARD
@@ -45,7 +85,8 @@ async function authToken(req, res, next) {
                                 userId: req.userId,
                                 role: req.userRole,
                                 bancardUserId: req.bancardUserId,
-                                name: user.name
+                                name: user.name,
+                                email: user.email
                             });
                         } else {
                             console.log('⚠️ Usuario no encontrado en BD, usando invitado');

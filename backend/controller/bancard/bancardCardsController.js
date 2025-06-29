@@ -1,4 +1,5 @@
 // backend/controller/bancard/bancardCardsController.js - VERSIÓN CORREGIDA
+
 const crypto = require('crypto');
 const axios = require('axios');
 const { 
@@ -7,7 +8,7 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ CATASTRAR NUEVA TARJETA - CORREGIDO PARA USUARIOS GENERALES
+ * ✅ CATASTRAR NUEVA TARJETA - CORREGIDO PARA FUNCIONAR
  */
 const createCardController = async (req, res) => {
     try {
@@ -28,7 +29,7 @@ const createCardController = async (req, res) => {
             return_url
         } = req.body;
 
-        // ✅ VALIDACIONES MEJORADAS PARA USUARIOS GENERALES
+        // ✅ VALIDACIONES PARA USUARIOS AUTENTICADOS
         if (!req.isAuthenticated) {
             return res.status(401).json({
                 message: "Debes iniciar sesión para registrar tarjetas",
@@ -46,20 +47,21 @@ const createCardController = async (req, res) => {
             });
         }
 
-        // ✅ USAR DATOS DEL USUARIO AUTENTICADO
-        const finalCardId = card_id || Date.now();
-        const finalUserId = req.bancardUserId || req.user.bancardUserId;
-        const finalUserPhone = user_cell_phone || req.user.phone || "12345678";
-        const finalUserEmail = user_mail || req.user.email;
-
-        if (!finalUserId) {
-            return res.status(400).json({
-                message: "Usuario no tiene ID de Bancard asignado",
-                success: false,
-                error: true,
-                details: "Contacta al administrador para configurar tu cuenta"
-            });
+        // ✅ GENERAR DATOS AUTOMÁTICAMENTE SI NO SE PROPORCIONAN
+        const finalCardId = card_id || Date.now() + Math.floor(Math.random() * 1000);
+        
+        // ✅ USAR bancardUserId DEL USUARIO O GENERAR UNO
+        let finalUserId = user_id;
+        if (!finalUserId && req.user) {
+            // Si el usuario no tiene bancardUserId, usar su _id convertido a número
+            finalUserId = req.user.bancardUserId || parseInt(req.user._id.toString().slice(-8), 16);
         }
+        if (!finalUserId) {
+            finalUserId = parseInt(req.userId.toString().slice(-8), 16);
+        }
+
+        const finalUserPhone = user_cell_phone || req.user?.phone || "12345678";
+        const finalUserEmail = user_mail || req.user?.email;
 
         if (!finalUserEmail) {
             return res.status(400).json({
@@ -189,16 +191,20 @@ const getUserCardsController = async (req, res) => {
                     error: true
                 });
             }
-            targetUserId = req.bancardUserId || req.user.bancardUserId;
+            // ✅ USAR bancardUserId DEL USUARIO O GENERAR UNO
+            targetUserId = req.user?.bancardUserId || parseInt(req.user?._id.toString().slice(-8), 16) || parseInt(req.userId.toString().slice(-8), 16);
         }
 
         // Verificar que el usuario solo pueda ver sus propias tarjetas (excepto admin)
-        if (req.userRole !== 'ADMIN' && targetUserId != (req.bancardUserId || req.user.bancardUserId)) {
-            return res.status(403).json({
-                message: "No puedes ver tarjetas de otros usuarios",
-                success: false,
-                error: true
-            });
+        if (req.userRole !== 'ADMIN') {
+            const userBancardId = req.user?.bancardUserId || parseInt(req.user?._id.toString().slice(-8), 16) || parseInt(req.userId.toString().slice(-8), 16);
+            if (targetUserId != userBancardId) {
+                return res.status(403).json({
+                    message: "No puedes ver tarjetas de otros usuarios",
+                    success: false,
+                    error: true
+                });
+            }
         }
 
         console.log("👤 Target User ID:", targetUserId);
@@ -487,16 +493,19 @@ const deleteCardController = async (req, res) => {
 
         // Si no se proporciona user_id, usar el del usuario autenticado
         if (!targetUserId || targetUserId === 'me') {
-            targetUserId = req.bancardUserId || req.user.bancardUserId;
+            targetUserId = req.user?.bancardUserId || parseInt(req.user?._id.toString().slice(-8), 16) || parseInt(req.userId.toString().slice(-8), 16);
         }
 
         // Verificar que el usuario solo pueda eliminar sus propias tarjetas (excepto admin)
-        if (req.userRole !== 'ADMIN' && targetUserId != (req.bancardUserId || req.user.bancardUserId)) {
-            return res.status(403).json({
-                message: "No puedes eliminar tarjetas de otros usuarios",
-                success: false,
-                error: true
-            });
+        if (req.userRole !== 'ADMIN') {
+            const userBancardId = req.user?.bancardUserId || parseInt(req.user?._id.toString().slice(-8), 16) || parseInt(req.userId.toString().slice(-8), 16);
+            if (targetUserId != userBancardId) {
+                return res.status(403).json({
+                    message: "No puedes eliminar tarjetas de otros usuarios",
+                    success: false,
+                    error: true
+                });
+            }
         }
 
         // Validaciones

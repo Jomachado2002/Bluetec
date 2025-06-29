@@ -1,4 +1,5 @@
-// backend/models/userModel.js - VERSIÓN CON BANCARD USER ID MEJORADO
+// backend/models/userModel.js - VERSIÓN COMPLETA MEJORADA CON BANCARD
+
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -71,7 +72,7 @@ const userSchema = new mongoose.Schema({
         default: null,
     },
     
-    // ✅ CAMPOS PARA BANCARD - MEJORADOS
+    // ✅ CAMPO CRÍTICO PARA BANCARD - MEJORADO
     bancardUserId: {
         type: Number, // ID único numérico para Bancard
         unique: true,
@@ -155,7 +156,11 @@ userSchema.statics.assignBancardUserIds = async function() {
         console.log('🔄 Asignando bancardUserId a usuarios existentes...');
         
         const usersWithoutBancardId = await this.find({ 
-            bancardUserId: { $exists: false } 
+            $or: [
+                { bancardUserId: { $exists: false } },
+                { bancardUserId: null },
+                { bancardUserId: undefined }
+            ]
         });
         
         console.log(`📋 Encontrados ${usersWithoutBancardId.length} usuarios sin bancardUserId`);
@@ -227,6 +232,26 @@ userSchema.methods.toPublicJSON = function() {
     return userObject;
 };
 
+// ✅ MÉTODO PARA OBTENER DATOS SEGUROS (COMPATIBLE CON TU CÓDIGO EXISTENTE)
+userSchema.methods.getSafeData = function() {
+    return {
+        _id: this._id,
+        name: this.name,
+        email: this.email,
+        role: this.role,
+        bancardUserId: this.bancardUserId,
+        phone: this.phone,
+        address: this.address,
+        dateOfBirth: this.dateOfBirth,
+        profilePic: this.profilePic,
+        isActive: this.isActive,
+        emailVerified: this.emailVerified,
+        lastLogin: this.lastLogin,
+        createdAt: this.createdAt,
+        updatedAt: this.updatedAt
+    };
+};
+
 // ✅ MÉTODOS ESTÁTICOS
 userSchema.statics.findByEmail = function(email) {
     return this.findOne({ email: email.toLowerCase() });
@@ -240,11 +265,32 @@ userSchema.statics.findByBancardUserId = function(bancardUserId) {
     return this.findOne({ bancardUserId: parseInt(bancardUserId) });
 };
 
+// ✅ MÉTODO PARA VERIFICAR SI UN USUARIO PUEDE USAR BANCARD
+userSchema.methods.canUseBancard = function() {
+    return !!(this.bancardUserId && this.email && this.name);
+};
+
+// ✅ MÉTODO PARA OBTENER DATOS PARA BANCARD
+userSchema.methods.getBancardData = function() {
+    if (!this.canUseBancard()) {
+        return null;
+    }
+    
+    return {
+        user_id: this.bancardUserId,
+        user_mail: this.email,
+        user_cell_phone: this.phone || '12345678',
+        user_name: this.name
+    };
+};
+
 // ✅ ÍNDICES PARA MEJORAR RENDIMIENTO
 userSchema.index({ email: 1 });
 userSchema.index({ bancardUserId: 1 });
 userSchema.index({ resetPasswordToken: 1 });
 userSchema.index({ createdAt: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ isActive: 1 });
 
 const userModel = mongoose.model("user", userSchema);
 
