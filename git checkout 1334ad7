@@ -1,0 +1,23 @@
+[33m19e6808[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{0}: pull origin main: Fast-forward
+[33md2ce10e[m HEAD@{1}: commit: cambios backend
+[33m8dd1770[m HEAD@{2}: reset: moving to origin/main
+[33m8dd1770[m HEAD@{3}: reset: moving to origin/main
+[33m95cc554[m HEAD@{4}: commit: cambios minimos para funcionamiento
+[33m8a51902[m HEAD@{5}: pull origin main: Fast-forward
+[33mdedf7b6[m HEAD@{6}: reset: moving to HEAD
+[33mdedf7b6[m HEAD@{7}: reset: moving to origin/main
+[33m5c0b691[m HEAD@{8}: commit: cambios backend
+[33m7fc5b4f[m HEAD@{9}: commit: cambios backend
+[33m3b19e8a[m HEAD@{10}: commit: cambios bancard
+[33m1334ad7[m HEAD@{11}: reset: moving to HEAD
+[33m1334ad7[m HEAD@{12}: commit: cambios en el backend
+[33m085ad80[m HEAD@{13}: commit: cambios bancard
+[33m51e36f0[m HEAD@{14}: commit: cambios backend
+[33mb391cfb[m HEAD@{15}: commit: cambios front bancard
+[33m082f7c4[m HEAD@{16}: commit: cambios en backend bancard
+[33m514cd28[m HEAD@{17}: reset: moving to origin/main
+[33mf1d9f15[m HEAD@{18}: commit: cambios en el backend
+[33m2e620b9[m HEAD@{19}: reset: moving to origin/main
+[33m3c6c802[m HEAD@{20}: commit: cambios front
+[33m6e55eeb[m HEAD@{21}: commit: cambios en el back presupuesto y cliente
+[33m4a13c75[m HEAD@{22}: clone: from https://github.com/Jomachado2002/Bluetec.git
