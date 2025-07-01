@@ -845,94 +845,69 @@ router.get("/debug/auth-status", authToken, async (req, res) => {
     }
 });
 
-// ===========================================
-// ✅ RUTA PARA FORZAR LIMPIEZA DE COOKIES
-// ===========================================
-router.post("/debug/clear-auth", (req, res) => {
+router.get("/debug/auth-simple", authToken, async (req, res) => {
     try {
-        console.log("🧹 === LIMPIANDO COOKIES DE AUTENTICACIÓN ===");
-        
-        // Limpiar todas las cookies relacionadas con autenticación
-        const cookieOptions = {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined
-        };
-
-        res.clearCookie('token', cookieOptions);
-        res.clearCookie('guestUserId', cookieOptions);
-        
-        // También intentar sin domain para desarrollo local
-        res.clearCookie('token');
-        res.clearCookie('guestUserId');
-
-        res.json({
-            message: "Cookies de autenticación limpiadas",
-            success: true,
-            error: false,
-            data: {
-                cleared_cookies: ['token', 'guestUserId'],
-                cookie_options: cookieOptions
-            }
-        });
-
-    } catch (error) {
-        console.error("❌ Error limpiando cookies:", error);
-        res.status(500).json({
-            message: "Error al limpiar cookies",
-            success: false,
-            error: true,
-            details: error.message
-        });
-    }
-});
-
-// ===========================================
-// ✅ RUTA PARA VERIFICAR CONECTIVIDAD CON BD
-// ===========================================
-router.get("/debug/database-status", async (req, res) => {
-    try {
-        console.log("💾 === VERIFICANDO ESTADO DE BASE DE DATOS ===");
-        
-        const mongoose = require('mongoose');
-        const userModel = require('../models/userModel');
-        
-        const dbStatus = {
-            connection_state: mongoose.connection.readyState,
-            connection_states: {
-                0: 'disconnected',
-                1: 'connected',
-                2: 'connecting',
-                3: 'disconnecting'
+        const debugInfo = {
+            middleware_result: {
+                userId: req.userId,
+                isAuthenticated: req.isAuthenticated,
+                userRole: req.userRole
             },
-            current_state: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState]
+            cookie_info: {
+                token_present: !!req.cookies?.token,
+                token_preview: req.cookies?.token ? req.cookies.token.substring(0, 20) + '...' : null
+            },
+            env_check: {
+                secret_key_present: !!process.env.TOKEN_SECRET_KEY,
+                secret_length: process.env.TOKEN_SECRET_KEY?.length || 0
+            }
         };
 
-        // Intentar consulta básica
-        try {
-            const userCount = await userModel.countDocuments();
-            dbStatus.users_count = userCount;
-            dbStatus.query_test = "OK";
-        } catch (queryError) {
-            dbStatus.query_test = "ERROR";
-            dbStatus.query_error = queryError.message;
+        // Si hay token, verificar manualmente
+        if (req.cookies?.token) {
+            try {
+                const jwt = require('jsonwebtoken');
+                const decoded = jwt.verify(req.cookies.token, process.env.TOKEN_SECRET_KEY);
+                debugInfo.manual_token_check = {
+                    valid: true,
+                    user_id: decoded._id,
+                    email: decoded.email,
+                    role: decoded.role,
+                    expires: new Date(decoded.exp * 1000).toISOString()
+                };
+
+                // Verificar usuario en BD
+                const userModel = require('../models/userModel');
+                const user = await userModel.findById(decoded._id).select('name email role isActive');
+                debugInfo.database_user = user ? {
+                    found: true,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    isActive: user.isActive
+                } : {
+                    found: false
+                };
+
+            } catch (tokenError) {
+                debugInfo.manual_token_check = {
+                    valid: false,
+                    error: tokenError.message
+                };
+            }
         }
 
         res.json({
-            message: "Estado de la base de datos",
-            success: dbStatus.connection_state === 1,
-            error: dbStatus.connection_state !== 1,
-            data: dbStatus
+            message: "Debug de autenticación",
+            success: true,
+            data: debugInfo
         });
 
     } catch (error) {
-        console.error("❌ Error verificando BD:", error);
         res.status(500).json({
-            message: "Error al verificar base de datos",
+            message: "Error en debug",
             success: false,
-            error: true,
-            details: error.message
+            error: error.message
         });
     }
 });
