@@ -98,7 +98,92 @@ const createCardController = async (req, res) => {
             });
         }
 
-        // ... resto del código sin cambios
+        // CÓDIGO FALTANTE - AGREGAR DESPUÉS DE LA LÍNEA 85 en createCardController
+
+        // ✅ VALIDAR CONFIGURACIÓN DE BANCARD
+        const configValidation = validateBancardConfig();
+        if (!configValidation.isValid) {
+            return res.status(500).json({
+                message: "Error de configuración del sistema",
+                success: false,
+                error: true,
+                details: configValidation.errors
+            });
+        }
+
+        // ✅ GENERAR TOKEN MD5 SEGÚN DOCUMENTACIÓN BANCARD
+        // md5(private_key + card_id + user_id + "request_new_card")
+        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${finalCardId}${finalUserId}request_new_card`;
+        const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
+
+        console.log("🔐 Token generado para catastro:", {
+            card_id: finalCardId,
+            user_id: finalUserId,
+            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...${finalCardId}${finalUserId}request_new_card`,
+            token
+        });
+
+        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN BANCARD
+        const payload = {
+            public_key: process.env.BANCARD_PUBLIC_KEY,
+            operation: {
+                token: token,
+                card_id: parseInt(finalCardId),
+                user_id: parseInt(finalUserId),
+                user_cell_phone: finalUserPhone,
+                user_mail: finalUserEmail,
+                return_url: `${process.env.FRONTEND_URL}/catastro-resultado`
+
+            }
+        };
+
+        // ✅ AGREGAR test_client PARA STAGING/TESTING
+        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
+            payload.test_client = true;
+        }
+
+        console.log("📤 Payload para catastro:", JSON.stringify(payload, null, 2));
+
+        // ✅ HACER PETICIÓN A BANCARD
+        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/cards/new`;
+        console.log("🌐 URL de Bancard para catastro:", bancardUrl);
+        
+        const response = await axios.post(bancardUrl, payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'BlueTec-eCommerce/1.0',
+                'Accept': 'application/json'
+            },
+            timeout: 30000
+        });
+
+        console.log("📥 Respuesta de catastro:", response.status, JSON.stringify(response.data, null, 2));
+
+        if (response.status === 200 && response.data.status === 'success') {
+            console.log("✅ Catastro iniciado exitosamente");
+            
+            res.json({
+                message: "Catastro iniciado exitosamente",
+                success: true,
+                error: false,
+                data: {
+                    process_id: response.data.process_id,
+                    card_id: finalCardId,
+                    user_id: finalUserId,
+                    iframe_url: `${getBancardBaseUrl()}/checkout/new/${response.data.process_id}`,
+                    bancard_response: response.data
+                }
+            });
+        } else {
+            console.error("❌ Bancard respondió con error:", response.data);
+            res.status(400).json({
+                message: "Error al iniciar catastro en Bancard",
+                success: false,
+                error: true,
+                details: response.data
+            });
+        }
+
         
     } catch (error) {
         console.error("❌ Error en catastro:", error);

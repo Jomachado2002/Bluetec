@@ -46,7 +46,13 @@ app.get('/test', (req, res) => {
 
 // Configuración de CORS mejorada con múltiples orígenes permitidos y añadiendo PATCH
 app.use(cors({
-  origin: [process.env.FRONTEND_URL, 'http://localhost:3000'],
+  origin: [
+    process.env.FRONTEND_URL,
+    'http://localhost:3000',
+    'https://www.bluetec.com.py',  // ✅ AGREGAR ESTE
+    'https://bluetec.com.py',      // ✅ AGREGAR ESTE TAMBIÉN (sin www)
+    'https://bluetec.vercel.app'   // ✅ AGREGAR ESTE POR SI ACASO
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
