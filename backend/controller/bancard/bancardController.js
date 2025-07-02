@@ -378,8 +378,8 @@ const createPaymentController = async (req, res) => {
                         description: description,
                         iframe_url: iframeUrl,
                         // ✅ MANTENER URLs ORIGINALES EN LA RESPUESTA PARA COMPATIBILIDAD
-                        return_url: return_url || `${process.env.FRONTEND_URL}/pago-exitoso`,
-                        cancel_url: cancel_url || `${process.env.FRONTEND_URL}/pago-cancelado`,
+                        return_url: `${backendUrl}/api/bancard/redirect/success`,
+                        cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
                         bancard_config: {
                             environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                             base_url: getBancardBaseUrl(),
