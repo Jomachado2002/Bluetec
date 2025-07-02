@@ -32,15 +32,16 @@ const bancardConfirmController = async (req, res) => {
         console.log("🔗 URL completa:", req.originalUrl);
         console.log("🔗 Método:", req.method);
 
-        // ✅ RESPUESTA EXACTA QUE BANCARD ESPERA - CERTIFICACIÓN
-        const bancardResponse = {
-            status: "success"
+        // ✅ RESPONDER INMEDIATAMENTE A BANCARD (CRÍTICO PARA CERTIFICACIÓN)
+        const responseData = {
+            status: "success",
+            message: "Confirmación recibida correctamente",
+            timestamp: new Date().toISOString(),
+            processing_time: `${Date.now() - startTime}ms`
         };
 
-        console.log("📤 Respondiendo a Bancard:", bancardResponse);
-        
-        // ✅ RESPONDER INMEDIATAMENTE A BANCARD CON FORMATO CORRECTO
-        res.status(200).json(bancardResponse);
+        console.log("📤 Respondiendo a Bancard:", responseData);
+        res.status(200).json(responseData);
 
         // ✅ PROCESAR EN BACKGROUND (NO AFECTA LA RESPUESTA A BANCARD)
         setImmediate(() => {
@@ -50,13 +51,15 @@ const bancardConfirmController = async (req, res) => {
     } catch (error) {
         console.error("❌ ERROR EN CONFIRMACIÓN:", error);
         
-        // ✅ SIEMPRE RESPONDER CON EL FORMATO CORRECTO AUNQUE HAYA ERROR
+        // ✅ SIEMPRE RESPONDER 200 A BANCARD AUNQUE HAYA ERROR
         res.status(200).json({
-            status: "success"
+            status: "success", 
+            message: "Confirmación recibida",
+            timestamp: new Date().toISOString(),
+            note: "Procesando"
         });
     }
 };
-
 
 const bancardConfirmGetController = (req, res) => {
     try {
@@ -122,16 +125,16 @@ const processConfirmationInBackground = async (body, query, headers) => {
             iva_ticket_number: operation?.iva_ticket_number || queryParams.iva_ticket_number || ''
         };
 
-        console.log("📊 DATOS PROCESADOS PARA ADMIN:", transactionData);
+        console.log("📊 DATOS PROCESADOS:", transactionData);
 
-        // ✅ DETERMINAR SI EL PAGO FUE EXITOSO
+        // ✅ DETERMINAR SI EL PAGO FUE EXITOSO (TU LÓGICA ORIGINAL)
         const isSuccessful = (transactionData.response === 'S' && transactionData.response_code === '00') ||
                            queryParams.status === 'success' ||
                            (transactionData.authorization_number && transactionData.ticket_number);
 
-        console.log("🎯 Resultado del pago:", isSuccessful ? "EXITOSO" : "FALLIDO");
+        console.log("🎯 Resultado:", isSuccessful ? "EXITOSO" : "FALLIDO");
 
-        // ✅ BUSCAR Y ACTUALIZAR TRANSACCIÓN EN BD (PARA EL ADMIN)
+        // ✅ BUSCAR Y ACTUALIZAR TRANSACCIÓN (TU CÓDIGO ORIGINAL)
         if (transactionData.shop_process_id) {
             try {
                 const transaction = await BancardTransactionModel.findOne({ 
@@ -150,10 +153,9 @@ const processConfirmationInBackground = async (body, query, headers) => {
                             security_information: transactionData.security_information || {},
                             confirmation_date: new Date(),
                             extended_response_description: transactionData.extended_response_description,
-                            bancard_confirmed: true
+                            bancard_confirmed: true // ✅ AGREGAR ESTE CAMPO
                         });
 
-                        // ✅ ACTUALIZAR VENTA SI EXISTE
                         if (transaction.sale_id) {
                             await SaleModel.findByIdAndUpdate(transaction.sale_id, {
                                 paymentStatus: 'pagado',
@@ -162,7 +164,7 @@ const processConfirmationInBackground = async (body, query, headers) => {
                                 notes: `${transaction.notes || ''}\nPago aprobado - Auth: ${transactionData.authorization_number}`
                             });
                         }
-                        console.log("✅ Transacción APROBADA y actualizada en admin");
+                        console.log("✅ Transacción APROBADA y actualizada");
                     } else {
                         await BancardTransactionModel.findByIdAndUpdate(transaction._id, {
                             status: 'rejected',
@@ -180,22 +182,21 @@ const processConfirmationInBackground = async (body, query, headers) => {
                                 notes: `${transaction.notes || ''}\nPago rechazado: ${transactionData.response_description}`
                             });
                         }
-                        console.log("❌ Transacción RECHAZADA y actualizada en admin");
+                        console.log("❌ Transacción RECHAZADA y actualizada");
                     }
-                } else {
-                    console.log("⚠️ Transacción no encontrada en BD para shop_process_id:", transactionData.shop_process_id);
                 }
             } catch (dbError) {
                 console.error("⚠️ Error actualizando BD:", dbError);
             }
         }
 
-        console.log("✅ Procesamiento background completado - Admin actualizado");
+        console.log("✅ Procesamiento background completado");
 
     } catch (error) {
         console.error("❌ Error en procesamiento background:", error);
     }
 };
+
 /**
  * ✅ CONTROLADOR PARA CREAR PAGOS - CON REDIRECCIÓN SINCRONIZADA
  */
