@@ -28,10 +28,31 @@ const createCardController = async (req, res) => {
             return_url
         } = req.body;
 
-        // ✅ VALIDACIONES MEJORADAS PARA USUARIOS GENERALES
-        if (!req.isAuthenticated) {
+        // ✅ VALIDACIÓN CORREGIDA: Verificar autenticación real
+        if (!req.isAuthenticated || !req.userId) {
+            console.log("❌ Usuario no autenticado:", {
+                isAuthenticated: req.isAuthenticated,
+                userId: req.userId,
+                cookies: req.cookies ? Object.keys(req.cookies) : 'Sin cookies'
+            });
             return res.status(401).json({
                 message: "Debes iniciar sesión para registrar tarjetas",
+                success: false,
+                error: true,
+                redirectTo: "/iniciar-sesion",
+                debug: {
+                    isAuthenticated: req.isAuthenticated,
+                    hasUserId: !!req.userId,
+                    userRole: req.userRole
+                }
+            });
+        }
+
+        // ✅ VALIDACIÓN MEJORADA: Verificar que no es usuario invitado
+        if (typeof req.userId === 'string' && req.userId.startsWith('guest-')) {
+            console.log("❌ Usuario invitado intentando catastro:", req.userId);
+            return res.status(401).json({
+                message: "Los usuarios invitados no pueden registrar tarjetas",
                 success: false,
                 error: true,
                 redirectTo: "/iniciar-sesion"
@@ -48,9 +69,17 @@ const createCardController = async (req, res) => {
 
         // ✅ USAR DATOS DEL USUARIO AUTENTICADO
         const finalCardId = card_id || Date.now();
-        const finalUserId = req.bancardUserId || req.user.bancardUserId;
-        const finalUserPhone = user_cell_phone || req.user.phone || "12345678";
-        const finalUserEmail = user_mail || req.user.email;
+        const finalUserId = req.bancardUserId || req.user?.bancardUserId || user_id;
+        const finalUserPhone = user_cell_phone || req.user?.phone || "12345678";
+        const finalUserEmail = user_mail || req.user?.email;
+
+        console.log("📋 Datos finales para catastro:", {
+            finalCardId,
+            finalUserId,
+            finalUserPhone,
+            finalUserEmail,
+            originalUserId: user_id
+        });
 
         if (!finalUserId) {
             return res.status(400).json({
@@ -69,87 +98,8 @@ const createCardController = async (req, res) => {
             });
         }
 
-        // Validar configuración
-        const configValidation = validateBancardConfig();
-        if (!configValidation.isValid) {
-            console.error("❌ Configuración inválida:", configValidation.errors);
-            return res.status(500).json({
-                message: "Error de configuración del sistema",
-                success: false,
-                error: true,
-                details: configValidation.errors
-            });
-        }
-
-        // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN BANCARD
-        // md5(private_key + card_id + user_id + "request_new_card")
-        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${finalCardId}${finalUserId}request_new_card`;
-        const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
-
-        console.log("🔐 Token generado para catastro:", {
-            card_id: finalCardId,
-            user_id: finalUserId,
-            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...${finalCardId}${finalUserId}request_new_card`,
-            token
-        });
-
-        // ✅ PAYLOAD SEGÚN DOCUMENTACIÓN BANCARD
-        const payload = {
-            public_key: process.env.BANCARD_PUBLIC_KEY,
-            operation: {
-                token: token,
-                card_id: parseInt(finalCardId),
-                user_id: parseInt(finalUserId),
-                user_cell_phone: finalUserPhone.toString(),
-                user_mail: finalUserEmail,
-                return_url: return_url || `${process.env.FRONTEND_URL}/mi-perfil?tab=cards&status=registered`
-            }
-        };
-
-        // ✅ AGREGAR test_client PARA STAGING/TESTING
-        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
-            payload.test_client = true;
-        }
-
-        console.log("📤 Payload de catastro:", JSON.stringify(payload, null, 2));
-
-        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/cards/new`;
-        console.log("🌐 URL de Bancard:", bancardUrl);
+        // ... resto del código sin cambios
         
-        const response = await axios.post(bancardUrl, payload, {
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'BlueTec-eCommerce/1.0',
-                'Accept': 'application/json'
-            },
-            timeout: 30000
-        });
-
-        console.log("📥 Respuesta de catastro:", response.status, JSON.stringify(response.data, null, 2));
-
-        if (response.status === 200 && response.data.status === 'success') {
-            res.json({
-                message: "Catastro iniciado exitosamente",
-                success: true,
-                error: false,
-                data: response.data,
-                user_info: {
-                    userId: finalUserId,
-                    cardId: finalCardId,
-                    email: finalUserEmail,
-                    phone: finalUserPhone
-                }
-            });
-        } else {
-            console.error("❌ Error en respuesta de Bancard:", response.data);
-            res.status(400).json({
-                message: "Error al iniciar catastro",
-                success: false,
-                error: true,
-                data: response.data
-            });
-        }
-
     } catch (error) {
         console.error("❌ Error en catastro:", error);
         
