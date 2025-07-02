@@ -32,15 +32,12 @@ const bancardConfirmController = async (req, res) => {
         console.log("🔗 URL completa:", req.originalUrl);
         console.log("🔗 Método:", req.method);
 
-        // ✅ RESPONDER INMEDIATAMENTE A BANCARD (CRÍTICO PARA CERTIFICACIÓN)
+        // ✅ RESPONDER INMEDIATAMENTE A BANCARD CON FORMATO EXACTO REQUERIDO
         const responseData = {
-            status: "success",
-            message: "Confirmación recibida correctamente",
-            timestamp: new Date().toISOString(),
-            processing_time: `${Date.now() - startTime}ms`
+            status: "success"
         };
 
-        console.log("📤 Respondiendo a Bancard:", responseData);
+        console.log("📤 Respondiendo a Bancard con formato certificación:", responseData);
         res.status(200).json(responseData);
 
         // ✅ PROCESAR EN BACKGROUND (NO AFECTA LA RESPUESTA A BANCARD)
@@ -51,12 +48,9 @@ const bancardConfirmController = async (req, res) => {
     } catch (error) {
         console.error("❌ ERROR EN CONFIRMACIÓN:", error);
         
-        // ✅ SIEMPRE RESPONDER 200 A BANCARD AUNQUE HAYA ERROR
+        // ✅ SIEMPRE RESPONDER 200 CON STATUS SUCCESS AUNQUE HAYA ERROR INTERNO
         res.status(200).json({
-            status: "success", 
-            message: "Confirmación recibida",
-            timestamp: new Date().toISOString(),
-            note: "Procesando"
+            status: "success"
         });
     }
 };
@@ -69,23 +63,16 @@ const bancardConfirmGetController = (req, res) => {
         console.log("URL completa:", req.originalUrl);
         console.log("IP origen:", req.ip);
         
-        // Bancard hace GET para verificar conectividad
+        // ✅ RESPUESTA SIMPLE PARA VERIFICACIONES DE CONECTIVIDAD
         res.status(200).json({
-            status: "success",
-            message: "Endpoint de confirmación activo y funcionando",
-            timestamp: new Date().toISOString(),
-            service: "bancard-confirmation",
-            method: "GET",
-            ready: true,
-            environment: process.env.BANCARD_ENVIRONMENT || 'staging'
+            status: "success"
         });
         
     } catch (error) {
         console.error("❌ Error en GET confirmación:", error);
+        // ✅ SIEMPRE RESPONDER SUCCESS INCLUSO EN ERROR
         res.status(200).json({
-            status: "success",
-            message: "Endpoint funcionando",
-            timestamp: new Date().toISOString()
+            status: "success"
         });
     }
 };
@@ -101,7 +88,7 @@ const processConfirmationInBackground = async (body, query, headers) => {
         const queryParams = query || {};
         const { operation } = body || {};
         
-        // ✅ COMBINAR DATOS DE AMBAS FUENTES (TU CÓDIGO ORIGINAL)
+        // ✅ COMBINAR DATOS DE AMBAS FUENTES
         const transactionData = {
             token: operation?.token || queryParams.token || '',
             shop_process_id: operation?.shop_process_id || queryParams.shop_process_id || '',
@@ -125,24 +112,28 @@ const processConfirmationInBackground = async (body, query, headers) => {
             iva_ticket_number: operation?.iva_ticket_number || queryParams.iva_ticket_number || ''
         };
 
-        console.log("📊 DATOS PROCESADOS:", transactionData);
+        console.log("📊 DATOS PROCESADOS PARA BD:", transactionData);
 
-        // ✅ DETERMINAR SI EL PAGO FUE EXITOSO (TU LÓGICA ORIGINAL)
+        // ✅ DETERMINAR SI EL PAGO FUE EXITOSO BASADO EN MÚLTIPLES FACTORES
         const isSuccessful = (transactionData.response === 'S' && transactionData.response_code === '00') ||
                            queryParams.status === 'success' ||
                            (transactionData.authorization_number && transactionData.ticket_number);
 
-        console.log("🎯 Resultado:", isSuccessful ? "EXITOSO" : "FALLIDO");
+        console.log("🎯 Resultado del pago:", isSuccessful ? "EXITOSO (approved)" : "FALLIDO (rejected)");
 
-        // ✅ BUSCAR Y ACTUALIZAR TRANSACCIÓN (TU CÓDIGO ORIGINAL)
+        // ✅ BUSCAR Y ACTUALIZAR TRANSACCIÓN EN BD
         if (transactionData.shop_process_id) {
             try {
+                const BancardTransactionModel = require('../../models/bancardTransactionModel');
+                const SaleModel = require('../../models/saleModel');
+                
                 const transaction = await BancardTransactionModel.findOne({ 
                     shop_process_id: parseInt(transactionData.shop_process_id) 
                 });
 
                 if (transaction) {
                     if (isSuccessful) {
+                        // ✅ MARCAR COMO APROBADO (aparecerá en verde en tu panel)
                         await BancardTransactionModel.findByIdAndUpdate(transaction._id, {
                             status: 'approved',
                             response: transactionData.response,
@@ -153,7 +144,7 @@ const processConfirmationInBackground = async (body, query, headers) => {
                             security_information: transactionData.security_information || {},
                             confirmation_date: new Date(),
                             extended_response_description: transactionData.extended_response_description,
-                            bancard_confirmed: true // ✅ AGREGAR ESTE CAMPO
+                            bancard_confirmed: true
                         });
 
                         if (transaction.sale_id) {
@@ -164,8 +155,9 @@ const processConfirmationInBackground = async (body, query, headers) => {
                                 notes: `${transaction.notes || ''}\nPago aprobado - Auth: ${transactionData.authorization_number}`
                             });
                         }
-                        console.log("✅ Transacción APROBADA y actualizada");
+                        console.log("✅ Transacción APROBADA y actualizada en BD");
                     } else {
+                        // ✅ MARCAR COMO RECHAZADO (aparecerá en rojo en tu panel)
                         await BancardTransactionModel.findByIdAndUpdate(transaction._id, {
                             status: 'rejected',
                             response: transactionData.response,
@@ -182,8 +174,10 @@ const processConfirmationInBackground = async (body, query, headers) => {
                                 notes: `${transaction.notes || ''}\nPago rechazado: ${transactionData.response_description}`
                             });
                         }
-                        console.log("❌ Transacción RECHAZADA y actualizada");
+                        console.log("❌ Transacción RECHAZADA y actualizada en BD");
                     }
+                } else {
+                    console.warn("⚠️ No se encontró transacción en BD para shop_process_id:", transactionData.shop_process_id);
                 }
             } catch (dbError) {
                 console.error("⚠️ Error actualizando BD:", dbError);
