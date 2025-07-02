@@ -912,4 +912,66 @@ router.get("/debug/auth-simple", authToken, async (req, res) => {
     }
 });
 
+router.get("/bancard/redirect/success", (req, res) => {
+    try {
+        console.log("🎉 === BANCARD SUCCESS REDIRECT ===");
+        console.log("📋 Query params recibidos:", req.query);
+        console.log("🌐 Headers:", req.headers);
+        console.log("🔗 URL completa:", req.originalUrl);
+        
+        // Obtener TODOS los parámetros que envía Bancard
+        const params = req.query;
+        
+        // Construir URL del frontend con TODOS los parámetros
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const redirectParams = new URLSearchParams(params).toString();
+        
+        // URL final hacia tu página PaymentSuccess.js existente
+        const finalUrl = `${frontendUrl}/pago-exitoso?${redirectParams}`;
+        
+        console.log("✅ Redirigiendo a página de éxito:", finalUrl);
+        
+        // Redirección HTTP 302 (temporal) hacia el frontend
+        res.redirect(302, finalUrl);
+        
+    } catch (error) {
+        console.error("❌ Error en success redirect:", error);
+        
+        // En caso de error, redirigir a página de error
+        const errorUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/pago-cancelado?error=redirect_error&details=${encodeURIComponent(error.message)}`;
+        res.redirect(302, errorUrl);
+    }
+});
+
+router.get("/bancard/redirect/cancel", (req, res) => {
+    try {
+        console.log("❌ === BANCARD CANCEL/ERROR REDIRECT ===");
+        console.log("📋 Query params recibidos:", req.query);
+        console.log("🌐 Headers:", req.headers);
+        console.log("🔗 URL completa:", req.originalUrl);
+        
+        // Obtener TODOS los parámetros que envía Bancard
+        const params = req.query;
+        
+        // Construir URL del frontend con TODOS los parámetros
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const redirectParams = new URLSearchParams(params).toString();
+        
+        // URL final hacia tu página PaymentCancelled.js existente
+        const finalUrl = `${frontendUrl}/pago-cancelado?${redirectParams}`;
+        
+        console.log("❌ Redirigiendo a página de cancelación:", finalUrl);
+        
+        // Redirección HTTP 302 (temporal) hacia el frontend
+        res.redirect(302, finalUrl);
+        
+    } catch (error) {
+        console.error("❌ Error en cancel redirect:", error);
+        
+        // En caso de error, redirigir a página de error con más detalles
+        const errorUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/pago-cancelado?error=redirect_error&details=${encodeURIComponent(error.message)}`;
+        res.redirect(302, errorUrl);
+    }
+});
+
 module.exports = router;

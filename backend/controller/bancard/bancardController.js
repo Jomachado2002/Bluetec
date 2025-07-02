@@ -60,6 +60,7 @@ const bancardConfirmController = async (req, res) => {
         });
     }
 };
+
 const bancardConfirmGetController = (req, res) => {
     try {
         console.log("🔍 === GET REQUEST A CONFIRMACIÓN BANCARD ===");
@@ -88,6 +89,7 @@ const bancardConfirmGetController = (req, res) => {
         });
     }
 };
+
 /**
  * ✅ NUEVA FUNCIÓN PARA PROCESAR EN BACKGROUND
  */
@@ -196,7 +198,7 @@ const processConfirmationInBackground = async (body, query, headers) => {
 };
 
 /**
- * ✅ CONTROLADOR PARA CREAR PAGOS - SIN MODIFICAR
+ * ✅ CONTROLADOR PARA CREAR PAGOS - CON REDIRECCIÓN SINCRONIZADA
  */
 const createPaymentController = async (req, res) => {
     try {
@@ -271,27 +273,31 @@ const createPaymentController = async (req, res) => {
         
         const token = generateSingleBuyToken(shopProcessId, formattedAmount, currency);
 
-        // ✅ PAYLOAD SIN test_client SEGÚN REQUERIMIENTO DE BANCARD
+        // ✅ OBTENER URL DEL BACKEND PARA REDIRECCIONES SINCRONIZADAS
+        const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
+        console.log("🔗 Backend URL para redirecciones:", backendUrl);
+
+        // ✅ PAYLOAD CON URLs DEL BACKEND (CAMBIO PRINCIPAL)
         const payload = {
-                public_key: process.env.BANCARD_PUBLIC_KEY,
-                operation: {
-                    token: token,
-                    shop_process_id: shopProcessId,
-                    amount: formattedAmount,
-                    currency: currency,
-                    description: description.substring(0, 20),
-                    return_url: return_url || `${process.env.FRONTEND_URL}/pago-exitoso`,     // ✅ FRONTEND
-                    cancel_url: cancel_url || `${process.env.FRONTEND_URL}/pago-cancelado`   // ✅ FRONTEND
-                }
-            };
-            // ✅ NO INCLUIR test_client PARA CERTIFICACIÓN
-       
+            public_key: process.env.BANCARD_PUBLIC_KEY,
+            operation: {
+                token: token,
+                shop_process_id: shopProcessId,
+                amount: formattedAmount,
+                currency: currency,
+                description: description.substring(0, 20),
+                // ✅ CRÍTICO: URLs del BACKEND para redirección sincronizada
+                return_url: `${backendUrl}/api/bancard/redirect/success`,
+                cancel_url: `${backendUrl}/api/bancard/redirect/cancel`
+            }
+        };
+        // ✅ NO INCLUIR test_client PARA CERTIFICACIÓN
 
         if (formattedIvaAmount) {
             payload.operation.iva_amount = formattedIvaAmount;
         }
 
-        console.log("📤 Payload para Bancard (SIN test_client):", JSON.stringify(payload, null, 2));
+        console.log("📤 Payload para Bancard (URLs del backend):", JSON.stringify(payload, null, 2));
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/single_buy`;
         console.log("🌐 URL de Bancard:", bancardUrl);
@@ -319,7 +325,7 @@ const createPaymentController = async (req, res) => {
                 const processId = response.data.process_id;
                 const iframeUrl = `${getBancardBaseUrl()}/checkout/new/${processId}`;
                 
-                // ✅ GUARDAR CON URLs ORIGINALES DEL FRONTEND
+                // ✅ GUARDAR TRANSACCIÓN CON URLs DEL BACKEND
                 try {
                     const newTransaction = new BancardTransactionModel({
                         shop_process_id: shopProcessId,
@@ -329,8 +335,9 @@ const createPaymentController = async (req, res) => {
                         description: description,
                         customer_info: customer_info || {},
                         items: items || [],
-                        return_url: return_url || `${process.env.FRONTEND_URL}/pago-exitoso`,
-                        cancel_url: cancel_url || `${process.env.FRONTEND_URL}/pago-cancelado`,
+                        // ✅ GUARDAR URLs DEL BACKEND PARA TRACKING
+                        return_url: `${backendUrl}/api/bancard/redirect/success`,
+                        cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
                         status: 'pending',
                         environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                         sale_id: sale_id || null,
@@ -370,6 +377,7 @@ const createPaymentController = async (req, res) => {
                         currency: currency,
                         description: description,
                         iframe_url: iframeUrl,
+                        // ✅ MANTENER URLs ORIGINALES EN LA RESPUESTA PARA COMPATIBILIDAD
                         return_url: return_url || `${process.env.FRONTEND_URL}/pago-exitoso`,
                         cancel_url: cancel_url || `${process.env.FRONTEND_URL}/pago-cancelado`,
                         bancard_config: {
