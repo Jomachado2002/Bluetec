@@ -1,4 +1,4 @@
-// frontend/src/components/user/CardManagementPage.js - VERSIÓN CORREGIDA
+// frontend/src/components/user/CardManagementPage.js - VERSIÓN LIMPIA
 import React, { useState, useEffect } from 'react';
 import { 
   FaCreditCard, 
@@ -49,6 +49,7 @@ const CardManagementPage = ({
     }
   };
 
+  // ✅ FUNCIÓN PRINCIPAL DE CATASTRO
   const handleRegisterCard = async () => {
     if (!user?.id) {
       setErrors({ register: 'Usuario no válido' });
@@ -61,13 +62,11 @@ const CardManagementPage = ({
     try {
       console.log('💳 Iniciando registro de tarjeta para usuario:', user);
       
-      // ✅ GENERAR card_id ÚNICO
       const cardId = Date.now() + Math.floor(Math.random() * 1000);
       
-      // ✅ PREPARAR DATOS PARA BANCARD
       const cardData = {
         card_id: cardId,
-        user_id: user.id, // Este debe ser el bancardUserId numérico
+        user_id: user.id,
         user_cell_phone: user.phone || '12345678',
         user_mail: user.email,
         return_url: `${window.location.origin}/mi-perfil?tab=cards&status=registered`
@@ -76,13 +75,31 @@ const CardManagementPage = ({
       console.log('📤 Enviando datos de catastro:', cardData);
 
       const result = await onRegisterCard(cardData);
+      console.log('📥 === DEBUG VERCEL ESPECÍFICO ===');
+      console.log('📥 Result completo:', JSON.stringify(result, null, 2));
+      console.log('📥 result.success:', result?.success);
+      console.log('📥 result.data:', result?.data);
+      console.log('📥 result.data.process_id:', result?.data?.process_id);
+      console.log('📥 typeof process_id:', typeof result?.data?.process_id);
+      console.log('📥 process_id length:', result?.data?.process_id?.length);
+      console.log('📥 process_id JSON:', JSON.stringify(result?.data?.process_id));
+
+console.log('📥 Resultado completo del catastro:', result);
+      console.log('📥 Resultado completo del catastro:', result);
 
       if (result.success && result.data?.process_id) {
-        console.log('✅ Catastro iniciado exitosamente:', result.data);
-        setProcessId(result.data.process_id);
+        const receivedProcessId = result.data.process_id;
+        console.log('✅ Catastro exitoso. Process ID:', receivedProcessId);
+        
+        setProcessId(receivedProcessId);
         setShowRegisterForm(false);
         setShowIframe(true);
-        loadBancardScript();
+        
+        // ✅ CARGAR SCRIPT CON PROCESS ID
+        setTimeout(() => {
+          loadBancardScript(receivedProcessId);
+        }, 300);
+        
       } else {
         console.error('❌ Error en catastro:', result);
         setErrors({ register: result.message || 'Error al iniciar registro' });
@@ -92,6 +109,116 @@ const CardManagementPage = ({
       setErrors({ register: 'Error al registrar tarjeta. Intenta nuevamente.' });
     } finally {
       setRegisteringCard(false);
+    }
+  };
+
+  // ✅ FUNCIÓN PARA CARGAR SCRIPT DE BANCARD
+  const loadBancardScript = (processIdToUse) => {
+    console.log('🔄 Cargando script de Bancard con processId:', processIdToUse);
+    
+    if (!processIdToUse || processIdToUse.trim() === '') {
+      console.error('❌ ProcessId inválido:', processIdToUse);
+      setErrors({ iframe: 'Error: Process ID inválido' });
+      return;
+    }
+    
+    // Remover script anterior si existe
+    const existingScript = document.getElementById('bancard-script');
+    if (existingScript) {
+      existingScript.remove();
+    }
+
+    const environment = process.env.REACT_APP_BANCARD_ENVIRONMENT || 'staging';
+    const baseUrl = environment === 'production' 
+      ? 'https://vpos.infonet.com.py' 
+      : 'https://vpos.infonet.com.py:8888';
+
+    const script = document.createElement('script');
+    script.id = 'bancard-script';
+    script.src = `${baseUrl}/checkout/javascript/dist/bancard-checkout-4.0.0.js`;
+    script.async = true;
+    
+    script.onload = () => {
+      console.log('✅ Script de Bancard cargado, inicializando iframe...');
+      setTimeout(() => {
+        initializeBancardIframe(processIdToUse);
+      }, 300);
+    };
+    
+    script.onerror = () => {
+      console.error('❌ Error cargando script de Bancard');
+      setShowIframe(false);
+      setRegisteringCard(false);
+      setErrors({ iframe: 'Error cargando el sistema de registro. Intenta nuevamente.' });
+    };
+
+    document.head.appendChild(script);
+  };
+
+  // ✅ FUNCIÓN PARA INICIALIZAR IFRAME
+  const initializeBancardIframe = (processIdToUse) => {
+    try {
+      console.log('🎯 Inicializando iframe con processId:', processIdToUse);
+      console.log('🎯 === VALIDACIÓN FINAL PROCESS_ID ===');
+      console.log('🎯 processId value:', processIdToUse);
+      console.log('🎯 processId type:', typeof processIdToUse);
+      console.log('🎯 processId length:', processIdToUse?.length);
+      console.log('🎯 processId JSON:', JSON.stringify(processIdToUse));
+      console.log('🎯 processId is empty?:', !processIdToUse || processIdToUse === '');
+
+      if (!processIdToUse || processIdToUse.trim() === '') {
+        console.error('❌ ProcessId vacío en inicialización:', processIdToUse);
+        setErrors({ iframe: 'Error: Process ID no válido' });
+        return;
+      }
+      
+      if (window.Bancard && window.Bancard.Cards) {
+        const styles = {
+          'input-background-color': '#ffffff',
+          'input-text-color': '#555555',
+          'input-border-color': '#cccccc',
+          'button-background-color': '#2A3190',
+          'button-text-color': '#ffffff',
+          'button-border-color': '#2A3190',
+          'form-background-color': '#ffffff'
+        };
+
+        const container = document.getElementById('bancard-card-container');
+        if (container) {
+          container.innerHTML = '';
+          container.style.display = 'block';
+          container.style.minHeight = '500px';
+          container.style.width = '100%';
+          
+          try {
+            console.log('🚀 Creando iframe de Bancard con processId:', processIdToUse);
+             console.log('🔍 VALIDACIÓN FINAL ANTES DE CREATEFORM:');
+            console.log('🔍 processId final:', processIdToUse);
+            console.log('🔍 processId String():', String(processIdToUse));
+            console.log('🔍 processId toString():', processIdToUse.toString());
+            window.Bancard.Cards.createForm('bancard-card-container', String(processIdToUse), styles);
+            console.log('✅ Iframe creado exitosamente');
+            
+            window.addEventListener('message', handleIframeMessage, false);
+            
+          } catch (iframeError) {
+            console.error('❌ Error creando iframe específico:', iframeError);
+            setErrors({ iframe: `Error al cargar formulario: ${iframeError.message}` });
+          }
+        } else {
+          console.error('❌ Contenedor no encontrado');
+          setErrors({ iframe: 'Error: Contenedor no encontrado' });
+        }
+      } else {
+        console.log('⏳ Bancard.Cards no disponible, reintentando...');
+        if (window.Bancard) {
+          console.log('📦 Bancard disponible:', Object.keys(window.Bancard));
+        }
+        setTimeout(() => initializeBancardIframe(processIdToUse), 500);
+      }
+    } catch (error) {
+      console.error('❌ Error general inicializando iframe:', error);
+      setErrors({ iframe: `Error al inicializar: ${error.message}` });
     }
   };
 
@@ -113,94 +240,6 @@ const CardManagementPage = ({
     } catch (error) {
       console.error('❌ Error al eliminar tarjeta:', error);
       setErrors({ delete: 'Error al eliminar tarjeta. Intenta nuevamente.' });
-    }
-  };
-
-  const loadBancardScript = () => {
-    console.log('🔄 Cargando script de Bancard para catastro...');
-    
-    // Remover script anterior si existe
-    const existingScript = document.getElementById('bancard-script');
-    if (existingScript) {
-      existingScript.remove();
-    }
-
-    // ✅ DETERMINAR URL BASE SEGÚN AMBIENTE
-    const environment = process.env.REACT_APP_BANCARD_ENVIRONMENT || 'staging';
-    const baseUrl = environment === 'production' 
-      ? 'https://vpos.infonet.com.py' 
-      : 'https://vpos.infonet.com.py:8888';
-
-    // Crear nuevo script
-    const script = document.createElement('script');
-    script.id = 'bancard-script';
-    script.src = `${baseUrl}/checkout/javascript/dist/bancard-checkout-4.0.0.js`;
-    script.async = true;
-    
-    script.onload = () => {
-      console.log('✅ Script de Bancard cargado para catastro');
-      setTimeout(initializeBancardIframe, 100);
-    };
-    
-    script.onerror = () => {
-      console.error('❌ Error cargando script de Bancard');
-      setShowIframe(false);
-      setRegisteringCard(false);
-      setErrors({ iframe: 'Error cargando el sistema de registro. Intenta nuevamente.' });
-    };
-
-    document.head.appendChild(script);
-  };
-
-  const initializeBancardIframe = () => {
-    try {
-      console.log('🎯 Inicializando iframe de catastro de Bancard...');
-      
-      if (window.Bancard && window.Bancard.Cards) {
-        // ✅ ESTILOS PARA EL IFRAME DE CATASTRO
-        const styles = {
-          'input-background-color': '#ffffff',
-          'input-text-color': '#555555',
-          'input-border-color': '#cccccc',
-          'button-background-color': '#2A3190',
-          'button-text-color': '#ffffff',
-          'button-border-color': '#2A3190',
-          'form-background-color': '#ffffff',
-          'form-border-color': '#dddddd',
-          'header-background-color': '#f8f9fa',
-          'header-text-color': '#333333'
-        };
-
-        const container = document.getElementById('bancard-card-container');
-        if (container) {
-          container.innerHTML = '';
-          container.style.display = 'block';
-          container.style.minHeight = '500px';
-          container.style.width = '100%';
-          
-          try {
-            // ✅ CREAR IFRAME DE CATASTRO
-            window.Bancard.Cards.createForm('bancard-card-container', processId, styles);
-            console.log('✅ Iframe de catastro inicializado exitosamente');
-            
-            // ✅ ESCUCHAR MENSAJES DEL IFRAME
-            window.addEventListener('message', handleIframeMessage, false);
-            
-          } catch (iframeError) {
-            console.error('❌ Error creando iframe de catastro:', iframeError);
-            setErrors({ iframe: 'Error al cargar formulario de registro' });
-          }
-        } else {
-          console.error('❌ Contenedor bancard-card-container no encontrado');
-          setErrors({ iframe: 'Error en la configuración del formulario' });
-        }
-      } else {
-        console.log('⏳ Bancard.Cards no disponible, reintentando...');
-        setTimeout(initializeBancardIframe, 1000);
-      }
-    } catch (error) {
-      console.error('❌ Error inicializando iframe de catastro:', error);
-      setErrors({ iframe: 'Error al cargar formulario de registro' });
     }
   };
 

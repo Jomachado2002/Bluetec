@@ -68,41 +68,87 @@ const UserProfilePage = () => {
     }
   };
 
-  // ✅ IMPLEMENTAR GESTIÓN DE TARJETAS BANCARD CON LOGS DETALLADOS
-  const handleRegisterCard = async (cardData) => {
-    try {
-      console.log('🆔 === INICIANDO REGISTRO DE TARJETA ===');
-      console.log('📤 Datos enviados:', cardData);
-      console.log('👤 Usuario actual:', userData);
-      
-      const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify(cardData)
-      });
+ // ✅ FUNCIÓN CORREGIDA - Reemplazar en UserProfilePage.js línea 76-102
 
-      console.log('📥 Response status:', response.status);
+const handleRegisterCard = async (cardData) => {
+  try {
+    console.log('🆔 === INICIANDO REGISTRO DE TARJETA ===');
+    console.log('📤 Datos enviados:', cardData);
+    console.log('👤 Usuario actual:', userData);
+    
+    const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(cardData)
+    });
+
+    console.log('📥 Response status:', response.status);
+    console.log('📥 Response ok:', response.ok);
+    console.log('📥 Response headers:', response.headers);
+    
+    // ✅ VERIFICAR SI LA RESPUESTA ES VÁLIDA
+    if (!response.ok) {
+      console.error('❌ Response no OK:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('❌ Error text completo:', errorText);
       
-      const result = await response.json();
-      console.log('📥 Response data:', result);
+      toast.error(`Error del servidor: ${response.status}`);
+      return { success: false, message: `Error ${response.status}` };
+    }
+    
+    // ✅ OBTENER TEXTO CRUDO PRIMERO
+    const responseText = await response.text();
+    console.log('📥 Response text crudo:', responseText);
+    
+    // ✅ INTENTAR PARSEAR JSON
+    let result;
+    try {
+      result = JSON.parse(responseText);
+      console.log('📥 JSON parseado exitosamente:', result);
+    } catch (parseError) {
+      console.error('❌ Error parseando JSON:', parseError);
+      console.error('❌ Texto que no se pudo parsear:', responseText);
+      toast.error('Error: Respuesta inválida del servidor');
+      return { success: false, message: 'Respuesta inválida del servidor' };
+    }
+    
+    // ✅ VERIFICAR ESTRUCTURA DE LA RESPUESTA
+    console.log('🔍 Verificando respuesta:', {
+      success: result.success,
+      hasData: !!result.data,
+      processId: result.data?.process_id,
+      message: result.message
+    });
+    
+    if (result.success) {
+      console.log('✅ Catastro exitoso desde frontend!');
+      console.log('🎯 Process ID recibido:', result.data?.process_id);
       
-      if (result.success) {
+      if (result.data?.process_id) {
+        console.log('✅ Process ID válido, devolviendo resultado');
         toast.success('✅ Proceso de catastro iniciado');
         return result;
       } else {
-        console.error('❌ Error en catastro:', result);
-        toast.error(result.message || 'Error al iniciar catastro');
-        return { success: false, message: result.message };
+        console.error('❌ No se recibió process_id válido');
+        toast.error('Error: No se recibió process_id');
+        return { success: false, message: 'No se recibió process_id' };
       }
-    } catch (error) {
-      console.error('❌ Error en catastro:', error);
-      toast.error('Error de conexión');
-      return { success: false, message: 'Error de conexión' };
+    } else {
+      console.error('❌ Backend reportó error:', result);
+      toast.error(result.message || 'Error al iniciar catastro');
+      return { success: false, message: result.message };
     }
-  };
+    
+  } catch (error) {
+    console.error('❌ Error crítico en handleRegisterCard:', error);
+    console.error('❌ Stack trace:', error.stack);
+    toast.error('Error de conexión crítico');
+    return { success: false, message: 'Error de conexión crítico' };
+  }
+};
 
   const handleFetchCards = async (userId) => {
     try {

@@ -46,6 +46,7 @@ import PurchaseManagement from "../pages/PurchaseManagement"
 import SaleDetails from "../pages/SaleDetails"
 import PurchaseDetails from "../pages/PurchaseDetails"
 import FinancialDashboard from "../pages/FinancialDashboard"
+import CatastroResult from "../pages/CatastroResult"
 
 const router = createBrowserRouter([
     {
@@ -79,6 +80,10 @@ const router = createBrowserRouter([
             {
                 path: "categorias-movil",
                 element: <MobileCategoriesPage />
+            },
+            {
+                 path: "catastro-resultado",
+                 element: <CatastroResult />
             },
             {
                 path: "categoria-producto",
