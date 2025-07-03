@@ -159,15 +159,6 @@ const bancardTransactionSchema = mongoose.Schema({
         ref: 'user'
     },
     
-    // ✅ CAMPOS ADICIONALES PARA IVA
-    iva_amount: {
-        type: Number,
-        default: null
-    },
-    iva_ticket_number: {
-        type: String,
-        default: null
-    },
     
     // ✅ CAMPOS PARA TRACKING DE 3DS
     requires_3ds: {

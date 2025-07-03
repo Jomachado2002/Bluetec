@@ -260,7 +260,7 @@ router.post("/bancard/test-pago-token", async (req, res) => {
             number_of_payments: 1,
             description: "Test de pago con token BlueTec",
             return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-            iva_amount: "15124.10"
+        
         };
 
         console.log("📤 Datos de test de pago:", testPaymentData);

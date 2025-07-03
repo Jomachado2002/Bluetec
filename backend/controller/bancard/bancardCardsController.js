@@ -138,11 +138,6 @@ const createCardController = async (req, res) => {
             }
         };
 
-        // ✅ AGREGAR test_client PARA STAGING/TESTING
-        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
-            payload.test_client = true;
-        }
-
         console.log("📤 Payload para catastro:", JSON.stringify(payload, null, 2));
 
         // ✅ HACER PETICIÓN A BANCARD
@@ -277,11 +272,7 @@ const getUserCardsController = async (req, res) => {
             }
         };
 
-        // ✅ AGREGAR test_client PARA STAGING/TESTING
-        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
-            payload.test_client = true;
-        }
-
+       
         console.log("📤 Payload para listar tarjetas:", JSON.stringify(payload, null, 2));
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/users/${targetUserId}/cards`;
@@ -350,7 +341,6 @@ const chargeWithTokenController = async (req, res) => {
             number_of_payments = 1,
             description,
             return_url,
-            iva_amount,
             additional_data = "",
             customer_info, // ✅ AGREGAR PARA BD
             items // ✅ AGREGAR PARA BD
@@ -427,23 +417,20 @@ const chargeWithTokenController = async (req, res) => {
                 additional_data: additional_data,
                 description: description || "Pago BlueTec con tarjeta registrada",
                 alias_token: alias_token,
-                extra_response_attributes: ["confirmation.process_id"],
                 // ✅ USAR URLs DEL BACKEND PARA REDIRECCIÓN SINCRONIZADA
                 return_url: `${backendUrl}/api/bancard/redirect/success`
             }
         };
 
-        // ✅ AGREGAR test_client PARA STAGING/TESTING
-        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
-            payload.test_client = true;
-        }
-
-        // Agregar IVA si se proporciona
-        //if (iva_amount) {
-          //  payload.operation.iva_amount = formatAmount(iva_amount);
-       // }
-
-        console.log("📤 Payload de pago con token:", JSON.stringify(payload, null, 2));
+        
+        console.log("📤 Payload de pago con token:", {
+            shop_process_id: payload.operation.shop_process_id,
+            amount: payload.operation.amount,
+            currency: payload.operation.currency,
+            alias_token: `${payload.operation.alias_token.substring(0, 20)}...`,
+            description: payload.operation.description,
+            is_token_payment: true
+        });
 
         // ✅ GUARDAR TRANSACCIÓN EN BD ANTES DE ENVIAR A BANCARD
         try {
@@ -502,6 +489,9 @@ const chargeWithTokenController = async (req, res) => {
                     { shop_process_id: parseInt(finalShopProcessId) },
                     { 
                         bancard_process_id: response.data?.operation?.process_id || response.data?.process_id,
+                        is_token_payment: true,
+                        alias_token: alias_token,
+                        user_bancard_id: req.bancardUserId || req.user?.bancardUserId,
                         // Si no requiere 3DS y hay respuesta inmediata, actualizar estado
                         ...(response.data?.operation?.response && {
                             response: response.data.operation.response,
@@ -676,10 +666,7 @@ const deleteCardController = async (req, res) => {
             }
         };
 
-        // ✅ AGREGAR test_client PARA STAGING/TESTING
-        if (process.env.BANCARD_ENVIRONMENT !== 'production') {
-            payload.test_client = true;
-        }
+       
 
         console.log("📤 Payload para eliminar tarjeta:", JSON.stringify(payload, null, 2));
 

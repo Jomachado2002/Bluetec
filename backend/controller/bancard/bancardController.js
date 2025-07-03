@@ -42,7 +42,7 @@ const bancardConfirmController = async (req, res) => {
 
         // ✅ PROCESAR EN BACKGROUND (NO AFECTA LA RESPUESTA A BANCARD)
         setImmediate(() => {
-            processConfirmationInBackground(req.body, req.query, req.headers);
+            processConfirmationInBackground(req.body, req.query, req.headers, req.ip);
         });
 
     } catch (error) {
@@ -90,7 +90,7 @@ const bancardConfirmGetController = (req, res) => {
 /**
  * ✅ NUEVA FUNCIÓN PARA PROCESAR EN BACKGROUND
  */
-const processConfirmationInBackground = async (body, query, headers) => {
+const processConfirmationInBackground = async (body, query, headers, clientIp) => {
     try {
         console.log("🔄 Procesando confirmación en background...");
         
@@ -118,8 +118,6 @@ const processConfirmationInBackground = async (body, query, headers) => {
                 version: queryParams.version || '0.3',
                 risk_index: queryParams.risk_index || '0'
             },
-            iva_amount: operation?.iva_amount || queryParams.iva_amount || '',
-            iva_ticket_number: operation?.iva_ticket_number || queryParams.iva_ticket_number || ''
         };
 
         console.log("📊 DATOS PROCESADOS:", transactionData);
@@ -134,8 +132,15 @@ const processConfirmationInBackground = async (body, query, headers) => {
         // ✅ BUSCAR Y ACTUALIZAR TRANSACCIÓN (TU CÓDIGO ORIGINAL)
         if (transactionData.shop_process_id) {
             try {
+                // ✅ BUSCAR TRANSACCIÓN TANTO DE PAGO OCASIONAL COMO CON TOKEN
                 const transaction = await BancardTransactionModel.findOne({ 
                     shop_process_id: parseInt(transactionData.shop_process_id) 
+                });
+                
+                console.log(`🔍 Buscando transacción: ${transactionData.shop_process_id}`, {
+                    found: !!transaction,
+                    isTokenPayment: transaction?.is_token_payment || false,
+                    currentStatus: transaction?.status
                 });
 
                 if (transaction) {
@@ -221,7 +226,6 @@ const createPaymentController = async (req, res) => {
             description,
             return_url,
             cancel_url,
-            iva_amount,
             customer_info,
             items,
             sale_id
@@ -261,11 +265,9 @@ const createPaymentController = async (req, res) => {
         console.log("🆔 Shop Process ID generado:", shopProcessId);
         
         const formattedAmount = formatAmount(amount);
-        const formattedIvaAmount = iva_amount ? formatAmount(iva_amount) : null;
         
         console.log("💰 Montos formateados:", {
             amount: formattedAmount,
-            iva_amount: formattedIvaAmount
         });
         
         const token = generateSingleBuyToken(shopProcessId, formattedAmount, currency);
@@ -291,7 +293,6 @@ const createPaymentController = async (req, res) => {
         // ✅ NO INCLUIR test_client PARA CERTIFICACIÓN
 
         if (formattedIvaAmount) {
-            payload.operation.iva_amount = formattedIvaAmount;
         }
 
         console.log("📤 Payload para Bancard (URLs del backend):", JSON.stringify(payload, null, 2));
