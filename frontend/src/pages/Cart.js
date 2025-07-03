@@ -1,17 +1,16 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import Context from '../context';
 import displayINRCurrency from '../helpers/displayCurrency';
 import { MdDelete, MdShoppingCart, MdDownload, MdWhatsapp } from "react-icons/md";
-import { FaArrowLeft, FaTrash, FaCreditCard } from "react-icons/fa";
+import { FaArrowLeft, FaTrash, FaCreditCard, FaUser, FaLock, FaShieldAlt, FaPlus } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import logo from '../helpers/logo.png';
 import { toast } from 'react-toastify';
 import { localCartHelper } from '../helpers/addToCart';
 import { trackWhatsAppContact, trackPDFDownload } from '../components/MetaPixelTracker';
-
-// ✅ IMPORTAR EL COMPONENTE DE BANCARD
 import BancardPayButton from '../components/BancardPayButton';
 
 const Cart = () => {
@@ -24,20 +23,26 @@ const Cart = () => {
         address: ''
     });
     const [showCustomerForm, setShowCustomerForm] = useState(false);
-    const [showPaymentSection, setShowPaymentSection] = useState(false);
+    const [paymentMode, setPaymentMode] = useState(''); // 'guest', 'register', 'saved_cards'
+    const [showRegisterPrompt, setShowRegisterPrompt] = useState(false);
+    const [registeredCards, setRegisteredCards] = useState([]);
+    const [selectedCard, setSelectedCard] = useState(null);
+    const [loadingCards, setLoadingCards] = useState(false);
+    
     const context = useContext(Context);
+    const navigate = useNavigate();
+    
+    // ✅ OBTENER USUARIO DEL STORE
+    const user = useSelector(state => state?.user?.user);
+    const isLoggedIn = !!user;
 
     // Función simplificada para cargar datos directamente desde localStorage
     const fetchData = () => {
         try {
             setLoading(true);
-            
-            // Obtener items directamente del localStorage
             const cartItems = localCartHelper.getCart();
             console.log("Datos de carrito cargados:", cartItems);
-            
             setData(cartItems);
-            
         } catch (error) {
             console.error('Error al cargar productos del carrito:', error);
             toast.error('Error al cargar el carrito');
@@ -46,10 +51,43 @@ const Cart = () => {
         }
     };
 
+    // ✅ CARGAR TARJETAS GUARDADAS SI EL USUARIO ESTÁ LOGUEADO
+    const fetchUserCards = async () => {
+        if (!isLoggedIn || !user.bancardUserId) return;
+        
+        setLoadingCards(true);
+        try {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/tarjetas/${user.bancardUserId}`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            const result = await response.json();
+            if (result.success && result.data?.cards) {
+                setRegisteredCards(result.data.cards);
+                console.log('Tarjetas cargadas:', result.data.cards);
+            }
+        } catch (error) {
+            console.error('Error cargando tarjetas:', error);
+        } finally {
+            setLoadingCards(false);
+        }
+    };
+
     // Cargar datos al montar el componente
     useEffect(() => {
         fetchData();
-    }, []);
+        if (isLoggedIn) {
+            fetchUserCards();
+            // Pre-llenar datos del usuario si está logueado
+            setCustomerData({
+                name: user.name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                address: user.address || ''
+            });
+        }
+    }, [isLoggedIn, user]);
 
     // Función para verificar que un producto tiene datos válidos
     const isValidProduct = (product) => {
@@ -147,7 +185,6 @@ const Cart = () => {
         console.log('Pago exitoso:', paymentData);
         toast.success('Redirigiendo a Bancard...');
         
-        // Opcional: guardar datos del pago
         sessionStorage.setItem('payment_in_progress', JSON.stringify({
             ...paymentData,
             customer: customerData,
@@ -158,6 +195,53 @@ const Cart = () => {
     const handlePaymentError = (error) => {
         console.error('Error en el pago:', error);
         toast.error('Error al procesar el pago. Intenta nuevamente.');
+    };
+
+    // ✅ PAGO CON TARJETA GUARDADA
+    const handlePayWithSavedCard = async () => {
+        if (!selectedCard || !isLoggedIn) {
+            toast.error('Selecciona una tarjeta para continuar');
+            return;
+        }
+
+        try {
+            const paymentData = {
+                shop_process_id: Date.now(),
+                amount: totalPrice.toFixed(2),
+                currency: 'PYG',
+                alias_token: selectedCard.alias_token,
+                description: `Compra BlueTec - ${validProducts.length} productos`,
+                customer_info: customerData
+            };
+
+            console.log('Procesando pago con tarjeta guardada:', paymentData);
+
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/pago-con-token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(paymentData)
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                if (result.requires3DS) {
+                    toast.info('Verificación 3DS requerida');
+                    // Redirigir al proceso 3DS
+                } else {
+                    toast.success('Pago procesado exitosamente');
+                    navigate('/pago-exitoso');
+                }
+            } else {
+                toast.error(result.message || 'Error en el pago');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Error de conexión');
+        }
     };
 
     // Función para verificar si hay datos de cliente válidos para el pago
@@ -190,7 +274,20 @@ const Cart = () => {
         }));
     };
 
-    // Generar PDF
+    // ✅ MANEJAR SELECCIÓN DE MODO DE PAGO
+    const handlePaymentModeSelection = (mode) => {
+        setPaymentMode(mode);
+        
+        if (mode === 'register') {
+            setShowRegisterPrompt(true);
+        } else if (mode === 'guest') {
+            setShowCustomerForm(true);
+        } else if (mode === 'saved_cards') {
+            setShowCustomerForm(true);
+        }
+    };
+
+    // Generar PDF (función existente - mantener igual)
     const generatePDF = () => {
         if (!hasValidCustomerDataForBudget()) {
             toast.error("Por favor ingrese al menos el nombre del cliente");
@@ -393,7 +490,7 @@ const Cart = () => {
         trackPDFDownload(customerData, totalPrice);
     };
 
-    // Función para enviar presupuesto por WhatsApp
+    // Función para enviar presupuesto por WhatsApp (mantener igual)
     const sendToWhatsApp = () => {
         if (!hasValidCustomerDataForBudget()) {
             toast.error("Por favor ingrese al menos el nombre del cliente");
@@ -405,7 +502,6 @@ const Cart = () => {
             return;
         }
 
-        // Construir el mensaje de WhatsApp
         let message = `*SOLICITUD DE PRESUPUESTO - BlueTec*\n\n`;
         message += `*Cliente:* ${customerData.name}\n`;
         
@@ -426,10 +522,8 @@ const Cart = () => {
         message += `\n*Total:* ${displayINRCurrency(totalPrice)}\n`;
         message += `\nSolicito confirmación de disponibilidad y coordinación para el pago. Gracias.`;
         
-        // Codificar el mensaje para URL
         const encodedMessage = encodeURIComponent(message);
         
-        // Tracking de WhatsApp
         trackWhatsAppContact({
             productName: 'Presupuesto de carrito',
             category: 'presupuesto',
@@ -437,24 +531,8 @@ const Cart = () => {
             _id: 'cart-budget'
         });
         
-        // Abrir WhatsApp con el mensaje
         window.open(`https://wa.me/+595984133733?text=${encodedMessage}`, '_blank');
         toast.success("Redirigiendo a WhatsApp...");
-    };
-
-    const toggleCustomerForm = () => {
-        setShowCustomerForm(!showCustomerForm);
-        if (!showCustomerForm) {
-            setShowPaymentSection(false);
-        }
-    };
-
-    const togglePaymentSection = () => {
-        if (!hasValidCustomerDataForPayment()) {
-            toast.error("Para proceder al pago, completa: nombre, email y teléfono");
-            return;
-        }
-        setShowPaymentSection(!showPaymentSection);
     };
 
     return (
@@ -477,6 +555,18 @@ const Cart = () => {
                         <div className="text-sm bg-[#2A3190] text-white px-4 py-1.5 rounded-full shadow-md">
                             {totalQty} {totalQty === 1 ? 'producto' : 'productos'}
                         </div>
+
+                        {/* ✅ MOSTRAR ESTADO DE USUARIO */}
+                        {isLoggedIn ? (
+                            <div className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-sm">
+                                <FaUser className="text-xs" />
+                                <span>Logueado</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-sm">
+                                <span>Invitado</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -607,7 +697,7 @@ const Cart = () => {
                             </div>
                         </div>
                 
-                        {/* Resumen */}
+                        {/* ✅ PANEL LATERAL MEJORADO */}
                         <div className="w-full lg:w-96">
                             <div className="bg-white rounded-xl shadow-lg p-6 sticky top-4 border-l-4 border-[#2A3190] border-t border-r border-b border-gray-100">
                                 <h2 className="text-xl font-bold text-[#2A3190] mb-6">
@@ -629,20 +719,110 @@ const Cart = () => {
                                     </div>
                                 </div>
 
-                                {/* Botón principal de acción */}
+                                {/* ✅ SECCIÓN DE OPCIONES DE PAGO MEJORADA */}
                                 <div className="mt-8">
-                                    <button 
-                                        onClick={toggleCustomerForm}
-                                        className="w-full text-center bg-[#2A3190] text-white py-3 rounded-lg hover:bg-[#1e236b] transition-all duration-300 shadow-md flex items-center justify-center gap-2 mb-4"
-                                    >
-                                        <FaCreditCard className="text-xl" />
-                                        <span>{showCustomerForm ? 'Ocultar opciones' : 'Finalizar compra'}</span>
-                                    </button>
+                                    {!paymentMode && (
+                                        <div className="space-y-4">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-4">¿Cómo deseas pagar?</h3>
+                                            
+                                            {/* ✅ OPCIÓN: USUARIO REGISTRADO CON TARJETAS GUARDADAS */}
+                                            {isLoggedIn && (
+                                                <div className="space-y-3">
+                                                    <button
+                                                        onClick={() => handlePaymentModeSelection('saved_cards')}
+                                                        className="w-full bg-green-600 text-white py-4 px-4 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-between group shadow-md"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="bg-green-500 p-2 rounded-full">
+                                                                <FaShieldAlt className="text-white" />
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-semibold">Pago con tarjetas guardadas</p>
+                                                                <p className="text-sm text-green-100">Rápido y seguro</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-green-500 px-3 py-1 rounded-full text-xs font-medium">
+                                                            RECOMENDADO
+                                                        </div>
+                                                    </button>
+                                                    
+                                                    <button
+                                                        onClick={() => handlePaymentModeSelection('guest')}
+                                                        className="w-full bg-[#2A3190] text-white py-4 px-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center gap-3 shadow-md"
+                                                    >
+                                                        <FaCreditCard className="text-xl" />
+                                                        <div className="text-left">
+                                                            <p className="font-semibold">Pagar con nueva tarjeta</p>
+                                                            <p className="text-sm text-blue-100">Ingresa datos manualmente</p>
+                                                        </div>
+                                                    </button>
+                                                </div>
+                                            )}
 
-                                    {/* Formulario de datos del cliente */}
+                                            {/* ✅ OPCIÓN: USUARIO NO REGISTRADO */}
+                                            {!isLoggedIn && (
+                                                <div className="space-y-3">
+                                                    <button
+                                                        onClick={() => handlePaymentModeSelection('register')}
+                                                        className="w-full bg-green-600 text-white py-4 px-4 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-between group shadow-md"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="bg-green-500 p-2 rounded-full">
+                                                                <FaUser className="text-white" />
+                                                            </div>
+                                                            <div className="text-left">
+                                                                <p className="font-semibold">Registrarme y pagar</p>
+                                                                <p className="text-sm text-green-100">Guarda tarjetas para futuras compras</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-green-500 px-3 py-1 rounded-full text-xs font-medium">
+                                                            RECOMENDADO
+                                                        </div>
+                                                    </button>
+                                                    
+                                                    <button
+                                                        onClick={() => handlePaymentModeSelection('guest')}
+                                                        className="w-full bg-gray-600 text-white py-4 px-4 rounded-lg hover:bg-gray-700 transition-all duration-300 flex items-center gap-3 shadow-md"
+                                                    >
+                                                        <FaCreditCard className="text-xl" />
+                                                        <div className="text-left">
+                                                            <p className="font-semibold">Pagar como invitado</p>
+                                                            <p className="text-sm text-gray-200">Sin registro, datos no se guardan</p>
+                                                        </div>
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* ✅ INFORMACIÓN SOBRE BENEFICIOS */}
+                                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-4">
+                                                <h4 className="font-semibold text-blue-800 mb-2">💡 Ventajas de registrarte</h4>
+                                                <ul className="text-blue-700 text-sm space-y-1">
+                                                    <li>• Guarda tus tarjetas para compras más rápidas</li>
+                                                    <li>• Historial de pedidos y transacciones</li>
+                                                    <li>• Ofertas exclusivas y promociones</li>
+                                                    <li>• Soporte personalizado</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ✅ FORMULARIO DE DATOS DEL CLIENTE */}
                                     {showCustomerForm && (
                                         <div className="space-y-4 bg-blue-50 p-5 rounded-lg border border-blue-100">
-                                            <h3 className="font-semibold text-[#2A3190]">Datos del cliente</h3>
+                                            <div className="flex justify-between items-center">
+                                                <h3 className="font-semibold text-[#2A3190]">
+                                                    {paymentMode === 'saved_cards' ? 'Confirma tus datos' : 'Datos del cliente'}
+                                                </h3>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowCustomerForm(false);
+                                                        setPaymentMode('');
+                                                    }}
+                                                    className="text-gray-500 hover:text-gray-700"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
                                             
                                             <div>
                                                 <label className="block text-gray-700 text-sm font-medium mb-1">
@@ -655,6 +835,7 @@ const Cart = () => {
                                                     onChange={handleInputChange}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
                                                     placeholder="Nombre completo"
+                                                    readOnly={isLoggedIn && paymentMode === 'saved_cards'}
                                                     required
                                                 />
                                             </div>
@@ -670,6 +851,7 @@ const Cart = () => {
                                                     onChange={handleInputChange}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
                                                     placeholder="tu@email.com"
+                                                    readOnly={isLoggedIn && paymentMode === 'saved_cards'}
                                                 />
                                             </div>
                                             
@@ -684,6 +866,7 @@ const Cart = () => {
                                                     onChange={handleInputChange}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
                                                     placeholder="+595 XXX XXXXXX"
+                                                    readOnly={isLoggedIn && paymentMode === 'saved_cards'}
                                                 />
                                             </div>
 
@@ -701,7 +884,70 @@ const Cart = () => {
                                                 />
                                             </div>
 
-                                            {/* Opciones de presupuesto */}
+                                            {/* ✅ SELECCIÓN DE TARJETAS GUARDADAS */}
+                                            {paymentMode === 'saved_cards' && isLoggedIn && (
+                                                <div className="border-t border-blue-200 pt-4">
+                                                    <h4 className="font-medium text-[#2A3190] mb-3">💳 Selecciona tu tarjeta</h4>
+                                                    
+                                                    {loadingCards ? (
+                                                        <div className="text-center py-4">
+                                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2A3190] mx-auto"></div>
+                                                            <p className="text-sm text-gray-600 mt-2">Cargando tarjetas...</p>
+                                                        </div>
+                                                    ) : registeredCards.length > 0 ? (
+                                                        <div className="space-y-3">
+                                                            {registeredCards.map((card, index) => (
+                                                                <button
+                                                                    key={index}
+                                                                    onClick={() => setSelectedCard(card)}
+                                                                    className={`w-full p-3 rounded-lg border-2 transition-all ${
+                                                                        selectedCard === card 
+                                                                            ? 'border-[#2A3190] bg-blue-50' 
+                                                                            : 'border-gray-200 hover:border-gray-300'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex justify-between items-center">
+                                                                        <div className="text-left">
+                                                                            <p className="font-medium text-gray-800">
+                                                                                {card.card_brand || 'Tarjeta'}
+                                                                            </p>
+                                                                            <p className="text-sm text-gray-600">
+                                                                                {card.card_masked_number || '**** **** **** ****'}
+                                                                            </p>
+                                                                        </div>
+                                                                        {selectedCard === card && (
+                                                                            <div className="text-[#2A3190]">
+                                                                                <FaShieldAlt />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </button>
+                                                            ))}
+                                                            
+                                                            <button
+                                                                onClick={() => navigate('/mi-perfil?tab=cards')}
+                                                                className="w-full p-3 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#2A3190] transition-all flex items-center justify-center gap-2 text-gray-600 hover:text-[#2A3190]"
+                                                            >
+                                                                <FaPlus className="text-sm" />
+                                                                <span>Agregar nueva tarjeta</span>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center py-6 bg-gray-50 rounded-lg">
+                                                            <FaCreditCard className="text-3xl text-gray-400 mx-auto mb-2" />
+                                                            <p className="text-gray-600 mb-3">No tienes tarjetas guardadas</p>
+                                                            <button
+                                                                onClick={() => navigate('/mi-perfil?tab=cards')}
+                                                                className="text-[#2A3190] hover:text-[#1e236b] font-medium text-sm"
+                                                            >
+                                                                Registrar primera tarjeta
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* ✅ OPCIONES DE PRESUPUESTO */}
                                             <div className="border-t border-blue-200 pt-4">
                                                 <h4 className="font-medium text-[#2A3190] mb-3">📋 Solicitar presupuesto</h4>
                                                 <div className="grid grid-cols-2 gap-3">
@@ -725,42 +971,86 @@ const Cart = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Opciones de pago */}
+                                            {/* ✅ BOTONES DE PAGO */}
                                             <div className="border-t border-blue-200 pt-4">
-                                                <h4 className="font-medium text-[#2A3190] mb-3">💳 Pagar ahora</h4>
+                                                <h4 className="font-medium text-[#2A3190] mb-3">💳 Proceder al pago</h4>
                                                 
-                                                {hasValidCustomerDataForPayment() ? (
+                                                {paymentMode === 'saved_cards' && selectedCard ? (
                                                     <button
-                                                        onClick={togglePaymentSection}
-                                                        className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2 font-medium shadow-md"
+                                                        onClick={handlePayWithSavedCard}
+                                                        disabled={!hasValidCustomerDataForPayment()}
+                                                        className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2 font-medium shadow-md disabled:opacity-50"
                                                     >
-                                                        <FaCreditCard />
-                                                        <span>{showPaymentSection ? 'Ocultar pago' : 'Proceder al pago'}</span>
+                                                        <FaLock />
+                                                        <span>Pagar con tarjeta seleccionada</span>
                                                     </button>
                                                 ) : (
-                                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                                        <p className="text-yellow-800 text-sm">
-                                                            ⚠️ Para proceder al pago, completa: nombre, email y teléfono
-                                                        </p>
-                                                    </div>
+                                                    <BancardPayButton
+                                                        cartItems={prepareBancardItems()}
+                                                        totalAmount={totalPrice}
+                                                        customerData={customerData}
+                                                        onPaymentStart={handlePaymentStart}
+                                                        onPaymentSuccess={handlePaymentSuccess}
+                                                        onPaymentError={handlePaymentError}
+                                                        disabled={validProducts.length === 0 || !hasValidCustomerDataForPayment()}
+                                                    />
                                                 )}
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Sección de pago con Bancard */}
-                                    {showPaymentSection && hasValidCustomerDataForPayment() && (
-                                        <div className="bg-green-50 p-5 rounded-lg border border-green-200 mt-4">
-                                            <h3 className="font-semibold text-green-800 mb-4">💳 Pagar con Bancard</h3>
-                                            <BancardPayButton
-                                                cartItems={prepareBancardItems()}
-                                                totalAmount={totalPrice}
-                                                customerData={customerData}
-                                                onPaymentStart={handlePaymentStart}
-                                                onPaymentSuccess={handlePaymentSuccess}
-                                                onPaymentError={handlePaymentError}
-                                                disabled={validProducts.length === 0}
-                                            />
+                                    {/* ✅ MODAL DE REGISTRO */}
+                                    {showRegisterPrompt && (
+                                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                                                <div className="p-6">
+                                                    <h2 className="text-xl font-bold text-[#2A3190] mb-4">¡Únete a BlueTec!</h2>
+                                                    
+                                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                                                        <h3 className="font-medium text-green-800 mb-2">🎉 Ventajas exclusivas:</h3>
+                                                        <ul className="text-green-700 text-sm space-y-1">
+                                                            <li>• Guarda tus tarjetas de forma segura</li>
+                                                            <li>• Compras más rápidas en el futuro</li>
+                                                            <li>• Historial completo de pedidos</li>
+                                                            <li>• Ofertas y descuentos exclusivos</li>
+                                                            <li>• Soporte prioritario</li>
+                                                        </ul>
+                                                    </div>
+                                                    
+                                                    <p className="text-gray-600 mb-6">
+                                                        Crea tu cuenta en menos de 2 minutos y disfruta de una experiencia de compra superior.
+                                                    </p>
+                                                    
+                                                    <div className="flex gap-3">
+                                                        <button
+                                                            onClick={() => setShowRegisterPrompt(false)}
+                                                            className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                                                        >
+                                                            Ahora no
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                navigate('/registro');
+                                                            }}
+                                                            className="flex-1 bg-[#2A3190] text-white py-2 rounded-lg hover:bg-[#1e236b] transition-colors"
+                                                        >
+                                                            Registrarme
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    <div className="mt-4 text-center">
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowRegisterPrompt(false);
+                                                                handlePaymentModeSelection('guest');
+                                                            }}
+                                                            className="text-gray-500 hover:text-gray-700 text-sm underline"
+                                                        >
+                                                            Continuar como invitado
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                 </div>

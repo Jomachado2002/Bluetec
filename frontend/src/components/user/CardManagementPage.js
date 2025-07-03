@@ -1,4 +1,4 @@
-// frontend/src/components/user/CardManagementPage.js - VERSIÓN LIMPIA
+// frontend/src/components/user/CardManagementPage.js - VERSIÓN MEJORADA
 import React, { useState, useEffect } from 'react';
 import { 
   FaCreditCard, 
@@ -8,8 +8,13 @@ import {
   FaSpinner,
   FaCheckCircle,
   FaExclamationTriangle,
-  FaUser
+  FaUser,
+  FaLock,
+  FaEye,
+  FaEyeSlash,
+  FaHistory
 } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 const CardManagementPage = ({ 
   user, 
@@ -24,6 +29,9 @@ const CardManagementPage = ({
   const [showIframe, setShowIframe] = useState(false);
   const [processId, setProcessId] = useState('');
   const [errors, setErrors] = useState({});
+  const [showTestPayment, setShowTestPayment] = useState(false);
+  const [testAmount, setTestAmount] = useState('10000');
+  const [selectedCardForTest, setSelectedCardForTest] = useState(null);
 
   // ✅ CARGAR TARJETAS AL MONTAR EL COMPONENTE
   useEffect(() => {
@@ -75,16 +83,6 @@ const CardManagementPage = ({
       console.log('📤 Enviando datos de catastro:', cardData);
 
       const result = await onRegisterCard(cardData);
-      console.log('📥 === DEBUG VERCEL ESPECÍFICO ===');
-      console.log('📥 Result completo:', JSON.stringify(result, null, 2));
-      console.log('📥 result.success:', result?.success);
-      console.log('📥 result.data:', result?.data);
-      console.log('📥 result.data.process_id:', result?.data?.process_id);
-      console.log('📥 typeof process_id:', typeof result?.data?.process_id);
-      console.log('📥 process_id length:', result?.data?.process_id?.length);
-      console.log('📥 process_id JSON:', JSON.stringify(result?.data?.process_id));
-
-console.log('📥 Resultado completo del catastro:', result);
       console.log('📥 Resultado completo del catastro:', result);
 
       if (result.success && result.data?.process_id) {
@@ -95,7 +93,6 @@ console.log('📥 Resultado completo del catastro:', result);
         setShowRegisterForm(false);
         setShowIframe(true);
         
-        // ✅ CARGAR SCRIPT CON PROCESS ID
         setTimeout(() => {
           loadBancardScript(receivedProcessId);
         }, 300);
@@ -122,7 +119,6 @@ console.log('📥 Resultado completo del catastro:', result);
       return;
     }
     
-    // Remover script anterior si existe
     const existingScript = document.getElementById('bancard-script');
     if (existingScript) {
       existingScript.remove();
@@ -159,13 +155,7 @@ console.log('📥 Resultado completo del catastro:', result);
   const initializeBancardIframe = (processIdToUse) => {
     try {
       console.log('🎯 Inicializando iframe con processId:', processIdToUse);
-      console.log('🎯 === VALIDACIÓN FINAL PROCESS_ID ===');
-      console.log('🎯 processId value:', processIdToUse);
-      console.log('🎯 processId type:', typeof processIdToUse);
-      console.log('🎯 processId length:', processIdToUse?.length);
-      console.log('🎯 processId JSON:', JSON.stringify(processIdToUse));
-      console.log('🎯 processId is empty?:', !processIdToUse || processIdToUse === '');
-
+      
       if (!processIdToUse || processIdToUse.trim() === '') {
         console.error('❌ ProcessId vacío en inicialización:', processIdToUse);
         setErrors({ iframe: 'Error: Process ID no válido' });
@@ -192,10 +182,6 @@ console.log('📥 Resultado completo del catastro:', result);
           
           try {
             console.log('🚀 Creando iframe de Bancard con processId:', processIdToUse);
-             console.log('🔍 VALIDACIÓN FINAL ANTES DE CREATEFORM:');
-            console.log('🔍 processId final:', processIdToUse);
-            console.log('🔍 processId String():', String(processIdToUse));
-            console.log('🔍 processId toString():', processIdToUse.toString());
             window.Bancard.Cards.createForm('bancard-card-container', String(processIdToUse), styles);
             console.log('✅ Iframe creado exitosamente');
             
@@ -233,7 +219,8 @@ console.log('📥 Resultado completo del catastro:', result);
       const result = await onDeleteCard(user.id, aliasToken);
       if (result.success) {
         console.log('✅ Tarjeta eliminada exitosamente');
-        await fetchUserCards(); // Recargar la lista
+        await fetchUserCards();
+        toast.success('Tarjeta eliminada exitosamente');
       } else {
         setErrors({ delete: result.message || 'Error al eliminar tarjeta' });
       }
@@ -251,13 +238,15 @@ console.log('📥 Resultado completo del catastro:', result);
       if (typeof event.data === 'object' && event.data.status) {
         if (event.data.status === 'add_new_card_success') {
           console.log('✅ Tarjeta catastrada exitosamente');
+          toast.success('¡Tarjeta registrada exitosamente!');
           setTimeout(() => {
             closeIframe();
-            fetchUserCards(); // Recargar lista de tarjetas
+            fetchUserCards();
           }, 2000);
         } else if (event.data.status === 'add_new_card_fail') {
           console.log('❌ Error en catastro de tarjeta');
           setErrors({ iframe: event.data.description || 'Error al catastrar tarjeta' });
+          toast.error('Error al registrar tarjeta');
         }
       }
     } catch (error) {
@@ -269,13 +258,66 @@ console.log('📥 Resultado completo del catastro:', result);
     setShowIframe(false);
     setProcessId('');
     
-    // Limpiar script y event listeners
     const script = document.getElementById('bancard-script');
     if (script) {
       script.remove();
     }
     
     window.removeEventListener('message', handleIframeMessage, false);
+  };
+
+  // ✅ FUNCIÓN PARA PROBAR PAGO CON TARJETA GUARDADA
+  const handleTestPayment = async () => {
+    if (!selectedCardForTest) {
+      toast.error('Selecciona una tarjeta para probar');
+      return;
+    }
+
+    try {
+      const paymentData = {
+        shop_process_id: Date.now(),
+        amount: parseFloat(testAmount).toFixed(2),
+        currency: 'PYG',
+        alias_token: selectedCardForTest.alias_token,
+        description: `Pago de prueba BlueTec - ${testAmount} PYG`,
+        customer_info: {
+          name: user.name,
+          email: user.email,
+          phone: user.phone
+        }
+      };
+
+      console.log('🧪 Procesando pago de prueba:', paymentData);
+      toast.info('Procesando pago de prueba...');
+
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/pago-con-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(paymentData)
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        if (result.requires3DS) {
+          toast.info('🔐 Verificación 3DS requerida - esto es normal');
+          console.log('Proceso 3DS requerido:', result.data);
+        } else {
+          toast.success('✅ Pago de prueba exitoso');
+          console.log('Pago directo exitoso:', result.data);
+        }
+        setShowTestPayment(false);
+      } else {
+        toast.error(result.message || 'Error en pago de prueba');
+        console.error('Error en pago:', result);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error de conexión en pago de prueba');
+    }
   };
 
   const getCardBrandColor = (brand) => {
@@ -286,9 +328,16 @@ console.log('📥 Resultado completo del catastro:', result);
         return 'bg-gradient-to-r from-red-600 to-red-700';
       case 'american express':
         return 'bg-gradient-to-r from-green-600 to-green-700';
+      case 'bancard':
+        return 'bg-gradient-to-r from-purple-600 to-purple-700';
       default:
         return 'bg-gradient-to-r from-gray-600 to-gray-700';
     }
+  };
+
+  const formatCardNumber = (cardNumber) => {
+    if (!cardNumber) return '**** **** **** ****';
+    return cardNumber.replace(/(.{4})/g, '$1 ').trim();
   };
 
   // ✅ MOSTRAR IFRAME DE CATASTRO
@@ -309,7 +358,6 @@ console.log('📥 Resultado completo del catastro:', result);
             </button>
           </div>
 
-          {/* Información del usuario */}
           <div className="p-4 bg-blue-50 border-b">
             <div className="flex items-center gap-3">
               <FaUser className="text-blue-600" />
@@ -320,7 +368,6 @@ console.log('📥 Resultado completo del catastro:', result);
             </div>
           </div>
 
-          {/* Contenedor del iframe */}
           <div className="p-4">
             <div 
               id="bancard-card-container" 
@@ -340,10 +387,9 @@ console.log('📥 Resultado completo del catastro:', result);
               </div>
             </div>
 
-            {/* Instrucciones */}
             <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
               <h4 className="font-medium text-yellow-800 mb-2">📝 Datos de prueba para testing:</h4>
-              <ul className="text-sm text-yellow-700 space-y-1">
+              <ul className="text-yellow-700 text-sm space-y-1 text-left">
                 <li>• <strong>Cédula válida Visa/MasterCard:</strong> 6587520</li>
                 <li>• <strong>Cédula válida Bancard:</strong> 9661000</li>
                 <li>• Completa los demás campos con datos reales de tu tarjeta</li>
@@ -351,7 +397,6 @@ console.log('📥 Resultado completo del catastro:', result);
             </div>
           </div>
 
-          {/* Footer con información de seguridad */}
           <div className="p-4 bg-gray-50 border-t text-center">
             <div className="flex items-center justify-center gap-2 text-green-600 mb-2">
               <FaShieldAlt />
@@ -377,16 +422,28 @@ console.log('📥 Resultado completo del catastro:', result);
               <FaCreditCard className="text-xl" />
               Mis Tarjetas Registradas
             </h1>
-            <p className="text-gray-600 mt-1">Gestiona tus métodos de pago para compras rápidas</p>
+            <p className="text-gray-600 mt-1">Gestiona tus métodos de pago para compras rápidas y seguras</p>
           </div>
           
-          <button
-            onClick={() => setShowRegisterForm(true)}
-            className="flex items-center gap-2 bg-[#2A3190] text-white px-4 py-2 rounded-lg hover:bg-[#1e236b] transition-colors"
-          >
-            <FaPlus className="text-sm" />
-            Registrar Nueva Tarjeta
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowRegisterForm(true)}
+              className="flex items-center gap-2 bg-[#2A3190] text-white px-4 py-2 rounded-lg hover:bg-[#1e236b] transition-colors"
+            >
+              <FaPlus className="text-sm" />
+              Registrar Nueva Tarjeta
+            </button>
+            
+            {cards.length > 0 && (
+              <button
+                onClick={() => setShowTestPayment(true)}
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <FaCheckCircle className="text-sm" />
+                Probar Pago
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -468,6 +525,91 @@ console.log('📥 Resultado completo del catastro:', result);
         </div>
       )}
 
+      {/* Modal para probar pago */}
+      {showTestPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-[#2A3190] mb-4">Probar Pago con Tarjeta</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Selecciona una tarjeta:
+                  </label>
+                  <div className="space-y-2">
+                    {cards.map((card, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedCardForTest(card)}
+                        className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                          selectedCardForTest === card 
+                            ? 'border-[#2A3190] bg-blue-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium text-gray-800">
+                              {card.card_brand || 'Tarjeta'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {formatCardNumber(card.card_masked_number)}
+                            </p>
+                          </div>
+                          {selectedCardForTest === card && (
+                            <div className="text-[#2A3190]">
+                              <FaCheckCircle />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Monto de prueba (PYG):
+                  </label>
+                  <input
+                    type="number"
+                    value={testAmount}
+                    onChange={(e) => setTestAmount(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190]"
+                    placeholder="10000"
+                    min="1000"
+                  />
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-yellow-800 text-sm">
+                    ⚠️ Este es un pago de prueba real. El monto será cargado a tu tarjeta.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowTestPayment(false)}
+                  className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleTestPayment}
+                  disabled={!selectedCardForTest || !testAmount}
+                  className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <FaLock />
+                  Procesar Pago
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Lista de tarjetas */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-6">Tarjetas Registradas</h2>
@@ -494,15 +636,15 @@ console.log('📥 Resultado completo del catastro:', result);
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {cards.map((card, index) => (
               <div key={index} className="relative">
-                <div className={`${getCardBrandColor(card.card_brand)} rounded-xl p-6 text-white shadow-lg`}>
+                <div className={`${getCardBrandColor(card.card_brand)} rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform`}>
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <p className="text-sm opacity-80">Tarjeta</p>
-                      <p className="font-semibold">{card.card_brand || 'Tarjeta'}</p>
+                      <p className="font-semibold text-lg">{card.card_brand || 'Tarjeta'}</p>
                     </div>
                     <button
                       onClick={() => handleDeleteCard(card.alias_token)}
-                      className="text-white/80 hover:text-white p-1 rounded transition-colors"
+                      className="text-white/80 hover:text-white p-1 rounded transition-colors bg-black/20 hover:bg-black/40"
                       title="Eliminar tarjeta"
                     >
                       <FaTrash className="text-sm" />
@@ -511,7 +653,7 @@ console.log('📥 Resultado completo del catastro:', result);
                   
                   <div className="mb-4">
                     <p className="text-lg font-mono tracking-wider">
-                      {card.card_masked_number || '**** **** **** ****'}
+                      {formatCardNumber(card.card_masked_number)}
                     </p>
                   </div>
                   
@@ -525,11 +667,24 @@ console.log('📥 Resultado completo del catastro:', result);
                       <p className="text-sm capitalize">{card.card_type || 'N/A'}</p>
                     </div>
                   </div>
+                  
+                  {/* Botón de acción rápida */}
+                  <div className="mt-4 pt-4 border-t border-white/20">
+                    <button
+                      onClick={() => {
+                        setSelectedCardForTest(card);
+                        setShowTestPayment(true);
+                      }}
+                      className="w-full bg-white/20 hover:bg-white/30 text-white py-2 rounded-lg transition-colors text-sm font-medium"
+                    >
+                      Probar pago
+                    </button>
+                  </div>
                 </div>
                 
                 {card.bancard_proccessed && (
                   <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                    Bancard
+                    ✓ Bancard
                   </div>
                 )}
               </div>
@@ -556,6 +711,33 @@ console.log('📥 Resultado completo del catastro:', result);
           </div>
         </div>
       </div>
+
+      {/* Estadísticas de uso (si hay tarjetas) */}
+      {cards.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <FaHistory />
+            Estadísticas de uso
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-green-50 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-green-600">{cards.length}</div>
+              <div className="text-sm text-green-700">Tarjetas registradas</div>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-blue-600">0</div>
+              <div className="text-sm text-blue-700">Pagos realizados</div>
+            </div>
+            
+            <div className="bg-purple-50 rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-purple-600">100%</div>
+              <div className="text-sm text-purple-700">Tasa de éxito</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

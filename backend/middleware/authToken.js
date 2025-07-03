@@ -1,4 +1,4 @@
-// backend/middleware/authToken.js - SOLUCIÓN SIMPLE
+// backend/middleware/authToken.js - VERSIÓN CORREGIDA (COMPATIBLE CON ANTERIOR)
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const userModel = require('../models/userModel');
@@ -27,6 +27,15 @@ async function authToken(req, res, next) {
                     req.userRole = user.role;
                     req.bancardUserId = user.bancardUserId;
                     
+                    // ✅ NUEVOS CAMPOS PARA MEJORAS (sin romper compatibilidad)
+                    req.userType = 'REGISTERED';
+                    req.userCapabilities = {
+                        canSaveCards: true,
+                        canViewHistory: true,
+                        canManageProfile: true,
+                        hasFullAccess: true
+                    };
+                    
                     console.log('✅ Usuario autenticado:', user.name, 'Role:', user.role);
                     return next();
                 } else {
@@ -41,12 +50,26 @@ async function authToken(req, res, next) {
             }
         }
 
-        // ✅ CONFIGURAR COMO INVITADO
+        // ✅ CONFIGURAR COMO INVITADO (mantener lógica original)
         const guestId = `guest-${Date.now()}`;
         req.userId = guestId;
         req.isAuthenticated = false;
         req.userRole = 'GUEST';
         req.sessionId = req.session?.id || `session-${Date.now()}`;
+        
+        // ✅ NUEVOS CAMPOS PARA MEJORAS (sin romper compatibilidad)
+        req.userType = 'GUEST';
+        req.userCapabilities = {
+            canBrowse: true,
+            canAddToCart: true,
+            canCheckout: true,
+            canRequestQuote: true,
+            canPayAsGuest: true,
+            cannotSaveCards: true,
+            cannotViewProfile: true,
+            cannotViewHistory: true,
+            shouldPromptRegistration: true
+        };
         
         console.log('🔓 Configurado como invitado:', guestId);
         next();
@@ -54,7 +77,7 @@ async function authToken(req, res, next) {
     } catch (err) {
         console.error('❌ Error en authToken:', err);
         
-        // ✅ FALLBACK
+        // ✅ FALLBACK (mantener lógica original)
         req.userId = `guest-${Date.now()}`;
         req.isAuthenticated = false;
         req.userRole = 'GUEST';
