@@ -197,53 +197,133 @@ const Cart = () => {
         toast.error('Error al procesar el pago. Intenta nuevamente.');
     };
 
-    // ✅ PAGO CON TARJETA GUARDADA
-    const handlePayWithSavedCard = async () => {
-        if (!selectedCard || !isLoggedIn) {
-            toast.error('Selecciona una tarjeta para continuar');
-            return;
+    // ✅ FUNCIÓN CORREGIDA PARA PAGO CON TARJETA GUARDADA (SIN IVA)
+const handlePayWithSavedCard = async () => {
+    if (!selectedCard || !isLoggedIn) {
+        toast.error('Selecciona una tarjeta para continuar');
+        return;
+    }
+
+    if (!hasValidCustomerDataForPayment()) {
+        toast.error('Por favor completa todos los datos requeridos');
+        return;
+    }
+
+    try {
+        console.log('💳 === PROCESANDO PAGO CON TARJETA GUARDADA ===');
+        
+        // ✅ PREPARAR DATOS COMPLETOS PARA BD (SIN IVA)
+        const paymentData = {
+            // Datos básicos del pago
+            amount: totalPrice.toFixed(2),
+            currency: 'PYG',
+            alias_token: selectedCard.alias_token,
+            number_of_payments: 1,
+            description: `Compra BlueTec - ${validProducts.length} productos`,
+            
+            // ✅ DATOS DEL CLIENTE PARA BD
+            customer_info: {
+                name: customerData.name,
+                email: customerData.email,
+                phone: customerData.phone,
+                address: customerData.address
+            },
+            
+            // ✅ ITEMS DEL CARRITO PARA BD
+            items: validProducts.map(product => ({
+                name: product.productId.productName,
+                quantity: product.quantity,
+                unitPrice: product.productId.sellingPrice,
+                total: product.quantity * product.productId.sellingPrice,
+                product_id: product.productId._id
+            })),
+            
+            // ❌ REMOVER IVA - CAUSA DEL ERROR
+            // iva_amount: (totalPrice * 0.1).toFixed(2), // 10% IVA
+            
+            // ✅ DATOS ADICIONALES
+            additional_data: JSON.stringify({
+                user_id: user._id,
+                bancard_user_id: user.bancardUserId,
+                card_brand: selectedCard.card_brand,
+                card_masked: selectedCard.card_masked_number,
+                source: 'saved_card_payment'
+            })
+        };
+
+        console.log('📤 Enviando datos de pago con tarjeta guardada:', {
+            ...paymentData,
+            alias_token: `${paymentData.alias_token.substring(0, 20)}...`,
+            items: paymentData.items.length
+        });
+
+        toast.info('Procesando pago con tarjeta guardada...');
+
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/pago-con-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(paymentData)
+        });
+
+        console.log('📥 Response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response:', errorText);
+            throw new Error(`Error HTTP ${response.status}`);
         }
 
-        try {
-            const paymentData = {
-                shop_process_id: Date.now(),
-                amount: totalPrice.toFixed(2),
-                currency: 'PYG',
-                alias_token: selectedCard.alias_token,
-                description: `Compra BlueTec - ${validProducts.length} productos`,
-                customer_info: customerData
-            };
-
-            console.log('Procesando pago con tarjeta guardada:', paymentData);
-
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/pago-con-token`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
-                body: JSON.stringify(paymentData)
-            });
-
-            const result = await response.json();
-            
-            if (result.success) {
-                if (result.requires3DS) {
-                    toast.info('Verificación 3DS requerida');
-                    // Redirigir al proceso 3DS
+        const result = await response.json();
+        console.log('📥 Resultado del pago:', result);
+        
+        if (result.success) {
+            if (result.requires3DS) {
+                console.log('🔐 Pago requiere verificación 3DS');
+                toast.info('🔐 Verificación 3DS requerida');
+                
+                // ✅ SI HAY iframe_url, MOSTRAR IFRAME PARA 3DS
+                if (result.data?.iframe_url) {
+                    console.log('🖼️ Mostrando iframe para 3DS:', result.data.iframe_url);
+                    
+                    // Guardar datos del pago para seguimiento
+                    sessionStorage.setItem('bancard_payment', JSON.stringify({
+                        shop_process_id: result.data.shop_process_id,
+                        process_id: result.data.process_id || result.data.bancard_process_id,
+                        amount: totalPrice,
+                        customer: customerData,
+                        requires3DS: true,
+                        timestamp: Date.now()
+                    }));
+                    
+                    // Redirigir al iframe 3DS o mostrar modal
+                    window.open(result.data.iframe_url, '_blank', 'width=800,height=600');
+                    
+                    toast.success('Ventana de verificación 3DS abierta');
                 } else {
-                    toast.success('Pago procesado exitosamente');
-                    navigate('/pago-exitoso');
+                    toast.warning('Verificación 3DS requerida pero no se recibió URL');
                 }
             } else {
-                toast.error(result.message || 'Error en el pago');
+                console.log('✅ Pago procesado directamente');
+                toast.success('✅ Pago procesado exitosamente');
+                
+                // ✅ LIMPIAR CARRITO Y REDIRIGIR
+                setTimeout(() => {
+                    localCartHelper.clearCart();
+                    navigate('/pago-exitoso?shop_process_id=' + (result.data.shop_process_id || Date.now()));
+                }, 1500);
             }
-        } catch (error) {
-            console.error('Error:', error);
-            toast.error('Error de conexión');
+        } else {
+            console.error('❌ Error en el pago:', result);
+            toast.error(result.message || 'Error en el pago');
         }
-    };
-
+    } catch (error) {
+        console.error('❌ Error crítico:', error);
+        toast.error('Error de conexión al procesar el pago');
+    }
+};
     // Función para verificar si hay datos de cliente válidos para el pago
     const hasValidCustomerDataForPayment = () => {
         return customerData.name.trim() && customerData.email.trim() && customerData.phone.trim();

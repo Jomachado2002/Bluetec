@@ -1,4 +1,4 @@
-// backend/helpers/bancardUtils.js - VERSIÓN CORREGIDA
+// backend/helpers/bancardUtils.js - VERSIÓN COMPLETA CON generateShopProcessId
 const crypto = require('crypto');
 
 /**
@@ -38,27 +38,38 @@ const generateSingleBuyToken = (shopProcessId, amount, currency = 'PYG') => {
 };
 
 /**
- * Genera un ID de proceso único (SOLO NÚMEROS como requiere Bancard)
+ * ✅ FUNCIÓN MEJORADA: Genera un ID de proceso único (SOLO NÚMEROS como requiere Bancard)
  * @returns {number} ID único numérico
  */
 const generateShopProcessId = () => {
-    // ✅ NUEVA ESTRATEGIA: Usar microsegundos + PID + aleatorio
+    // ✅ ESTRATEGIA ULTRA ÚNICA: Combinar timestamp + microsegundos + aleatorio
     const now = Date.now();
     const microseconds = process.hrtime ? process.hrtime.bigint() : BigInt(now * 1000);
-    const pid = process.pid || Math.floor(Math.random() * 9999);
     const random = Math.floor(Math.random() * 99999);
     
-    // Crear ID único basado en timestamp + microsegundos + random
-    const uniquePart = Number(microseconds.toString().slice(-8)); // Últimos 8 dígitos de microsegundos
-    const shopProcessId = Number(`${now.toString().slice(-6)}${uniquePart.toString().slice(-4)}${random.toString().slice(-3)}`);
+    // Crear ID único de 10-12 dígitos para evitar conflictos
+    const uniquePart = Number(microseconds.toString().slice(-6)); // Últimos 6 dígitos de microsegundos
+    const timePart = Number(now.toString().slice(-6)); // Últimos 6 dígitos del timestamp
+    const randomPart = Math.floor(Math.random() * 999); // 3 dígitos aleatorios
     
-    console.log('🆔 Generando shop_process_id ULTRA ÚNICO:', {
+    // Combinar las partes para crear un ID único
+    const shopProcessId = parseInt(`${timePart}${randomPart}`);
+    
+    console.log('🆔 Generando shop_process_id ÚNICO:', {
         shopProcessId,
         timestamp: now,
         microseconds: microseconds.toString(),
-        random,
-        pid
+        timePart,
+        randomPart,
+        length: shopProcessId.toString().length
     });
+    
+    // ✅ VERIFICAR QUE SEA UN NÚMERO VÁLIDO
+    if (isNaN(shopProcessId) || shopProcessId <= 0) {
+        console.error('❌ shop_process_id inválido generado:', shopProcessId);
+        // Fallback a timestamp simple
+        return Date.now();
+    }
     
     return shopProcessId;
 };
@@ -161,12 +172,63 @@ const parseAmount = (amountStr) => {
     return parseFloat(amountStr || '0');
 };
 
+/**
+ * ✅ NUEVA FUNCIÓN: Genera token para pago con alias
+ * @param {string} shopProcessId - ID de la transacción
+ * @param {number} amount - Monto
+ * @param {string} currency - Moneda
+ * @param {string} aliasToken - Token de la tarjeta
+ * @returns {string} Token MD5
+ */
+const generateChargeToken = (shopProcessId, amount, currency, aliasToken) => {
+    const privateKey = process.env.BANCARD_PRIVATE_KEY;
+    const formattedAmount = Number(amount).toFixed(2);
+    
+    // ✅ ORDEN PARA CHARGE: private_key + shop_process_id + "charge" + amount + currency + alias_token
+    const hashString = `${privateKey}${shopProcessId}charge${formattedAmount}${currency}${aliasToken}`;
+    const token = crypto.createHash('md5').update(hashString, 'utf8').digest('hex');
+    
+    console.log('🔐 Token de charge generado:', {
+        shopProcessId,
+        amount: formattedAmount,
+        currency,
+        aliasToken: `${aliasToken.substring(0, 20)}...`,
+        token
+    });
+    
+    return token;
+};
+
+/**
+ * ✅ NUEVA FUNCIÓN: Genera token para eliminar tarjeta
+ * @param {string} userId - ID del usuario
+ * @param {string} aliasToken - Token de la tarjeta
+ * @returns {string} Token MD5
+ */
+const generateDeleteCardToken = (userId, aliasToken) => {
+    const privateKey = process.env.BANCARD_PRIVATE_KEY;
+    
+    // ✅ ORDEN PARA DELETE: private_key + "delete_card" + user_id + alias_token
+    const hashString = `${privateKey}delete_card${userId}${aliasToken}`;
+    const token = crypto.createHash('md5').update(hashString, 'utf8').digest('hex');
+    
+    console.log('🔐 Token de eliminación generado:', {
+        userId,
+        aliasToken: `${aliasToken.substring(0, 20)}...`,
+        token
+    });
+    
+    return token;
+};
+
 module.exports = {
     generateSingleBuyToken,
     verifyConfirmationToken,
-    generateShopProcessId,
+    generateShopProcessId, // ✅ EXPORTAR NUEVA FUNCIÓN
     getBancardBaseUrl,
     validateBancardConfig,
     formatAmount,
-    parseAmount
+    parseAmount,
+    generateChargeToken, // ✅ EXPORTAR NUEVA FUNCIÓN
+    generateDeleteCardToken // ✅ EXPORTAR NUEVA FUNCIÓN
 };
