@@ -65,7 +65,7 @@ const BancardConfirmProxy = () => {
             version: params.version || '0.3',
             risk_index: params.risk_index || '0'
           },
-          iva_amount: params.iva_amount || '',
+      
           iva_ticket_number: params.iva_ticket_number || ''
         };
 

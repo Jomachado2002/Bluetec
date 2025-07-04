@@ -55,6 +55,18 @@ const filterProductController = async (req, res) => {
         'psuWattage', 'psuEfficiency', 'psuModular',
         'psuFormFactor', 'psuProtections'
       ],
+      impresoras: [
+        'printerType', 'printerResolution', 'printerSpeed', 
+        'printerColor', 'printerDuplex', 'printerConnectivity', 'printerTrayCapacity'
+      ],
+      cartuchos_toners: [
+        'tonerType', 'tonerPrinterType', 'tonerColor', 
+        'tonerYield', 'tonerCartridgeType', 'tonerCompatibleModel'
+      ],
+      escaneres: [
+        'scannerType', 'scannerResolution', 'scannerSpeed', 
+        'scannerMaxSize', 'scannerConnectivity', 'scannerFormats'
+      ],
     
       // Periféricos
       monitores: [
@@ -164,6 +176,26 @@ const filterProductController = async (req, res) => {
       ap: [
         'apWiFiStandard', 'apSupportedBands', 
         'apMaxSpeed', 'apPorts', 'apAntennas'
+      ],
+        camaras_fotografia: [
+        'cameraType', 'cameraResolution', 'cameraSensor', 
+        'cameraLens', 'cameraVideo', 'cameraISO', 'cameraConnectivity'
+      ],
+      drones: [
+        'droneType', 'droneFlightTime', 'droneRange', 
+        'droneCamera', 'droneStabilization', 'droneSmartFeatures', 'droneWeight'
+      ],
+      televisores: [
+        'tvScreenSize', 'tvResolution', 'tvPanelType', 
+        'tvSmartFeatures', 'tvHDR', 'tvConnectivity', 'tvRefreshRate'
+      ],
+      parlantes: [
+        'speakerType', 'speakerPower', 'speakerConnectivity', 
+        'speakerBatteryLife', 'speakerResistance', 'speakerFrequencyResponse', 'speakerSpecialFeatures'
+      ],
+      relojes_inteligentes: [
+        'smartwatchCompatibility', 'smartwatchDisplay', 'smartwatchBatteryLife', 
+        'smartwatchSensors', 'smartwatchResistance', 'smartwatchConnectivity', 'smartwatchSportsFeatures'
       ]
   };
 

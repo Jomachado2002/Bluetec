@@ -17,6 +17,9 @@ export const generatePageTitle = (selectedCategory, selectedSubcategory) => {
           { id: 106, label: "Procesador", value: "procesador" },
           { id: 107, label: "Tarjeta Grafica", value: "tarjeta_grafica" },
           { id: 108, label: "Gabinetes", value: "gabinetes" },
+          { id: 109, label: "Impresoras", value: "impresoras" },
+          { id: 110, label: "Cartuchos y Toners", value: "cartuchos_toners" },
+          { id: 111, label: "Escáneres", value: "escaneres" },
         ]
       },
       {
@@ -89,6 +92,18 @@ export const generatePageTitle = (selectedCategory, selectedSubcategory) => {
           { id: 803, label: "Cables de Red y conectores", value: "cablesred" },
           { id: 804, label: "Racks", value: "racks" },
           { id: 805, label: "Access Point", value: "ap" }
+        ]
+      },
+      {
+        id: 9,
+        label: "Electrónicos",
+        value: "electronicos",
+        subcategories: [
+          { id: 901, label: "Cámaras de Fotografía", value: "camaras_fotografia" },
+          { id: 902, label: "Drones", value: "drones" },
+          { id: 903, label: "Televisores", value: "televisores" },
+          { id: 904, label: "Parlantes", value: "parlantes" },
+          { id: 905, label: "Relojes Inteligentes", value: "relojes_inteligentes" }
         ]
       }
     ];

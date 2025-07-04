@@ -95,7 +95,6 @@ const QuickPayWithCard = ({
         description: `Compra BlueTec - ${cartItems.length} productos`,
         return_url: `${window.location.origin}/pago-exitoso`,
         additional_data: '',
-        iva_amount: (totalAmount * 0.1).toFixed(2) // IVA del 10%
       };
 
       console.log('📤 Datos de pago:', paymentData);

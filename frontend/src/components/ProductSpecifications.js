@@ -225,6 +225,31 @@ const ProductSpecifications = ({
       placeholder: "Ingresa el tipo de iluminación (RGB, LED)"
     }
   ],
+   impresoras: [
+      { label: "Tipo de Impresora", name: "printerType", placeholder: "Ingresa el tipo (Láser, Inkjet, Multifunción)" },
+      { label: "Resolución", name: "printerResolution", placeholder: "Ingresa la resolución de impresión" },
+      { label: "Velocidad", name: "printerSpeed", placeholder: "Ingresa la velocidad de impresión (ppm)" },
+      { label: "Impresión Color", name: "printerColor", placeholder: "Ingresa si imprime en color (Sí/No)" },
+      { label: "Impresión Dúplex", name: "printerDuplex", placeholder: "¿Cuenta con impresión dúplex?" },
+      { label: "Conectividad", name: "printerConnectivity", placeholder: "Ingresa las opciones de conectividad" },
+      { label: "Capacidad de Bandeja", name: "printerTrayCapacity", placeholder: "Ingresa la capacidad de la bandeja" }
+    ],
+    cartuchos_toners: [
+      { label: "Tipo", name: "tonerType", placeholder: "Ingresa el tipo (Cartucho, Tóner)" },
+      { label: "Tipo de Impresora", name: "tonerPrinterType", placeholder: "Ingresa el tipo de impresora compatible" },
+      { label: "Color", name: "tonerColor", placeholder: "Ingresa el color (Negro, Cyan, Magenta, Amarillo)" },
+      { label: "Rendimiento", name: "tonerYield", placeholder: "Ingresa el rendimiento de páginas" },
+      { label: "Tipo de Cartucho", name: "tonerCartridgeType", placeholder: "Ingresa el tipo (Original, Compatible, Recargable)" },
+      { label: "Modelo Compatible", name: "tonerCompatibleModel", placeholder: "Ingresa los modelos de impresora compatibles" }
+    ],
+    escaneres: [
+      { label: "Tipo de Escáner", name: "scannerType", placeholder: "Ingresa el tipo (Plano, Alimentador, Portátil)" },
+      { label: "Resolución", name: "scannerResolution", placeholder: "Ingresa la resolución máxima (dpi)" },
+      { label: "Velocidad", name: "scannerSpeed", placeholder: "Ingresa la velocidad de escaneo" },
+      { label: "Tamaño Máximo", name: "scannerMaxSize", placeholder: "Ingresa el tamaño máximo de documento" },
+      { label: "Conectividad", name: "scannerConnectivity", placeholder: "Ingresa las opciones de conectividad" },
+      { label: "Formatos Soportados", name: "scannerFormats", placeholder: "Ingresa los formatos de salida soportados" }
+    ],
   // Periféricos
   auriculares: [
     { 
@@ -1035,6 +1060,52 @@ const ProductSpecifications = ({
         placeholder: "Ingresa las funciones principales" 
       },
     
+    ],
+    // NUEVA CATEGORÍA: ELECTRÓNICOS
+    camaras_fotografia: [
+      { label: "Tipo de Cámara", name: "cameraType", placeholder: "Ingresa el tipo (DSLR, Mirrorless, Compacta)" },
+      { label: "Resolución", name: "cameraResolution", placeholder: "Ingresa la resolución en megapíxeles" },
+      { label: "Sensor", name: "cameraSensor", placeholder: "Ingresa el tipo de sensor (Full Frame, APS-C, etc.)" },
+      { label: "Lente Incluido", name: "cameraLens", placeholder: "Ingresa si incluye lente y especificaciones" },
+      { label: "Video", name: "cameraVideo", placeholder: "Ingresa la capacidad de grabación de video" },
+      { label: "ISO", name: "cameraISO", placeholder: "Ingresa el rango de ISO" },
+      { label: "Conectividad", name: "cameraConnectivity", placeholder: "Ingresa opciones de conectividad (WiFi, Bluetooth)" }
+    ],
+    drones: [
+      { label: "Tipo de Drone", name: "droneType", placeholder: "Ingresa el tipo (Recreativo, Profesional, Racing)" },
+      { label: "Tiempo de Vuelo", name: "droneFlightTime", placeholder: "Ingresa el tiempo máximo de vuelo" },
+      { label: "Alcance", name: "droneRange", placeholder: "Ingresa el alcance máximo de control" },
+      { label: "Cámara", name: "droneCamera", placeholder: "Ingresa las especificaciones de cámara" },
+      { label: "Estabilización", name: "droneStabilization", placeholder: "Ingresa el tipo de estabilización (Gimbal, etc.)" },
+      { label: "Funciones Inteligentes", name: "droneSmartFeatures", placeholder: "Ingresa funciones automáticas (Follow me, etc.)" },
+      { label: "Peso", name: "droneWeight", placeholder: "Ingresa el peso del drone" }
+    ],
+    televisores: [
+      { label: "Tamaño de Pantalla", name: "tvScreenSize", placeholder: "Ingresa el tamaño en pulgadas" },
+      { label: "Resolución", name: "tvResolution", placeholder: "Ingresa la resolución (HD, 4K, 8K)" },
+      { label: "Tipo de Panel", name: "tvPanelType", placeholder: "Ingresa el tipo (LED, OLED, QLED)" },
+      { label: "Smart TV", name: "tvSmartFeatures", placeholder: "Ingresa el sistema operativo y funciones smart" },
+      { label: "HDR", name: "tvHDR", placeholder: "Ingresa compatibilidad HDR (HDR10, Dolby Vision)" },
+      { label: "Conectividad", name: "tvConnectivity", placeholder: "Ingresa puertos y conectividad (HDMI, USB, WiFi)" },
+      { label: "Tasa de Refresco", name: "tvRefreshRate", placeholder: "Ingresa la tasa de refresco en Hz" }
+    ],
+    parlantes: [
+      { label: "Tipo de Parlante", name: "speakerType", placeholder: "Ingresa el tipo (Bluetooth, Wired, Smart Speaker)" },
+      { label: "Potencia", name: "speakerPower", placeholder: "Ingresa la potencia en watts" },
+      { label: "Conectividad", name: "speakerConnectivity", placeholder: "Ingresa opciones de conectividad" },
+      { label: "Duración de Batería", name: "speakerBatteryLife", placeholder: "Ingresa la duración de batería (si aplica)" },
+      { label: "Resistencia", name: "speakerResistance", placeholder: "Ingresa resistencia al agua/polvo (IP rating)" },
+      { label: "Respuesta de Frecuencia", name: "speakerFrequencyResponse", placeholder: "Ingresa el rango de frecuencia" },
+      { label: "Características Especiales", name: "speakerSpecialFeatures", placeholder: "Ingresa funciones especiales (Assistant, etc.)" }
+    ],
+    relojes_inteligentes: [
+      { label: "Compatibilidad", name: "smartwatchCompatibility", placeholder: "Ingresa compatibilidad (iOS, Android, etc.)" },
+      { label: "Pantalla", name: "smartwatchDisplay", placeholder: "Ingresa tipo y tamaño de pantalla" },
+      { label: "Duración de Batería", name: "smartwatchBatteryLife", placeholder: "Ingresa la duración de batería" },
+      { label: "Sensores", name: "smartwatchSensors", placeholder: "Ingresa sensores disponibles (GPS, cardíaco, etc.)" },
+      { label: "Resistencia", name: "smartwatchResistance", placeholder: "Ingresa resistencia al agua (ATM, IP)" },
+      { label: "Conectividad", name: "smartwatchConnectivity", placeholder: "Ingresa opciones de conectividad (WiFi, Cellular)" },
+      { label: "Funciones Deportivas", name: "smartwatchSportsFeatures", placeholder: "Ingresa funciones deportivas y de salud" }
     ]
   };
 
