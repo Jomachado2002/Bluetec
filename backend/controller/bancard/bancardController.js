@@ -286,13 +286,13 @@ const createPaymentController = async (req, res) => {
                 currency: currency,
                 description: description.substring(0, 20),
                 // ✅ CRÍTICO: URLs del BACKEND para redirección sincronizada
-                return_url: `${backendUrl}/api/bancard/redirect/success`,
-                cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
+                return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+                cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
             }
         };
         // ✅ NO INCLUIR test_client PARA CERTIFICACIÓN
 
-        
+
         console.log("📤 Payload para Bancard (URLs del backend):", JSON.stringify(payload, null, 2));
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/single_buy`;
@@ -332,8 +332,8 @@ const createPaymentController = async (req, res) => {
                         customer_info: customer_info || {},
                         items: items || [],
                         // ✅ GUARDAR URLs DEL BACKEND PARA TRACKING
-                        return_url: `${backendUrl}/api/bancard/redirect/success`,
-                        cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
+                        return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+                        cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
                         status: 'pending',
                         environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                         sale_id: sale_id || null,
@@ -374,8 +374,8 @@ const createPaymentController = async (req, res) => {
                         description: description,
                         iframe_url: iframeUrl,
                         // ✅ MANTENER URLs ORIGINALES EN LA RESPUESTA PARA COMPATIBILIDAD
-                        return_url: `${backendUrl}/api/bancard/redirect/success`,
-                        cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
+                        return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+                        cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
                         bancard_config: {
                             environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                             base_url: getBancardBaseUrl(),
