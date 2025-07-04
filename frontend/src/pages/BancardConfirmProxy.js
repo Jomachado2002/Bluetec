@@ -99,9 +99,7 @@ const BancardConfirmProxy = () => {
         const isSuccess = (operation.response === 'S' && operation.response_code === '00') ||
                  params.status === 'success' ||
                  params.response_code === '00' ||
-                 (params.authorization_number && params.ticket_number) ||
-                 (!params.response_code && params.shop_process_id) || // Pago ocasional exitoso
-                 (operation.response === 'S'); // Respuesta positiva de Bancard
+                 (params.authorization_number && params.ticket_number);
 
         console.log('🎯 Análisis de resultado:', {
           response: operation.response,
