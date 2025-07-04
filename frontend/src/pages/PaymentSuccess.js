@@ -29,6 +29,7 @@ const PaymentSuccess = () => {
     const currency_id = searchParams.get('currency_id');
     const amount = searchParams.get('amount');
     const authorization_number = searchParams.get('authorization_number');
+    const displayAmount = amount || paymentData?.amount || transactionDetails?.confirmation?.amount;
     const ticket_number = searchParams.get('ticket_number');
     const response_code = searchParams.get('response_code');
     const response_description = searchParams.get('response_description');
@@ -129,8 +130,7 @@ const PaymentSuccess = () => {
     const isPaymentSuccessful = response_code === '00' || 
                            (!response_code && shop_process_id) ||
                            (authorization_number && ticket_number) ||
-                           searchParams.get('status') === 'success';
-    const displayAmount = amount || paymentData?.amount || transactionDetails?.confirmation?.amount;
+                           searchParams.get('status') === 'payment_success';
     
 
     if (isLoading) {
