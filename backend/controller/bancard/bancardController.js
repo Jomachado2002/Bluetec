@@ -287,14 +287,12 @@ const createPaymentController = async (req, res) => {
                 description: description.substring(0, 20),
                 // ✅ CRÍTICO: URLs del BACKEND para redirección sincronizada
                 return_url: `${backendUrl}/api/bancard/redirect/success`,
-                cancel_url: `${backendUrl}/api/bancard/redirect/cancel`
+                cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
             }
         };
         // ✅ NO INCLUIR test_client PARA CERTIFICACIÓN
 
-        if (formattedIvaAmount) {
-        }
-
+        
         console.log("📤 Payload para Bancard (URLs del backend):", JSON.stringify(payload, null, 2));
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/single_buy`;

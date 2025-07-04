@@ -79,7 +79,7 @@ const PaymentSuccess = () => {
         }
 
         // ✅ LIMPIAR CARRITO SI EL PAGO FUE EXITOSO
-        if (response_code === '00' || !response_code) {
+        if (isPaymentSuccessful) {
             // Solo limpiar si el código de respuesta es exitoso o no está presente (asumimos éxito)
             setTimeout(() => {
                 localCartHelper.clearCart();
@@ -126,7 +126,10 @@ const PaymentSuccess = () => {
     
 
     // ✅ DETERMINAR SI EL PAGO FUE EXITOSO
-    const isPaymentSuccessful = response_code === '00' || (!response_code && shop_process_id);
+    const isPaymentSuccessful = response_code === '00' || 
+                           (!response_code && shop_process_id) ||
+                           (authorization_number && ticket_number) ||
+                           searchParams.get('status') === 'success';
     const displayAmount = amount || paymentData?.amount || transactionDetails?.confirmation?.amount;
     
 

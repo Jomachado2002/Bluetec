@@ -97,9 +97,11 @@ const BancardConfirmProxy = () => {
 
         // ✅ DETERMINAR ÉXITO BASADO EN MÚLTIPLES FACTORES
         const isSuccess = (operation.response === 'S' && operation.response_code === '00') ||
-                         params.status === 'success' ||
-                         params.response_code === '00' ||
-                         (params.authorization_number && params.ticket_number);
+                 params.status === 'success' ||
+                 params.response_code === '00' ||
+                 (params.authorization_number && params.ticket_number) ||
+                 (!params.response_code && params.shop_process_id) || // Pago ocasional exitoso
+                 (operation.response === 'S'); // Respuesta positiva de Bancard
 
         console.log('🎯 Análisis de resultado:', {
           response: operation.response,

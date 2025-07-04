@@ -312,6 +312,8 @@ const BancardPayButton = ({
         }));
         
         onPaymentSuccess(result.data);
+        sessionStorage.setItem('payment_customer_data', JSON.stringify(formData));
+        sessionStorage.setItem('payment_cart_items', JSON.stringify(cartItems));
       } else {
         console.error('❌ Respuesta inválida:', result);
         throw new Error(result.message || 'La respuesta del servidor no contiene los datos necesarios');
