@@ -1,4 +1,4 @@
-// backend/controller/bancard/bancardController.js - VERSIÓN COMPLETA MEJORADA PARA CERTIFICACIÓN
+// backend/controller/bancard/bancardController.js - VERSIÓN CORREGIDA PARA PAGOS OCASIONALES
 
 const crypto = require('crypto');
 const axios = require('axios');
@@ -98,7 +98,7 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
         const queryParams = query || {};
         const { operation } = body || {};
         
-        // ✅ COMBINAR DATOS DE AMBAS FUENTES (TU CÓDIGO ORIGINAL)
+        // ✅ COMBINAR DATOS DE AMBAS FUENTES
         const transactionData = {
             token: operation?.token || queryParams.token || '',
             shop_process_id: operation?.shop_process_id || queryParams.shop_process_id || '',
@@ -122,17 +122,16 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
 
         console.log("📊 DATOS PROCESADOS:", transactionData);
 
-        // ✅ DETERMINAR SI EL PAGO FUE EXITOSO (TU LÓGICA ORIGINAL)
+        // ✅ DETERMINAR SI EL PAGO FUE EXITOSO
         const isSuccessful = (transactionData.response === 'S' && transactionData.response_code === '00') ||
                            queryParams.status === 'success' ||
                            (transactionData.authorization_number && transactionData.ticket_number);
 
         console.log("🎯 Resultado:", isSuccessful ? "EXITOSO" : "FALLIDO");
 
-        // ✅ BUSCAR Y ACTUALIZAR TRANSACCIÓN (TU CÓDIGO ORIGINAL)
+        // ✅ BUSCAR Y ACTUALIZAR TRANSACCIÓN
         if (transactionData.shop_process_id) {
             try {
-                // ✅ BUSCAR TRANSACCIÓN TANTO DE PAGO OCASIONAL COMO CON TOKEN
                 const transaction = await BancardTransactionModel.findOne({ 
                     shop_process_id: parseInt(transactionData.shop_process_id) 
                 });
@@ -155,7 +154,7 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
                             security_information: transactionData.security_information || {},
                             confirmation_date: new Date(),
                             extended_response_description: transactionData.extended_response_description,
-                            bancard_confirmed: true // ✅ AGREGAR ESTE CAMPO
+                            bancard_confirmed: true
                         });
 
                         if (transaction.sale_id) {
@@ -200,12 +199,14 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
 };
 
 /**
- * ✅ CONTROLADOR PARA CREAR PAGOS - CON REDIRECCIÓN SINCRONIZADA
+ * ✅ CONTROLADOR PARA CREAR PAGOS OCASIONALES - CORREGIDO PARA IFRAME
  */
 const createPaymentController = async (req, res) => {
     try {
-        console.log("🛒 === INICIO PROCESO DE PAGO BANCARD (CERTIFICACIÓN) ===");
+        console.log("🛒 === INICIO PROCESO DE PAGO OCASIONAL BANCARD ===");
         console.log("📦 Request body:", JSON.stringify(req.body, null, 2));
+        console.log("👤 Usuario autenticado:", req.isAuthenticated);
+        console.log("🆔 User ID:", req.userId);
         
         const configValidation = validateBancardConfig();
         if (!configValidation.isValid) {
@@ -229,7 +230,7 @@ const createPaymentController = async (req, res) => {
             customer_info,
             items,
             sale_id,
-            // ✅ NUEVOS CAMPOS DE TRACKING
+            // ✅ CAMPOS DE TRACKING
             user_type = 'GUEST',
             payment_method = 'new_card',
             user_bancard_id = null,
@@ -246,6 +247,19 @@ const createPaymentController = async (req, res) => {
             utm_medium = '',
             utm_campaign = ''
         } = req.body;
+
+        // ✅ DECLARAR VARIABLES DE TRACKING AL INICIO
+        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
+        const finalUserBancardId = req.isAuthenticated ? (req.bancardUserId || req.user?.bancardUserId) : null;
+        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+        console.log("🔍 Variables de tracking declaradas:", {
+            finalUserType,
+            finalUserBancardId,
+            clientIpAddress,
+            isAuthenticated: req.isAuthenticated,
+            userId: req.userId
+        });
 
         if (!amount || amount <= 0) {
             return res.status(400).json({
@@ -265,10 +279,6 @@ const createPaymentController = async (req, res) => {
 
         // ✅ USAR VARIABLE DE ENTORNO CORRECTAMENTE
         const confirmationUrl = process.env.BANCARD_CONFIRMATION_URL;
-        // ✅ DECLARAR VARIABLES FALTANTES PARA TRACKING
-        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
-        const finalUserBancardId = req.isAuthenticated ? (req.bancardUserId || req.user?.bancardUserId) : null;
-        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         
         if (!confirmationUrl) {
             console.error("❌ BANCARD_CONFIRMATION_URL no está configurada");
@@ -296,7 +306,7 @@ const createPaymentController = async (req, res) => {
         const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
         console.log("🔗 Backend URL para redirecciones:", backendUrl);
 
-        // ✅ PAYLOAD CON URLs DEL BACKEND (CAMBIO PRINCIPAL)
+        // ✅ PAYLOAD CORREGIDO PARA PAGO OCASIONAL (SIN test_client)
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
@@ -305,15 +315,13 @@ const createPaymentController = async (req, res) => {
                 amount: formattedAmount,
                 currency: currency,
                 description: description.substring(0, 20),
-                // ✅ CRÍTICO: URLs del BACKEND para redirección sincronizada
+                // ✅ URLs del FRONTEND para que el usuario vea el resultado
                 return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
                 cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
             }
         };
-        // ✅ NO INCLUIR test_client PARA CERTIFICACIÓN
 
-
-        console.log("📤 Payload para Bancard (URLs del backend):", JSON.stringify(payload, null, 2));
+        console.log("📤 Payload para Bancard (PAGO OCASIONAL):", JSON.stringify(payload, null, 2));
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/single_buy`;
         console.log("🌐 URL de Bancard:", bancardUrl);
@@ -336,67 +344,60 @@ const createPaymentController = async (req, res) => {
 
         if (response.status === 200 && response.data) {
             if (response.data.status === 'success') {
-                console.log("✅ Pago creado exitosamente en Bancard (MODO CERTIFICACIÓN)");
+                console.log("✅ Pago ocasional creado exitosamente en Bancard");
                 
                 const processId = response.data.process_id;
-                const iframeUrl = `${getBancardBaseUrl()}/checkout/new/${processId}`;
-                
-                // ✅ USAR VARIABLES DECLARADAS ARRIBA
-                console.log("💾 Guardando transacción con datos:", {
-                    finalUserType,
-                    finalUserBancardId,
-                    clientIpAddress,
-                    userId: req.userId
-                });
+                const iframeUrl = `${getBancardBaseUrl()}/checkout/javascript/dist/bancard-checkout-4.0.0.js`;
+
+                // ✅ GUARDAR TRANSACCIÓN EN BD
                 try {
-                   const newTransaction = new BancardTransactionModel({
-                    shop_process_id: shopProcessId,
-                    bancard_process_id: processId,
-                    amount: parseFloat(formattedAmount),
-                    currency: currency,
-                    description: description,
-                    customer_info: customer_info || {},
-                    items: items || [],
-                    // ✅ URLs DEL BACKEND PARA TRACKING
-                    return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-                    cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
-                    status: 'pending',
-                    environment: process.env.BANCARD_ENVIRONMENT || 'staging',
-                    sale_id: sale_id || null,
-                    created_by: req.userId || null,
-                    is_certification_test: true,
-                    
-                    // ✅ NUEVOS CAMPOS DE TRACKING Y ANÁLISIS
-                    user_type: finalUserType,
-                    payment_method: payment_method,
-                    user_bancard_id: finalUserBancardId,
-                    ip_address: clientIpAddress,
-                    user_agent: user_agent,
-                    payment_session_id: payment_session_id,
-                    device_type: device_type,
-                    cart_total_items: cart_total_items,
-                    referrer_url: referrer_url,
-                    order_notes: order_notes,
-                    delivery_method: delivery_method,
-                    invoice_number: invoice_number,
-                    tax_amount: parseFloat(tax_amount) || 0,
-                    utm_source: utm_source,
-                    utm_medium: utm_medium,
-                    utm_campaign: utm_campaign,
-                    
-                    // ✅ CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
-                    is_token_payment: false,
-                    alias_token: null
-                });
+                    const newTransaction = new BancardTransactionModel({
+                        shop_process_id: shopProcessId,
+                        bancard_process_id: processId,
+                        amount: parseFloat(formattedAmount),
+                        currency: currency,
+                        description: description,
+                        customer_info: customer_info || {},
+                        items: items || [],
+                        return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+                        cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
+                        status: 'pending',
+                        environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+                        sale_id: sale_id || null,
+                        created_by: req.userId || null,
+                        is_certification_test: false, // ✅ NO es test, es pago real
+                        
+                        // ✅ CAMPOS DE TRACKING
+                        user_type: finalUserType,
+                        payment_method: payment_method,
+                        user_bancard_id: finalUserBancardId,
+                        ip_address: clientIpAddress,
+                        user_agent: user_agent,
+                        payment_session_id: payment_session_id,
+                        device_type: device_type,
+                        cart_total_items: cart_total_items,
+                        referrer_url: referrer_url,
+                        order_notes: order_notes,
+                        delivery_method: delivery_method,
+                        invoice_number: invoice_number,
+                        tax_amount: parseFloat(tax_amount) || 0,
+                        utm_source: utm_source,
+                        utm_medium: utm_medium,
+                        utm_campaign: utm_campaign,
+                        
+                        // ✅ CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
+                        is_token_payment: false,
+                        alias_token: null
+                    });
 
                     await newTransaction.save();
-                    console.log("✅ Transacción guardada en BD (CERTIFICACIÓN):", newTransaction._id);
+                    console.log("✅ Transacción de pago ocasional guardada en BD:", newTransaction._id);
 
                     if (sale_id) {
                         await SaleModel.findByIdAndUpdate(sale_id, {
                             paymentStatus: 'processing',
                             bancard_transaction_id: newTransaction._id,
-                            notes: `${sale_id.notes || ''}\nTransacción Bancard iniciada (CERTIFICACIÓN): ${shopProcessId}`
+                            notes: `${sale_id.notes || ''}\nTransacción Bancard iniciada: ${shopProcessId}`
                         });
                         console.log("✅ Venta actualizada con transacción Bancard");
                     }
@@ -407,11 +408,11 @@ const createPaymentController = async (req, res) => {
                 
                 console.log("🔗 URLs generadas:", {
                     process_id: processId,
-                    iframe_url: iframeUrl
+                    iframe_script_url: iframeUrl
                 });
                 
                 return res.json({
-                    message: "Pago creado exitosamente (MODO CERTIFICACIÓN)",
+                    message: "Pago ocasional creado exitosamente",
                     success: true,
                     error: false,
                     data: {
@@ -420,14 +421,36 @@ const createPaymentController = async (req, res) => {
                         amount: formattedAmount,
                         currency: currency,
                         description: description,
-                        iframe_url: iframeUrl,
-                        // ✅ MANTENER URLs ORIGINALES EN LA RESPUESTA PARA COMPATIBILIDAD
+                        
+                        // ✅ DATOS PARA EL IFRAME SEGÚN DOCUMENTACIÓN BANCARD
+                        iframe_config: {
+                            script_url: iframeUrl,
+                            process_id: processId,
+                            container_id: 'bancard-iframe-container',
+                            // ✅ CONFIGURACIÓN SEGÚN LA DOCUMENTACIÓN
+                            initialization_code: `
+                                window.onload = function() {
+                                    Bancard.Checkout.createForm('bancard-iframe-container', '${processId}', {
+                                        'form-background-color': '#ffffff',
+                                        'button-background-color': '#2A3190',
+                                        'button-text-color': '#ffffff',
+                                        'button-border-color': '#2A3190',
+                                        'input-background-color': '#ffffff',
+                                        'input-text-color': '#555555',
+                                        'input-placeholder-color': '#999999'
+                                    });
+                                };
+                            `
+                        },
+                        
+                        // ✅ URLs FINALES PARA EL USUARIO
                         return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
                         cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
+                        
                         bancard_config: {
-                            environment: process.env.BANCARD_ENVIfRONMENT || 'staging',
+                            environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                             base_url: getBancardBaseUrl(),
-                            certification_mode: true
+                            certification_mode: false // ✅ NO es certificación
                         }
                     }
                 });
@@ -468,7 +491,7 @@ const getTransactionStatusController = async (req, res) => {
     try {
         const { transactionId } = req.params;
         
-        console.log("🔍 === CONSULTANDO ESTADO DE TRANSACCIÓN (CERTIFICACIÓN) ===");
+        console.log("🔍 === CONSULTANDO ESTADO DE TRANSACCIÓN ===");
         console.log("🔍 Transaction ID:", transactionId);
         
         const configValidation = validateBancardConfig();
@@ -490,7 +513,6 @@ const getTransactionStatusController = async (req, res) => {
                 token: token,
                 shop_process_id: parseInt(transactionId)
             }
-            // ✅ SIN test_client para certificación
         };
 
         console.log("📤 Payload para consulta:", JSON.stringify(payload, null, 2));
@@ -508,11 +530,10 @@ const getTransactionStatusController = async (req, res) => {
         console.log("📥 Estado obtenido de Bancard:", response.status, JSON.stringify(response.data, null, 2));
 
         res.json({
-            message: "Estado obtenido exitosamente (CERTIFICACIÓN)",
+            message: "Estado obtenido exitosamente",
             success: true,
             error: false,
-            data: response.data,
-            certification_test: true
+            data: response.data
         });
 
     } catch (error) {
@@ -531,7 +552,7 @@ const getTransactionStatusController = async (req, res) => {
  */
 const rollbackPaymentController = async (req, res) => {
     try {
-        console.log("🔄 === INICIANDO ROLLBACK DE PAGO (CERTIFICACIÓN) ===");
+        console.log("🔄 === INICIANDO ROLLBACK DE PAGO ===");
         
         const { shop_process_id } = req.body;
         
@@ -552,7 +573,7 @@ const rollbackPaymentController = async (req, res) => {
             });
         }
 
-        console.log("🔄 Procesando rollback para (CERTIFICACIÓN):", shop_process_id);
+        console.log("🔄 Procesando rollback para:", shop_process_id);
 
         // ✅ GENERAR TOKEN PARA ROLLBACK según documentación
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${shop_process_id}rollback0.00`;
@@ -564,7 +585,6 @@ const rollbackPaymentController = async (req, res) => {
                 token: token,
                 shop_process_id: parseInt(shop_process_id)
             }
-            // ✅ SIN test_client para certificación
         };
 
         console.log("📤 Payload de rollback:", JSON.stringify(payload, null, 2));
@@ -589,7 +609,7 @@ const rollbackPaymentController = async (req, res) => {
                     {
                         is_rolled_back: true,
                         rollback_date: new Date(),
-                        rollback_reason: 'Rollback de certificación',
+                        rollback_reason: 'Rollback solicitado',
                         status: 'rolled_back'
                     }
                 );
@@ -601,11 +621,10 @@ const rollbackPaymentController = async (req, res) => {
 
         if (response.status === 200) {
             res.json({
-                message: "Rollback procesado exitosamente (CERTIFICACIÓN)",
+                message: "Rollback procesado exitosamente",
                 success: true,
                 error: false,
-                data: response.data,
-                certification_test: true
+                data: response.data
             });
         } else {
             res.status(response.status).json({
@@ -642,13 +661,13 @@ const rollbackPaymentController = async (req, res) => {
  * ✅ HEALTH CHECK
  */
 const bancardHealthController = (req, res) => {
-    console.log("🏥 Health check de Bancard (CERTIFICACIÓN)");
+    console.log("🏥 Health check de Bancard");
     
     const configValidation = validateBancardConfig();
     
     res.status(200).json({
         status: "healthy",
-        message: "Servicio de Bancard funcionando (MODO CERTIFICACIÓN)",
+        message: "Servicio de Bancard funcionando",
         timestamp: new Date().toISOString(),
         service: "bancard-integration",
         version: "2.0.0",
@@ -656,9 +675,7 @@ const bancardHealthController = (req, res) => {
         base_url: getBancardBaseUrl(),
         config_valid: configValidation.isValid,
         config_errors: configValidation.errors || [],
-        config_details: configValidation.config,
-        certification_mode: true,
-        test_client_disabled: true
+        config_details: configValidation.config
     });
 };
 

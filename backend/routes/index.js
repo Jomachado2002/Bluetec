@@ -215,7 +215,20 @@ router.post("/bancard/test-catastro", async (req, res) => {
     }
 });
 
+const {
+    getUserPurchasesController,
+    getPurchaseDetailsController,
+    getUserPurchaseStatsController,
+    getAllUserPurchasesController
+} = require('../controller/user/userPurchasesController');
 
+// Rutas para usuarios
+router.get("/usuario/compras", authToken, getUserPurchasesController);
+router.get("/usuario/compras/:purchaseId", authToken, getPurchaseDetailsController);
+router.get("/usuario/estadisticas-compras", authToken, getUserPurchaseStatsController);
+
+// Rutas para admin
+router.get("/admin/todas-compras", authToken, getAllUserPurchasesController);
 
 // Test de pago con token
 router.post("/bancard/test-pago-token", async (req, res) => {

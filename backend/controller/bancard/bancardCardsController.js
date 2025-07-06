@@ -1,16 +1,16 @@
-// backend/controller/bancard/bancardCardsController.js - VERSIÓN CORREGIDA CON BD
+// backend/controller/bancard/bancardCardsController.js - VERSIÓN CORREGIDA
 const crypto = require('crypto');
 const axios = require('axios');
-const BancardTransactionModel = require('../../models/bancardTransactionModel'); // ✅ AGREGAR IMPORT
+const BancardTransactionModel = require('../../models/bancardTransactionModel');
 const { 
     validateBancardConfig,
     getBancardBaseUrl,
-    generateShopProcessId, // ✅ AGREGAR IMPORT
+    generateShopProcessId,
     formatAmount
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ CATASTRAR NUEVA TARJETA - CORREGIDO PARA USUARIOS GENERALES
+ * ✅ CATASTRAR NUEVA TARJETA - CORREGIDO
  */
 const createCardController = async (req, res) => {
     try {
@@ -113,7 +113,6 @@ const createCardController = async (req, res) => {
         }
 
         // ✅ GENERAR TOKEN MD5 SEGÚN DOCUMENTACIÓN BANCARD
-        // md5(private_key + card_id + user_id + "request_new_card")
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${finalCardId}${finalUserId}request_new_card`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
@@ -134,7 +133,6 @@ const createCardController = async (req, res) => {
                 user_cell_phone: finalUserPhone,
                 user_mail: finalUserEmail,
                 return_url: `${process.env.FRONTEND_URL}/catastro-resultado`
-
             }
         };
 
@@ -180,7 +178,6 @@ const createCardController = async (req, res) => {
             });
         }
 
-        
     } catch (error) {
         console.error("❌ Error en catastro:", error);
         
@@ -206,18 +203,18 @@ const createCardController = async (req, res) => {
  */
 const getUserCardsController = async (req, res) => {
     // ✅ VERIFICAR SI YA SE ENVIÓ UNA RESPUESTA (ANTI-BUCLE)
-if (res.headersSent) {
-    console.log("⚠️ Headers ya enviados, evitando respuesta duplicada");
-    return;
-}
+    if (res.headersSent) {
+        console.log("⚠️ Headers ya enviados, evitando respuesta duplicada");
+        return;
+    }
 
-// ✅ VERIFICAR PROCESAMIENTO ÚNICO
-const requestKey = `${req.method}_${req.originalUrl}_${Date.now()}`;
-if (req.processing) {
-    console.log("⚠️ Request ya en procesamiento, evitando duplicación");
-    return;
-}
-req.processing = true;
+    // ✅ VERIFICAR PROCESAMIENTO ÚNICO
+    if (req.processing) {
+        console.log("⚠️ Request ya en procesamiento, evitando duplicación");
+        return;
+    }
+    req.processing = true;
+
     try {
         console.log("📋 === OBTENIENDO TARJETAS PARA USUARIO ===");
         
@@ -257,10 +254,6 @@ req.processing = true;
 
         // Validar configuración
         const configValidation = validateBancardConfig();
-        // ✅ DECLARAR VARIABLES FALTANTES
-        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
-        const finalUserBancardId = req.bancardUserId || req.user?.bancardUserId || user_bancard_id;
-        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         if (!configValidation.isValid) {
             return res.status(500).json({
                 message: "Error de configuración del sistema",
@@ -270,7 +263,6 @@ req.processing = true;
         }
 
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN
-        // md5(private_key + user_id + "request_user_cards")
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${targetUserId}request_user_cards`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
@@ -289,7 +281,6 @@ req.processing = true;
             }
         };
 
-       
         console.log("📤 Payload para listar tarjetas:", JSON.stringify(payload, null, 2));
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/users/${targetUserId}/cards`;
@@ -323,7 +314,7 @@ req.processing = true;
             });
         }
 
-       } catch (error) {
+    } catch (error) {
         console.error("❌ Error obteniendo tarjetas:", error);
         
         let errorMessage = "Error al obtener tarjetas";
@@ -346,13 +337,13 @@ req.processing = true;
 };
 
 /**
- * ✅ PAGO CON ALIAS TOKEN - CORREGIDO CON INTEGRACIÓN A BD
+ * ✅ PAGO CON ALIAS TOKEN - CORREGIDO CON VARIABLES DECLARADAS
  */
 const chargeWithTokenController = async (req, res) => {
     try {
         console.log("💳 === PAGO CON ALIAS TOKEN ===");
-        
-       const {
+
+        const {
             shop_process_id,
             amount,
             currency = 'PYG',
@@ -363,7 +354,7 @@ const chargeWithTokenController = async (req, res) => {
             additional_data = "",
             customer_info,
             items,
-            // ✅ NUEVOS CAMPOS DE TRACKING
+            // ✅ CAMPOS DE TRACKING
             user_type = 'REGISTERED',
             payment_method = 'saved_card',
             user_bancard_id = null,
@@ -380,6 +371,19 @@ const chargeWithTokenController = async (req, res) => {
             utm_medium = '',
             utm_campaign = ''
         } = req.body;
+
+        // ✅ DECLARAR VARIABLES AL INICIO PARA EVITAR ERROR
+        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
+        const finalUserBancardId = user_bancard_id || req.bancardUserId || req.user?.bancardUserId;
+        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+        console.log("🔍 Variables de tracking inicializadas:", {
+            finalUserType,
+            finalUserBancardId,
+            clientIpAddress,
+            isAuthenticated: req.isAuthenticated,
+            userId: req.userId
+        });
 
         // ✅ VALIDACIONES PARA USUARIOS AUTENTICADOS
         if (!req.isAuthenticated) {
@@ -420,12 +424,9 @@ const chargeWithTokenController = async (req, res) => {
 
         // ✅ GENERAR shop_process_id SI NO SE PROPORCIONA
         const finalShopProcessId = shop_process_id || generateShopProcessId();
-      const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-      const finalUserBancardId = user_bancard_id || req.bancardUserId || req.user?.bancardUserId;
         console.log("🆔 Shop Process ID:", finalShopProcessId);
 
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN
-        // md5(private_key + shop_process_id + "charge" + amount + currency + alias_token)
         const formattedAmount = formatAmount(amount);
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${finalShopProcessId}charge${formattedAmount}${currency}${alias_token}`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
@@ -435,7 +436,6 @@ const chargeWithTokenController = async (req, res) => {
             formattedAmount,
             currency,
             alias_token: `${alias_token.substring(0, 20)}...`,
-            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...${finalShopProcessId}charge${formattedAmount}${currency}${alias_token.substring(0, 10)}...`,
             token
         });
 
@@ -454,12 +454,11 @@ const chargeWithTokenController = async (req, res) => {
                 additional_data: additional_data,
                 description: description || "Pago BlueTec con tarjeta registrada",
                 alias_token: alias_token,
-                // ✅ USAR URLs DEL BACKEND PARA REDIRECCIÓN SINCRONIZADA
-                return_url: `${backendUrl}/api/bancard/redirect/success`
+                return_url: `${backendUrl}/api/bancard/redirect/success`,
+                extra_response_attributes: ["confirmation.process_id"]
             }
         };
 
-        
         console.log("📤 Payload de pago con token:", {
             shop_process_id: payload.operation.shop_process_id,
             amount: payload.operation.amount,
@@ -473,7 +472,7 @@ const chargeWithTokenController = async (req, res) => {
         try {
             const newTransaction = new BancardTransactionModel({
                 shop_process_id: parseInt(finalShopProcessId),
-                bancard_process_id: null, // Se actualizará después
+                bancard_process_id: null,
                 amount: parseFloat(formattedAmount),
                 currency: currency,
                 description: description || "Pago BlueTec con tarjeta registrada",
@@ -489,7 +488,7 @@ const chargeWithTokenController = async (req, res) => {
                 environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                 created_by: req.userId,
                 
-                // ✅ CAMPOS DE TRACKING Y ANÁLISIS CORREGIDOS
+                // ✅ CAMPOS DE TRACKING CORREGIDOS
                 user_type: finalUserType,
                 payment_method: payment_method,
                 user_bancard_id: finalUserBancardId,
@@ -521,7 +520,6 @@ const chargeWithTokenController = async (req, res) => {
                 amount: newTransaction.amount,
                 created_by: req.userId
             });
-            console.log("✅ Transacción guardada en BD:", newTransaction._id);
 
         } catch (dbError) {
             console.error("⚠️ Error guardando transacción en BD:", {
@@ -561,7 +559,7 @@ const chargeWithTokenController = async (req, res) => {
                         bancard_process_id: response.data?.operation?.process_id || response.data?.process_id,
                         is_token_payment: true,
                         alias_token: alias_token,
-                        user_bancard_id: req.bancardUserId || req.user?.bancardUserId,
+                        user_bancard_id: finalUserBancardId,
                         // Si no requiere 3DS y hay respuesta inmediata, actualizar estado
                         ...(response.data?.operation?.response && {
                             response: response.data.operation.response,
@@ -705,28 +703,13 @@ const deleteCardController = async (req, res) => {
             });
         }
 
-       // ✅ DECLARAR VARIABLES FALTANTES PARA PAGO CON TOKEN
-        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
-        const finalUserBancardId = user_bancard_id || req.bancardUserId || req.user?.bancardUserId;
-        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        
-        console.log("🔍 Variables declaradas para pago con token:", {
-            finalUserType,
-            finalUserBancardId,
-            clientIpAddress,
-            isAuthenticated: req.isAuthenticated,
-            userId: req.userId
-        });
-
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN
-        // md5(private_key + "delete_card" + user_id + alias_token)
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}delete_card${targetUserId}${alias_token}`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
         console.log("🔐 Token generado para eliminar:", {
             user_id: targetUserId,
             alias_token: `${alias_token.substring(0, 20)}...`,
-            tokenString: `${process.env.BANCARD_PRIVATE_KEY?.substring(0, 10)}...delete_card${targetUserId}${alias_token.substring(0, 10)}...`,
             token
         });
 
@@ -738,8 +721,6 @@ const deleteCardController = async (req, res) => {
                 alias_token: alias_token
             }
         };
-
-       
 
         console.log("📤 Payload para eliminar tarjeta:", JSON.stringify(payload, null, 2));
 
