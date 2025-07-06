@@ -182,7 +182,7 @@ const BancardPayButton = ({
 
  const initializeBancardIframe = (retryCount = 0) => {
   try {
-    console.log('🎯 Inicializando iframe con processId:', processId, '(intento', retryCount + 1, ')');
+    console.log('🎯 Inicializando iframe de PAGO OCASIONAL con processId:', processId, '(intento', retryCount + 1, ')');
     
     // Máximo 5 intentos para inicialización
     if (retryCount >= 5) {
@@ -208,13 +208,14 @@ const BancardPayButton = ({
     }
     
     // Verificar que window.Bancard.Cards existe
-    if (!window.Bancard.Cards) {
-      console.warn('⚠️ window.Bancard.Cards no existe, reintentando...');
+    // Verificar que window.Bancard.Checkout existe (PARA PAGO OCASIONAL)
+    if (!window.Bancard.Checkout) {
+      console.warn('⚠️ window.Bancard.Checkout no existe, reintentando...');
       setTimeout(() => initializeBancardIframe(retryCount + 1), 500);
       return;
     }
     
-    console.log('✅ window.Bancard.Cards disponible, creando formulario...');
+    console.log('✅ window.Bancard.Checkout disponible, creando formulario...');
     
     const styles = {
       'input-background-color': '#ffffff',
@@ -227,9 +228,9 @@ const BancardPayButton = ({
       'form-border-color': '#dddddd'
     };
     
-    const container = document.getElementById('bancard-card-container');
+    const container = document.getElementById('bancard-iframe-container');
     if (!container) {
-      console.error('❌ Contenedor bancard-card-container no encontrado');
+      console.error('❌ Contenedor bancard-iframe-container no encontrado');
       setErrors({ iframe: 'Error: Contenedor no encontrado' });
       setLoading(false);
       return;
@@ -244,9 +245,9 @@ const BancardPayButton = ({
     container.style.borderRadius = '8px';
     
     try {
-      console.log('🚀 Creando formulario Bancard con processId:', String(processId));
-      window.Bancard.Cards.createForm('bancard-card-container', String(processId), styles);
-      console.log('✅ Iframe inicializado exitosamente');
+      console.log('🚀 Creando formulario PAGO OCASIONAL con processId:', String(processId));
+      window.Bancard.Checkout.createForm('bancard-iframe-container', String(processId), styles);
+      console.log('✅ Iframe de pago ocasional inicializado exitosamente');
       
       // Agregar event listener para mensajes
       window.addEventListener('message', handleIframeMessage, false);
@@ -534,7 +535,7 @@ const BancardPayButton = ({
             
             {/* ✅ CONTENEDOR PARA EL IFRAME DE BANCARD - MEJORADO */}
             <div 
-              id="bancard-card-container"
+              id="bancard-iframe-container"
               className="w-full"
               style={{ 
                 display: loading ? 'none' : 'block',

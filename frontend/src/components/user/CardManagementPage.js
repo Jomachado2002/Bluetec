@@ -155,6 +155,13 @@ const CardManagementPage = ({
 
   // ✅ FUNCIÓN PARA INICIALIZAR IFRAME
   const initializeBancardIframe = (processIdToUse) => {
+    // ✅ VERIFICAR QUE EL CONTENEDOR EXISTE ANTES DE CONTINUAR
+      const container = document.getElementById('bancard-card-container');
+      if (!container) {
+        console.error('❌ Contenedor bancard-card-container no encontrado');
+        setErrors({ iframe: 'Error: Contenedor no encontrado' });
+        return;
+      }
     try {
       console.log('🎯 Inicializando iframe con processId:', processIdToUse);
       

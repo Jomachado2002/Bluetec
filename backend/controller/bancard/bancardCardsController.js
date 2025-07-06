@@ -522,14 +522,13 @@ const chargeWithTokenController = async (req, res) => {
             });
 
         } catch (dbError) {
-            console.error("⚠️ Error guardando transacción en BD:", {
-                error: dbError.message,
-                stack: dbError.stack,
-                finalUserBancardId,
-                finalUserType,
-                req_userId: req.userId
+            console.error("❌ Error crítico guardando transacción en BD:", dbError);
+            return res.status(500).json({
+                message: "Error al guardar transacción en base de datos",
+                success: false,
+                error: true,
+                details: dbError.message
             });
-            // Continuar con el pago aunque falle el guardado en BD
         }
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/charge`;
@@ -592,6 +591,25 @@ const chargeWithTokenController = async (req, res) => {
                 });
             } else {
                 console.log("✅ Pago procesado directamente");
+                
+                // ✅ ACTUALIZAR ESTADO FINAL DE LA TRANSACCIÓN
+                try {
+                    const finalStatus = response.data?.operation?.response === 'S' && 
+                                      response.data?.operation?.response_code === '00' ? 'approved' : 'rejected';
+                    
+                    await BancardTransactionModel.findOneAndUpdate(
+                        { shop_process_id: parseInt(finalShopProcessId) },
+                        { 
+                            status: finalStatus,
+                            bancard_confirmed: true,
+                            confirmation_date: new Date()
+                        }
+                    );
+                    console.log(`✅ Transacción marcada como: ${finalStatus}`);
+                } catch (updateError) {
+                    console.error("⚠️ Error actualizando estado final:", updateError);
+                }
+
                 res.json({
                     message: "Pago con token procesado exitosamente",
                     success: true,

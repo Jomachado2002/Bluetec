@@ -72,6 +72,10 @@ const getAllBancardTransactionsController = async (req, res) => {
         const sort = {};
         sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
         // ✅ DEBUG: Mostrar query construida
+        // Paginación
+        const skip = (page - 1) * limit;
+
+        // ✅ DEBUG: Mostrar query construida
         console.log("📋 Query de búsqueda construida:", {
             query,
             sort,
@@ -79,9 +83,6 @@ const getAllBancardTransactionsController = async (req, res) => {
             limit: Number(limit),
             hasUserFilter: !!user_bancard_id
         });
-
-        // Paginación
-        const skip = (page - 1) * limit;
 
         // ✅ SIN POPULATE POR AHORA
         const transactions = await BancardTransactionModel
