@@ -265,6 +265,10 @@ const createPaymentController = async (req, res) => {
 
         // ✅ USAR VARIABLE DE ENTORNO CORRECTAMENTE
         const confirmationUrl = process.env.BANCARD_CONFIRMATION_URL;
+        // ✅ DECLARAR VARIABLES FALTANTES PARA TRACKING
+        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
+        const finalUserBancardId = req.isAuthenticated ? (req.bancardUserId || req.user?.bancardUserId) : null;
+        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         
         if (!confirmationUrl) {
             console.error("❌ BANCARD_CONFIRMATION_URL no está configurada");
@@ -337,10 +341,13 @@ const createPaymentController = async (req, res) => {
                 const processId = response.data.process_id;
                 const iframeUrl = `${getBancardBaseUrl()}/checkout/new/${processId}`;
                 
-                // ✅ GUARDAR TRANSACCIÓN CON URLs DEL BACKEND
-           //  const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
-            //    const finalUserBancardId = req.isAuthenticated ? (req.bancardUserId || req.user?.bancardUserId) : null;
-              //  const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+                // ✅ USAR VARIABLES DECLARADAS ARRIBA
+                console.log("💾 Guardando transacción con datos:", {
+                    finalUserType,
+                    finalUserBancardId,
+                    clientIpAddress,
+                    userId: req.userId
+                });
                 try {
                    const newTransaction = new BancardTransactionModel({
                     shop_process_id: shopProcessId,

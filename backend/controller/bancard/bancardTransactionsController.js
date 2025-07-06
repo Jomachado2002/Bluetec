@@ -49,6 +49,14 @@ const getAllBancardTransactionsController = async (req, res) => {
         }
         if (user_bancard_id) query.user_bancard_id = user_bancard_id;
         if (payment_method) query.payment_method = payment_method;
+        // ✅ FILTRO POR USUARIO CORREGIDO
+        if (user_bancard_id) {
+            // Buscar por ambos campos para mayor compatibilidad
+            query.$or = [
+                { user_bancard_id: parseInt(user_bancard_id) },
+                { created_by: user_bancard_id } // Si se pasa ObjectId como string
+            ];
+        }
         
         if (search) {
             query.$or = [
@@ -63,6 +71,14 @@ const getAllBancardTransactionsController = async (req, res) => {
         // Ordenamiento
         const sort = {};
         sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+        // ✅ DEBUG: Mostrar query construida
+        console.log("📋 Query de búsqueda construida:", {
+            query,
+            sort,
+            skip,
+            limit: Number(limit),
+            hasUserFilter: !!user_bancard_id
+        });
 
         // Paginación
         const skip = (page - 1) * limit;

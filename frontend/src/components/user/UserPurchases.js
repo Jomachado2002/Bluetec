@@ -36,9 +36,26 @@ const UserPurchases = ({ user }) => {
     try {
       const queryParams = new URLSearchParams();
       
-      // Filtrar por usuario
-      if (user.bancardUserId) {
-        queryParams.append('user_bancard_id', user.bancardUserId);
+      // ✅ FILTRAR POR USUARIO CORREGIDO - Usar múltiples métodos
+      if (user) {
+        // Método 1: Si tiene bancardUserId, buscar por user_bancard_id
+        if (user.bancardUserId) {
+          queryParams.append('user_bancard_id', user.bancardUserId);
+          console.log('🔍 Buscando por user_bancard_id:', user.bancardUserId);
+        }
+        
+        // Método 2: También buscar por created_by usando el _id del usuario
+        if (user._id) {
+          queryParams.append('created_by', user._id);
+          console.log('🔍 También buscando por created_by:', user._id);
+        }
+        
+        console.log('👤 Datos de usuario para búsqueda:', {
+          bancardUserId: user.bancardUserId,
+          _id: user._id,
+          name: user.name,
+          email: user.email
+        });
       }
       
       // Agregar filtros
@@ -52,6 +69,26 @@ const UserPurchases = ({ user }) => {
       });
 
       const result = await response.json();
+      // ✅ DEBUG: Mostrar resultado de la búsqueda
+      console.log('📥 Resultado de búsqueda de transacciones:', {
+        success: result.success,
+        transactionsCount: result.data?.transactions?.length || 0,
+        paginationInfo: result.data?.pagination,
+        queryUsed: queryParams.toString()
+      });
+      
+      if (result.data?.transactions?.length > 0) {
+        console.log('📋 Primeras transacciones encontradas:', 
+          result.data.transactions.slice(0, 3).map(t => ({
+            id: t._id,
+            shop_process_id: t.shop_process_id,
+            amount: t.amount,
+            user_bancard_id: t.user_bancard_id,
+            created_by: t.created_by,
+            status: t.status
+          }))
+        );
+      }
       if (result.success) {
         setPurchases(result.data.transactions || []);
       }

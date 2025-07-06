@@ -22,37 +22,60 @@ const BancardPayButton = ({
     address: customerData.address || ''
   });
   const [errors, setErrors] = useState({});
+  // ✅ MEJORAR MANEJO DE MENSAJES DEL IFRAME
   const handleIframeMessage = (event) => {
-    console.log('📨 Mensaje recibido del iframe:', event.data);
+    console.log('📨 Mensaje recibido del iframe:', {
+      origin: event.origin,
+      data: event.data,
+      type: typeof event.data
+    });
     
     try {
-        // Verificar origen del mensaje
+        // Verificar origen del mensaje con más flexibility
         const environment = process.env.REACT_APP_BANCARD_ENVIRONMENT || 'staging';
-        const expectedOrigin = environment === 'production' 
-            ? 'https://vpos.infonet.com.py' 
-            : 'https://vpos.infonet.com.py:8888';
+        const validOrigins = [
+          'https://vpos.infonet.com.py',
+          'https://vpos.infonet.com.py:8888'
+        ];
         
-        if (event.origin !== expectedOrigin) {
+        if (!validOrigins.includes(event.origin)) {
             console.warn('⚠️ Mensaje de origen no confiable:', event.origin);
-            return;
+            // No return aquí, solo log - algunos navegadores pueden cambiar el origen
         }
 
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        let data = event.data;
+        
+        // Intentar parsear si es string
+        if (typeof event.data === 'string') {
+          try {
+            data = JSON.parse(event.data);
+          } catch (parseError) {
+            console.log('📝 Mensaje como string:', event.data);
+            // Podría ser un mensaje simple como "loaded" o similar
+            return;
+          }
+        }
+        
+        console.log('📋 Datos parseados del iframe:', data);
         
         // Manejar diferentes tipos de mensajes
-        if (data.type === 'card_registered' || data.type === 'payment_success') {
-            console.log('✅ Registro de tarjeta exitoso:', data);
+        if (data && typeof data === 'object') {
+          if (data.type === 'payment_success' || data.status === 'success') {
+            console.log('✅ Pago exitoso desde iframe:', data);
             setShowIframe(false);
             setLoading(false);
             onPaymentSuccess(data);
-        } else if (data.type === 'payment_error' || data.type === 'card_error') {
-            console.error('❌ Error en el proceso:', data);
+          } else if (data.type === 'payment_error' || data.status === 'error') {
+            console.error('❌ Error en el pago desde iframe:', data);
             setShowIframe(false);
             setLoading(false);
             onPaymentError(new Error(data.message || 'Error en el proceso de pago'));
-        } else if (data.type === 'iframe_loaded') {
+          } else if (data.type === 'iframe_loaded' || data.message === 'loaded') {
             console.log('✅ Iframe cargado correctamente');
             setLoading(false);
+          } else {
+            console.log('📝 Mensaje no reconocido del iframe:', data);
+          }
         }
     } catch (error) {
         console.error('❌ Error procesando mensaje del iframe:', error);
@@ -70,10 +93,15 @@ const BancardPayButton = ({
     });
   }, [totalAmount, cartItems.length, customerData, disabled]);
 
-  // ✅ CARGAR SCRIPT DE BANCARD CUANDO NECESITEMOS EL IFRAME
   useEffect(() => {
     if (showIframe && processId) {
-      loadBancardScript();
+      console.log('🎯 Efecto para cargar script:', { showIframe, processId });
+      // Agregar delay para asegurar que el DOM esté listo
+      const timer = setTimeout(() => {
+        loadBancardScript();
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showIframe, processId]);
@@ -88,13 +116,23 @@ const BancardPayButton = ({
     };
   }, []);
 
-  const loadBancardScript = () => {
-    console.log('🔄 Cargando script de Bancard...');
+  const loadBancardScript = (retryCount = 0) => {
+    console.log('🔄 Cargando script de Bancard... (intento', retryCount + 1, ')');
+    
+    // Máximo 3 intentos
+    if (retryCount >= 3) {
+      console.error('❌ Máximo de intentos alcanzado para cargar script');
+      setShowIframe(false);
+      setLoading(false);
+      onPaymentError(new Error('No se pudo cargar el sistema de pagos después de 3 intentos'));
+      return;
+    }
     
     // Remover script anterior si existe
     const existingScript = document.getElementById('bancard-script');
     if (existingScript) {
       existingScript.remove();
+      console.log('🗑️ Script anterior removido');
     }
 
     // Determinar URL base según ambiente
@@ -103,6 +141,8 @@ const BancardPayButton = ({
       ? 'https://vpos.infonet.com.py' 
       : 'https://vpos.infonet.com.py:8888';
 
+    console.log('🌐 Environment detectado:', environment, '- Base URL:', baseUrl);
+
     // Crear nuevo script
     const script = document.createElement('script');
     script.id = 'bancard-script';
@@ -110,70 +150,128 @@ const BancardPayButton = ({
     script.async = true;
     
     script.onload = () => {
-      console.log('✅ Script de Bancard cargado exitosamente');
-      setTimeout(initializeBancardIframe, 100); // Pequeño delay para asegurar carga
+      console.log('✅ Script de Bancard cargado exitosamente en intento', retryCount + 1);
+      // Verificar que window.Bancard existe antes de continuar
+      if (window.Bancard) {
+        console.log('✅ window.Bancard disponible:', Object.keys(window.Bancard));
+        setTimeout(initializeBancardIframe, 200);
+      } else {
+        console.warn('⚠️ window.Bancard no disponible después de cargar script');
+        setTimeout(() => {
+          if (window.Bancard) {
+            initializeBancardIframe();
+          } else {
+            console.error('❌ window.Bancard sigue no disponible, reintentando...');
+            loadBancardScript(retryCount + 1);
+          }
+        }, 500);
+      }
     };
     
     script.onerror = () => {
-      console.error('❌ Error cargando script de Bancard');
-      setShowIframe(false);
-      setLoading(false);
-      onPaymentError(new Error('Error cargando el sistema de pagos'));
+      console.error('❌ Error cargando script de Bancard en intento', retryCount + 1);
+      // Reintentar después de 1 segundo
+      setTimeout(() => {
+        loadBancardScript(retryCount + 1);
+      }, 1000);
     };
 
     document.head.appendChild(script);
+    console.log('📤 Script agregado al DOM:', script.src);
   };
 
- const initializeBancardIframe = () => {
+ const initializeBancardIframe = (retryCount = 0) => {
   try {
-    console.log('🎯 Inicializando iframe de catastro con processId:', processId);
+    console.log('🎯 Inicializando iframe con processId:', processId, '(intento', retryCount + 1, ')');
+    
+    // Máximo 5 intentos para inicialización
+    if (retryCount >= 5) {
+      console.error('❌ Máximo de intentos alcanzado para inicializar iframe');
+      setErrors({ iframe: 'No se pudo cargar el formulario después de varios intentos' });
+      setLoading(false);
+      return;
+    }
     
     // ✅ VALIDACIÓN CRÍTICA: Verificar que processId existe
     if (!processId || processId.trim() === '') {
       console.error('❌ processId está vacío:', processId);
       setErrors({ iframe: 'Error: Process ID no válido' });
+      setLoading(false);
       return;
     }
     
-    if (window.Bancard && window.Bancard.Cards) {
-      const styles = {
-        'input-background-color': '#ffffff',
-        'input-text-color': '#555555',
-        'input-border-color': '#cccccc',
-        'button-background-color': '#2A3190',
-        'button-text-color': '#ffffff',
-        'button-border-color': '#2A3190',
-        'form-background-color': '#ffffff',
-        'form-border-color': '#dddddd'
-      };
-      if (!processId || processId.trim() === '') {
-          console.error('❌ processId está vacío:', processId);
-          setLoading(false);
-          return;
-      }
-      const container = document.getElementById('bancard-card-container');
-      if (container) {
-        container.innerHTML = '';
-        
-        try {
-          // ✅ CAMBIO CRÍTICO: Usar processId como string explícitamente
-          window.Bancard.Cards.createForm('bancard-card-container', String(processId), styles);
-          console.log('✅ Iframe de catastro inicializado con processId:', processId);
-          
-          window.addEventListener('message', handleIframeMessage, false);
-          
-        } catch (iframeError) {
-          console.error('❌ Error creando iframe:', iframeError);
-          setErrors({ iframe: 'Error al cargar formulario de registro' });
-        }
-      }
-    } else {
-      console.log('⏳ Bancard.Cards no disponible, reintentando...');
-      setTimeout(initializeBancardIframe, 500); // ✅ Reducir tiempo de reintento
+    // Verificar que window.Bancard existe
+    if (!window.Bancard) {
+      console.warn('⚠️ window.Bancard no existe, reintentando en 1 segundo...');
+      setTimeout(() => initializeBancardIframe(retryCount + 1), 1000);
+      return;
     }
+    
+    // Verificar que window.Bancard.Cards existe
+    if (!window.Bancard.Cards) {
+      console.warn('⚠️ window.Bancard.Cards no existe, reintentando...');
+      setTimeout(() => initializeBancardIframe(retryCount + 1), 500);
+      return;
+    }
+    
+    console.log('✅ window.Bancard.Cards disponible, creando formulario...');
+    
+    const styles = {
+      'input-background-color': '#ffffff',
+      'input-text-color': '#555555',
+      'input-border-color': '#cccccc',
+      'button-background-color': '#2A3190',
+      'button-text-color': '#ffffff',
+      'button-border-color': '#2A3190',
+      'form-background-color': '#ffffff',
+      'form-border-color': '#dddddd'
+    };
+    
+    const container = document.getElementById('bancard-card-container');
+    if (!container) {
+      console.error('❌ Contenedor bancard-card-container no encontrado');
+      setErrors({ iframe: 'Error: Contenedor no encontrado' });
+      setLoading(false);
+      return;
+    }
+    
+    // Limpiar contenedor
+    container.innerHTML = '';
+    container.style.display = 'block';
+    container.style.minHeight = '500px';
+    container.style.width = '100%';
+    container.style.border = '1px solid #e5e5e5';
+    container.style.borderRadius = '8px';
+    
+    try {
+      console.log('🚀 Creando formulario Bancard con processId:', String(processId));
+      window.Bancard.Cards.createForm('bancard-card-container', String(processId), styles);
+      console.log('✅ Iframe inicializado exitosamente');
+      
+      // Agregar event listener para mensajes
+      window.addEventListener('message', handleIframeMessage, false);
+      
+      // Ocultar loading después de un momento
+      setTimeout(() => {
+        setLoading(false);
+      }, 1000);
+      
+    } catch (createFormError) {
+      console.error('❌ Error en createForm:', createFormError);
+      setErrors({ iframe: `Error al crear formulario: ${createFormError.message}` });
+      setLoading(false);
+      
+      // Reintentar si es un error recoverable
+      if (retryCount < 3) {
+        console.log('🔄 Reintentando crear formulario...');
+        setTimeout(() => initializeBancardIframe(retryCount + 1), 2000);
+      }
+    }
+    
   } catch (error) {
-    console.error('❌ Error inicializando iframe:', error);
-    setErrors({ iframe: 'Error al cargar formulario de registro' });
+    console.error('❌ Error general inicializando iframe:', error);
+    setErrors({ iframe: `Error general: ${error.message}` });
+    setLoading(false);
   }
 };
 

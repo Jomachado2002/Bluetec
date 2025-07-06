@@ -257,6 +257,10 @@ req.processing = true;
 
         // Validar configuración
         const configValidation = validateBancardConfig();
+        // ✅ DECLARAR VARIABLES FALTANTES
+        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
+        const finalUserBancardId = req.bancardUserId || req.user?.bancardUserId || user_bancard_id;
+        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         if (!configValidation.isValid) {
             return res.status(500).json({
                 message: "Error de configuración del sistema",
@@ -485,8 +489,8 @@ const chargeWithTokenController = async (req, res) => {
                 environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                 created_by: req.userId,
                 
-                // ✅ NUEVOS CAMPOS DE TRACKING Y ANÁLISIS
-                user_type: user_type,
+                // ✅ CAMPOS DE TRACKING Y ANÁLISIS CORREGIDOS
+                user_type: finalUserType,
                 payment_method: payment_method,
                 user_bancard_id: finalUserBancardId,
                 ip_address: clientIpAddress,
@@ -509,10 +513,24 @@ const chargeWithTokenController = async (req, res) => {
             });
 
             await newTransaction.save();
+            console.log("✅ Transacción guardada exitosamente:", {
+                id: newTransaction._id,
+                shop_process_id: newTransaction.shop_process_id,
+                user_bancard_id: finalUserBancardId,
+                user_type: finalUserType,
+                amount: newTransaction.amount,
+                created_by: req.userId
+            });
             console.log("✅ Transacción guardada en BD:", newTransaction._id);
 
         } catch (dbError) {
-            console.error("⚠️ Error guardando transacción en BD:", dbError);
+            console.error("⚠️ Error guardando transacción en BD:", {
+                error: dbError.message,
+                stack: dbError.stack,
+                finalUserBancardId,
+                finalUserType,
+                req_userId: req.userId
+            });
             // Continuar con el pago aunque falle el guardado en BD
         }
 
@@ -687,15 +705,18 @@ const deleteCardController = async (req, res) => {
             });
         }
 
-        // Validar configuración
-        const configValidation = validateBancardConfig();
-        if (!configValidation.isValid) {
-            return res.status(500).json({
-                message: "Error de configuración del sistema",
-                success: false,
-                error: true
-            });
-        }
+       // ✅ DECLARAR VARIABLES FALTANTES PARA PAGO CON TOKEN
+        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
+        const finalUserBancardId = user_bancard_id || req.bancardUserId || req.user?.bancardUserId;
+        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+        
+        console.log("🔍 Variables declaradas para pago con token:", {
+            finalUserType,
+            finalUserBancardId,
+            clientIpAddress,
+            isAuthenticated: req.isAuthenticated,
+            userId: req.userId
+        });
 
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN
         // md5(private_key + "delete_card" + user_id + alias_token)

@@ -379,7 +379,7 @@ const handleRegisterCard = async (cardData) => {
   const tabs = [
     { id: 'profile', label: 'Mi Perfil', icon: FaUser },
     { id: 'cards', label: 'Mis Tarjetas', icon: FaCreditCard },
-    { id: 'purchases', label:'Mis Compras', icon: BiSolidPurchaseTag},
+    { id: 'purchases', label: 'Mis Compras', icon: BiSolidPurchaseTag },
     { id: 'favorites', label: 'Favoritos', icon: FaHeart },
     { id: 'settings', label: 'Configuración', icon: FaCog }
   ];
@@ -510,6 +510,20 @@ const handleRegisterCard = async (cardData) => {
           />
         )}
 
+        {activeTab === 'purchases' && (
+          <UserPurchases
+            user={{
+              // ✅ PASAR DATOS COMPLETOS DEL USUARIO
+              _id: userData._id,
+              bancardUserId: userData.bancardUserId,
+              name: userData.name,
+              email: userData.email,
+              phone: userData.phone,
+              role: userData.role
+            }}
+          />
+        )}
+        
         {activeTab === 'favorites' && (
           <FavoritesPage
             user={userData}
