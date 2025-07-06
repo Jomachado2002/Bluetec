@@ -10,12 +10,11 @@ import {
     FaCheckCircle, 
     FaTimesCircle, 
     FaClock,
-    FaSyncAlt,  // ✅ AGREGAR ESTA LÍNEA
+    FaSyncAlt,
     FaFileInvoiceDollar
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import SummaryApi from '../common';
-import displayPYGCurrency from '../helpers/displayCurrency';
 
 const BancardTransactions = () => {
     const [transactions, setTransactions] = useState([]);
@@ -29,6 +28,7 @@ const BancardTransactions = () => {
         endDate: '',
         search: ''
     });
+    const [showProductModal, setShowProductModal] = useState(false);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 20,
@@ -36,50 +36,60 @@ const BancardTransactions = () => {
         pages: 0
     });
 
-    useEffect(() => {
-        fetchTransactions();
-    }, [filters, pagination.page]);
+    // ✅ FUNCIÓN PARA FORMATEAR MONEDA PYG
+    const displayPYGCurrency = (num) => {
+        const formatter = new Intl.NumberFormat('es-PY', {
+            style: "currency",
+            currency: 'PYG',
+            minimumFractionDigits: 0
+        });
+        return formatter.format(num);
+    };
 
     const fetchTransactions = useCallback(async () => {
-    setIsLoading(true);
-    try {
-        const queryParams = new URLSearchParams();
-        
-        Object.entries(filters).forEach(([key, value]) => {
-            if (value) queryParams.append(key, value);
-        });
-        
-        queryParams.append('page', pagination.page);
-        queryParams.append('limit', pagination.limit);
+        setIsLoading(true);
+        try {
+            const queryParams = new URLSearchParams();
+            
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+            
+            queryParams.append('page', pagination.page);
+            queryParams.append('limit', pagination.limit);
 
-        const response = await fetch(`${SummaryApi.baseURL}/api/bancard/transactions?${queryParams.toString()}`, {
-            method: 'GET',
-            credentials: 'include'
-        });
+            const response = await fetch(`${SummaryApi.baseURL}/api/bancard/transactions?${queryParams.toString()}`, {
+                method: 'GET',
+                credentials: 'include'
+            });
 
-        const result = await response.json();
-        if (result.success) {
-            setTransactions(result.data.transactions || []);
-            setPagination(prev => ({
-                ...prev,
-                total: result.data.pagination.total,
-                pages: result.data.pagination.pages
-            }));
-        } else {
-            toast.error(result.message || "Error al cargar las transacciones");
+            const result = await response.json();
+            if (result.success) {
+                setTransactions(result.data.transactions || []);
+                setPagination(prev => ({
+                    ...prev,
+                    total: result.data.pagination.total,
+                    pages: result.data.pagination.pages
+                }));
+            } else {
+                toast.error(result.message || "Error al cargar las transacciones");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            toast.error("Error de conexión");
+        } finally {
+            setIsLoading(false);
         }
-    } catch (error) {
-        console.error("Error:", error);
-        toast.error("Error de conexión");
-    } finally {
-        setIsLoading(false);
-    }
-}, [filters, pagination.page, pagination.limit]);
+    }, [filters, pagination.page, pagination.limit]);
+
+    useEffect(() => {
+        fetchTransactions();
+    }, [fetchTransactions]);
 
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         setFilters(prev => ({ ...prev, [name]: value }));
-        setPagination(prev => ({ ...prev, page: 1 })); // Reset a página 1
+        setPagination(prev => ({ ...prev, page: 1 }));
     };
 
     const resetFilters = () => {
@@ -93,46 +103,45 @@ const BancardTransactions = () => {
     };
 
     const handleRollback = async () => {
-    if (!selectedTransaction || !rollbackReason.trim()) {
-        toast.error("Debe proporcionar una razón para el rollback");
-        return;
-    }
-
-    try {
-        setIsLoading(true);
-        
-        // ✅ ENDPOINT CORRECTO PARA ROLLBACK
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/transactions/${selectedTransaction._id}/rollback`, {
-            method: 'POST',
-            headers: {
-                "Content-Type": "application/json"
-            },
-            credentials: 'include',
-            body: JSON.stringify({ reason: rollbackReason })
-        });
-
-        const result = await response.json();
-        
-        if (result.success) {
-            toast.success("✅ Transacción reversada exitosamente");
-            setShowRollbackModal(false);
-            setSelectedTransaction(null);
-            setRollbackReason('');
-            fetchTransactions(); // Recargar lista
-        } else {
-            if (result.requiresManualReversal) {
-                toast.warn("⚠️ La transacción requiere reversión manual. Contacte a Bancard.");
-            } else {
-                toast.error(result.message || "Error al reversar transacción");
-            }
+        if (!selectedTransaction || !rollbackReason.trim()) {
+            toast.error("Debe proporcionar una razón para el rollback");
+            return;
         }
-    } catch (error) {
-        console.error("❌ Error en rollback:", error);
-        toast.error("Error de conexión al hacer rollback");
-    } finally {
-        setIsLoading(false);
-    }
-};
+
+        try {
+            setIsLoading(true);
+            
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/transactions/${selectedTransaction._id}/rollback`, {
+                method: 'POST',
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                credentials: 'include',
+                body: JSON.stringify({ reason: rollbackReason })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                toast.success("✅ Transacción reversada exitosamente");
+                setShowRollbackModal(false);
+                setSelectedTransaction(null);
+                setRollbackReason('');
+                fetchTransactions();
+            } else {
+                if (result.requiresManualReversal) {
+                    toast.warn("⚠️ La transacción requiere reversión manual. Contacte a Bancard.");
+                } else {
+                    toast.error(result.message || "Error al reversar transacción");
+                }
+            }
+        } catch (error) {
+            console.error("❌ Error en rollback:", error);
+            toast.error("Error de conexión al hacer rollback");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const checkTransactionStatus = async (transaction) => {
         try {
@@ -145,7 +154,6 @@ const BancardTransactions = () => {
             if (result.success) {
                 toast.success("Estado consultado correctamente");
                 console.log("Estado de la transacción:", result.data);
-                // Opcional: mostrar modal con detalles
             } else {
                 toast.error("Error al consultar estado");
             }
@@ -197,11 +205,11 @@ const BancardTransactions = () => {
             minute: '2-digit'
         });
     };
-     const testRollbackForCertification = async () => {
+
+    const testRollbackForCertification = async () => {
         try {
             console.log("🧪 === INICIANDO PRUEBA DE ROLLBACK PARA CERTIFICACIÓN ===");
             
-            // Buscar la primera transacción aprobada para usar como prueba
             const approvedTransaction = transactions.find(t => t.status === 'approved' && !t.is_rolled_back);
             
             if (!approvedTransaction) {
@@ -212,7 +220,6 @@ const BancardTransactions = () => {
             const shopProcessId = approvedTransaction.shop_process_id;
             console.log("🎯 Usando transacción para prueba:", shopProcessId);
             
-            // Mostrar confirmación
             const userConfirmed = window.confirm(
                 `🔄 PRUEBA DE ROLLBACK PARA CERTIFICACIÓN\n\n` +
                 `Se reversará la transacción #${shopProcessId}\n` +
@@ -229,7 +236,6 @@ const BancardTransactions = () => {
             setIsLoading(true);
             toast.info("🔄 Ejecutando prueba de rollback...");
 
-            // Llamar al endpoint de prueba de rollback
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/test-rollback`, {
                 method: 'POST',
                 headers: {
@@ -249,7 +255,6 @@ const BancardTransactions = () => {
                 toast.success("✅ PRUEBA DE ROLLBACK EXITOSA - Bancard debería marcar como completado");
                 console.log("✅ Detalles de la prueba:", result.data);
                 
-                // Mostrar resultado detallado
                 alert(
                     `✅ PRUEBA DE ROLLBACK COMPLETADA\n\n` +
                     `Shop Process ID: ${result.data.shop_process_id}\n` +
@@ -258,12 +263,10 @@ const BancardTransactions = () => {
                     `🎯 Ahora Bancard debería marcar "Recibir rollback" como completado.`
                 );
                 
-                // Recargar transacciones para ver el cambio
                 fetchTransactions();
             } else {
                 console.warn("⚠️ Respuesta de prueba:", result);
                 
-                // Verificar errores específicos
                 if (result.details?.messages) {
                     const errorKey = result.details.messages[0]?.key;
                     if (errorKey === 'TransactionAlreadyConfirmed') {
@@ -299,7 +302,6 @@ const BancardTransactions = () => {
                 </h1>
                 
                 <div className="flex gap-3">
-                    {/* ✅ NUEVO BOTÓN DE PRUEBA ROLLBACK */}
                     <button
                         onClick={testRollbackForCertification}
                         disabled={isLoading}
@@ -320,6 +322,7 @@ const BancardTransactions = () => {
                     </button>
                 </div>
             </div>
+
             {/* Filtros */}
             <div className="bg-white p-4 rounded-lg shadow mb-6">
                 <div className="flex items-center mb-3">
@@ -420,6 +423,9 @@ const BancardTransactions = () => {
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tipo Usuario</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Método Pago</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Productos</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Fecha</th>
@@ -444,6 +450,56 @@ const BancardTransactions = () => {
                                                 <div className="text-xs text-gray-500">
                                                     {transaction.customer_info?.email}
                                                 </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-sm">
+                                            <div className="flex flex-col items-center">
+                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                    transaction.user_type === 'REGISTERED' 
+                                                        ? 'bg-green-100 text-green-800' 
+                                                        : 'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    {transaction.user_type === 'REGISTERED' ? '👤 Registrado' : '👥 Invitado'}
+                                                </span>
+                                                {transaction.device_type && (
+                                                    <span className="text-xs text-gray-500 mt-1">
+                                                        📱 {transaction.device_type}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-sm">
+                                            <div className="flex flex-col items-center">
+                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                    transaction.payment_method === 'saved_card' 
+                                                        ? 'bg-blue-100 text-blue-800' 
+                                                        : 'bg-purple-100 text-purple-800'
+                                                }`}>
+                                                    {transaction.payment_method === 'saved_card' ? '💳 Guardada' : '🆕 Nueva'}
+                                                </span>
+                                                {transaction.is_token_payment && (
+                                                    <span className="text-xs text-green-600 mt-1">
+                                                        🔐 Token
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-sm">
+                                            <div className="flex flex-col items-center">
+                                                <span className="font-medium text-gray-900">
+                                                    {transaction.cart_total_items || transaction.items?.length || 0} items
+                                                </span>
+                                                {transaction.items && transaction.items.length > 0 && (
+                                                    <div className="text-xs text-gray-500 mt-1 max-w-32 truncate">
+                                                        {transaction.items[0].name}
+                                                        {transaction.items.length > 1 && ` +${transaction.items.length - 1}`}
+                                                    </div>
+                                                )}
+                                                {transaction.invoice_number && (
+                                                    <span className="text-xs text-blue-600 mt-1">
+                                                        📄 {transaction.invoice_number}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right">
@@ -497,6 +553,16 @@ const BancardTransactions = () => {
                                                     title="Consultar estado"
                                                 >
                                                     <FaEye />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedTransaction(transaction);
+                                                        setShowProductModal(true);
+                                                    }}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Ver productos"
+                                                >
+                                                    <FaFileInvoiceDollar />
                                                 </button>
                                                 
                                                 {transaction.status === 'approved' && !transaction.is_rolled_back && (
@@ -608,105 +674,185 @@ const BancardTransactions = () => {
 
             {/* Modal de Rollback */}
             {showRollbackModal && selectedTransaction && (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            <div className="flex justify-between items-center p-4 border-b">
-                <h2 className="font-bold text-lg text-gray-800 flex items-center">
-                    <FaUndo className="mr-2 text-orange-600" />
-                    🔄 Reversar Transacción
-                </h2>
-                <button 
-                    className="text-2xl text-gray-600 hover:text-black" 
-                    onClick={() => {
-                        setShowRollbackModal(false);
-                        setSelectedTransaction(null);
-                        setRollbackReason('');
-                    }}
-                >
-                    ×
-                </button>
-            </div>
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h2 className="font-bold text-lg text-gray-800 flex items-center">
+                                <FaUndo className="mr-2 text-orange-600" />
+                                🔄 Reversar Transacción
+                            </h2>
+                            <button 
+                                className="text-2xl text-gray-600 hover:text-black" 
+                                onClick={() => {
+                                    setShowRollbackModal(false);
+                                    setSelectedTransaction(null);
+                                    setRollbackReason('');
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
 
-            <div className="p-4">
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center">
-                        <FaExclamationTriangle className="text-yellow-600 mr-2" />
-                        <h3 className="font-medium text-yellow-800">⚠️ ¡Atención!</h3>
-                    </div>
-                    <p className="text-yellow-700 text-sm mt-1">
-                        Esta acción reversará la transacción #{selectedTransaction.shop_process_id} 
-                        por {displayPYGCurrency(selectedTransaction.amount)}. 
-                        <strong>Esta acción no se puede deshacer.</strong>
-                    </p>
-                </div>
+                        <div className="p-4">
+                            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="flex items-center">
+                                    <FaExclamationTriangle className="text-yellow-600 mr-2" />
+                                    <h3 className="font-medium text-yellow-800">⚠️ ¡Atención!</h3>
+                                </div>
+                                <p className="text-yellow-700 text-sm mt-1">
+                                    Esta acción reversará la transacción #{selectedTransaction.shop_process_id} 
+                                    por {displayPYGCurrency(selectedTransaction.amount)}. 
+                                    <strong>Esta acción no se puede deshacer.</strong>
+                                </p>
+                            </div>
 
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        📝 Razón del rollback *
-                    </label>
-                    <textarea
-                        value={rollbackReason}
-                        onChange={(e) => setRollbackReason(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                        rows="3"
-                        placeholder="Explique el motivo de la reversión (ej: Cliente solicitó cancelación, Error en el pedido, etc.)"
-                        required
-                    ></textarea>
-                </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    📝 Razón del rollback *
+                                </label>
+                                <textarea
+                                    value={rollbackReason}
+                                    onChange={(e) => setRollbackReason(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                    rows="3"
+                                    placeholder="Explique el motivo de la reversión (ej: Cliente solicitó cancelación, Error en el pedido, etc.)"
+                                    required
+                                ></textarea>
+                            </div>
 
-                <div className="grid grid-cols-2 gap-2 text-sm mb-4 bg-gray-50 p-3 rounded-lg">
-                    <div>
-                        <span className="text-gray-600">👤 Cliente:</span>
-                        <div className="font-medium">{selectedTransaction.customer_info?.name || 'N/A'}</div>
-                    </div>
-                    <div>
-                        <span className="text-gray-600">📅 Fecha:</span>
-                        <div className="font-medium">{formatDate(selectedTransaction.transaction_date)}</div>
-                    </div>
-                    <div>
-                        <span className="text-gray-600">🔐 Autorización:</span>
-                        <div className="font-medium">{selectedTransaction.authorization_number || 'N/A'}</div>
-                    </div>
-                    <div>
-                        <span className="text-gray-600">🌐 Ambiente:</span>
-                        <div className="font-medium capitalize">{selectedTransaction.environment}</div>
-                    </div>
-                </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm mb-4 bg-gray-50 p-3 rounded-lg">
+                                <div>
+                                    <span className="text-gray-600">👤 Cliente:</span>
+                                    <div className="font-medium">{selectedTransaction.customer_info?.name || 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">📅 Fecha:</span>
+                                    <div className="font-medium">{formatDate(selectedTransaction.transaction_date)}</div>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">🔐 Autorización:</span>
+                                    <div className="font-medium">{selectedTransaction.authorization_number || 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">🌐 Ambiente:</span>
+                                    <div className="font-medium capitalize">{selectedTransaction.environment}</div>
+                                </div>
+                            </div>
 
-                <div className="flex justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setShowRollbackModal(false);
-                            setSelectedTransaction(null);
-                            setRollbackReason('');
-                        }}
-                        className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-                    >
-                        ❌ Cancelar
-                    </button>
-                    <button
-                        onClick={handleRollback}
-                        disabled={!rollbackReason.trim() || isLoading}
-                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
-                    >
-                        {isLoading ? (
-                            <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                🔄 Procesando...
-                            </>
-                        ) : (
-                            <>
-                                <FaUndo className="mr-2" />
-                                ✅ Confirmar Rollback
-                            </>
-                        )}
-                    </button>
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowRollbackModal(false);
+                                        setSelectedTransaction(null);
+                                        setRollbackReason('');
+                                    }}
+                                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                                >
+                                    ❌ Cancelar
+                                </button>
+                                <button
+                                    onClick={handleRollback}
+                                    disabled={!rollbackReason.trim() || isLoading}
+                                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-colors"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            🔄 Procesando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FaUndo className="mr-2" />
+                                            ✅ Confirmar Rollback
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-)}
+            )}
+
+            {/* Modal de Detalles de Productos */}
+            {selectedTransaction && showProductModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h2 className="font-bold text-lg text-gray-800 flex items-center">
+                                <FaFileInvoiceDollar className="mr-2 text-blue-600" />
+                                🛒 Detalles de la Compra
+                            </h2>
+                            <button 
+                                className="text-2xl text-gray-600 hover:text-black" 
+                                onClick={() => setShowProductModal(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="p-4 max-h-96 overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                                <div>
+                                    <span className="text-gray-600">💳 Transacción:</span>
+                                    <div className="font-medium">#{selectedTransaction.shop_process_id}</div>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">👤 Cliente:</span>
+                                    <div className="font-medium">{selectedTransaction.customer_info?.name || 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">📱 Dispositivo:</span>
+                                    <div className="font-medium capitalize">{selectedTransaction.device_type || 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">🌐 Origen:</span>
+                                    <div className="font-medium">{selectedTransaction.referrer_url || 'Directo'}</div>
+                                </div>
+                            </div>
+
+                            {selectedTransaction.items && selectedTransaction.items.length > 0 ? (
+                                <div>
+                                    <h3 className="font-semibold text-gray-800 mb-3">🛍️ Productos Comprados:</h3>
+                                    <div className="space-y-3">
+                                        {selectedTransaction.items.map((item, index) => (
+                                            <div key={index} className="border border-gray-200 rounded-lg p-3">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex-1">
+                                                        <h4 className="font-medium text-gray-800">{item.name}</h4>
+                                                        {item.category && (
+                                                            <p className="text-sm text-gray-500">{item.category}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-medium text-gray-800">
+                                                            {displayPYGCurrency(item.total || (item.quantity * item.unitPrice))}
+                                                        </p>
+                                                        <p className="text-sm text-gray-500">
+                                                            {item.quantity} × {displayPYGCurrency(item.unitPrice)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-gray-500">
+                                    📦 No hay información detallada de productos
+                                </div>
+                            )}
+
+                            {selectedTransaction.order_notes && (
+                                <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                                    <h4 className="font-medium text-yellow-800 mb-1">📝 Notas del Pedido:</h4>
+                                    <p className="text-yellow-700 text-sm">{selectedTransaction.order_notes}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

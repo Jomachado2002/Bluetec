@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Context from '../context';
@@ -31,6 +31,25 @@ const Cart = () => {
     
     const context = useContext(Context);
     const navigate = useNavigate();
+    // ✅ FUNCIÓN PARA CAPTURAR DATOS DE TRACKING
+const captureTrackingData = () => {
+    return {
+        user_agent: navigator.userAgent,
+        device_type: window.innerWidth < 768 ? 'mobile' : 
+                     window.innerWidth < 1024 ? 'tablet' : 'desktop',
+        referrer_url: document.referrer || 'direct',
+        payment_session_id: sessionStorage.getItem('payment_session') || 
+                            `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        cart_total_items: totalQty,
+        order_notes: customerData.address || '', // usar dirección como notas por ahora
+        delivery_method: 'pickup', // valor por defecto
+        invoice_number: `INV-${Date.now()}`,
+        tax_amount: (totalPrice * 0.1).toFixed(2), // 10% IVA
+        utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
+        utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
+        utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || ''
+    };
+};
     
     // ✅ OBTENER USUARIO DEL STORE
     const user = useSelector(state => state?.user?.user);
@@ -52,42 +71,45 @@ const Cart = () => {
     };
 
     // ✅ CARGAR TARJETAS GUARDADAS SI EL USUARIO ESTÁ LOGUEADO
-    const fetchUserCards = async () => {
-        if (!isLoggedIn || !user.bancardUserId) return;
-        
-        setLoadingCards(true);
-        try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/tarjetas/${user.bancardUserId}`, {
-                method: 'GET',
-                credentials: 'include'
-            });
+    const fetchUserCards = useCallback(async () => {
+       if (!isLoggedIn || !user?.bancardUserId || loadingCards) return; // ← AGREGAR loadingCards
 
-            const result = await response.json();
-            if (result.success && result.data?.cards) {
-                setRegisteredCards(result.data.cards);
-                console.log('Tarjetas cargadas:', result.data.cards);
-            }
-        } catch (error) {
-            console.error('Error cargando tarjetas:', error);
-        } finally {
-            setLoadingCards(false);
-        }
-    };
+   
+   setLoadingCards(true);
+   try {
+       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/tarjetas/${user.bancardUserId}`, {
+           method: 'GET',
+           credentials: 'include'
+       });
+
+       const result = await response.json();
+       if (result.success && result.data?.cards) {
+           setRegisteredCards(result.data.cards);
+           console.log('Tarjetas cargadas:', result.data.cards);
+       }
+   } catch (error) {
+       console.error('Error cargando tarjetas:', error);
+   } finally {
+       setLoadingCards(false);
+   }
+}, [isLoggedIn, user?.bancardUserId]);
 
     // Cargar datos al montar el componente
-    useEffect(() => {
-        fetchData();
-        if (isLoggedIn) {
-            fetchUserCards();
-            // Pre-llenar datos del usuario si está logueado
-            setCustomerData({
-                name: user.name || '',
-                email: user.email || '',
-                phone: user.phone || '',
-                address: user.address || ''
-            });
-        }
-    }, [isLoggedIn, user]);
+   useEffect(() => {
+    fetchData();
+    if (isLoggedIn) {
+        fetchUserCards();
+        // Pre-llenar datos del usuario si está logueado
+        setCustomerData({
+            name: user.name || '',
+            email: user.email || '',
+            phone: user.phone || '',
+            address: user.address || ''
+        });
+    }
+}, [isLoggedIn, user?.bancardUserId]);
+
+
 
     // Función para verificar que un producto tiene datos válidos
     const isValidProduct = (product) => {
@@ -212,7 +234,9 @@ const handlePayWithSavedCard = async () => {
     try {
         console.log('💳 === PROCESANDO PAGO CON TARJETA GUARDADA ===');
         
-        // ✅ PREPARAR DATOS COMPLETOS PARA BD (SIN IVA)
+            // ✅ PREPARAR DATOS COMPLETOS PARA BD CON TRACKING
+        const trackingData = captureTrackingData();
+        
         const paymentData = {
             // Datos básicos del pago
             amount: totalPrice.toFixed(2),
@@ -231,15 +255,32 @@ const handlePayWithSavedCard = async () => {
             
             // ✅ ITEMS DEL CARRITO PARA BD
             items: validProducts.map(product => ({
+                product_id: product.productId._id,
                 name: product.productId.productName,
                 quantity: product.quantity,
                 unitPrice: product.productId.sellingPrice,
                 total: product.quantity * product.productId.sellingPrice,
-                product_id: product.productId._id
+                category: product.productId.category,
+                brand: product.productId.brandName
             })),
             
-            // ❌ REMOVER IVA - CAUSA DEL ERROR
-            // iva_amount: (totalPrice * 0.1).toFixed(2), // 10% IVA
+            // ✅ DATOS DE TRACKING Y ANÁLISIS
+            user_type: 'REGISTERED',
+            payment_method: 'saved_card',
+            user_bancard_id: user.bancardUserId,
+            ip_address: '', // se captura en backend
+            user_agent: trackingData.user_agent,
+            payment_session_id: trackingData.payment_session_id,
+            device_type: trackingData.device_type,
+            cart_total_items: trackingData.cart_total_items,
+            referrer_url: trackingData.referrer_url,
+            order_notes: trackingData.order_notes,
+            delivery_method: trackingData.delivery_method,
+            invoice_number: trackingData.invoice_number,
+            tax_amount: trackingData.tax_amount,
+            utm_source: trackingData.utm_source,
+            utm_medium: trackingData.utm_medium,
+            utm_campaign: trackingData.utm_campaign,
             
             // ✅ DATOS ADICIONALES
             additional_data: JSON.stringify({
@@ -247,7 +288,8 @@ const handlePayWithSavedCard = async () => {
                 bancard_user_id: user.bancardUserId,
                 card_brand: selectedCard.card_brand,
                 card_masked: selectedCard.card_masked_number,
-                source: 'saved_card_payment'
+                source: 'saved_card_payment',
+                total_amount_formatted: displayINRCurrency(totalPrice)
             })
         };
 

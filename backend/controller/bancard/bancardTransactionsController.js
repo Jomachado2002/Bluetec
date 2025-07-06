@@ -24,15 +24,17 @@ const getAllBancardTransactionsController = async (req, res) => {
             });
         }
 
-        const {
-            status,
-            startDate,
-            endDate,
-            search,
-            limit = 50,
-            page = 1,
-            sortBy = 'createdAt',
-            sortOrder = 'desc'
+        const { 
+            status, 
+            startDate, 
+            endDate, 
+            search, 
+            limit = 50, 
+            page = 1, 
+            sortBy = 'createdAt', 
+            sortOrder = 'desc',
+            user_bancard_id,
+            payment_method 
         } = req.query;
 
         // Construir query
@@ -45,7 +47,9 @@ const getAllBancardTransactionsController = async (req, res) => {
             if (startDate) query.transaction_date.$gte = new Date(startDate);
             if (endDate) query.transaction_date.$lte = new Date(endDate);
         }
-
+        if (user_bancard_id) query.user_bancard_id = user_bancard_id;
+        if (payment_method) query.payment_method = payment_method;
+        
         if (search) {
             query.$or = [
                 { shop_process_id: { $regex: search, $options: 'i' } },

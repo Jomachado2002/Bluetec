@@ -228,7 +228,23 @@ const createPaymentController = async (req, res) => {
             cancel_url,
             customer_info,
             items,
-            sale_id
+            sale_id,
+            // ✅ NUEVOS CAMPOS DE TRACKING
+            user_type = 'GUEST',
+            payment_method = 'new_card',
+            user_bancard_id = null,
+            user_agent = '',
+            payment_session_id = '',
+            device_type = 'unknown',
+            cart_total_items = 0,
+            referrer_url = '',
+            order_notes = '',
+            delivery_method = 'pickup',
+            invoice_number = '',
+            tax_amount = 0,
+            utm_source = '',
+            utm_medium = '',
+            utm_campaign = ''
         } = req.body;
 
         if (!amount || amount <= 0) {
@@ -322,24 +338,49 @@ const createPaymentController = async (req, res) => {
                 const iframeUrl = `${getBancardBaseUrl()}/checkout/new/${processId}`;
                 
                 // ✅ GUARDAR TRANSACCIÓN CON URLs DEL BACKEND
+           //  const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
+            //    const finalUserBancardId = req.isAuthenticated ? (req.bancardUserId || req.user?.bancardUserId) : null;
+              //  const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
                 try {
-                    const newTransaction = new BancardTransactionModel({
-                        shop_process_id: shopProcessId,
-                        bancard_process_id: processId,
-                        amount: parseFloat(formattedAmount),
-                        currency: currency,
-                        description: description,
-                        customer_info: customer_info || {},
-                        items: items || [],
-                        // ✅ GUARDAR URLs DEL BACKEND PARA TRACKING
-                        return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-                        cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
-                        status: 'pending',
-                        environment: process.env.BANCARD_ENVIRONMENT || 'staging',
-                        sale_id: sale_id || null,
-                        created_by: req.userId || null,
-                        is_certification_test: true // Marcar como test de certificación
-                    });
+                   const newTransaction = new BancardTransactionModel({
+                    shop_process_id: shopProcessId,
+                    bancard_process_id: processId,
+                    amount: parseFloat(formattedAmount),
+                    currency: currency,
+                    description: description,
+                    customer_info: customer_info || {},
+                    items: items || [],
+                    // ✅ URLs DEL BACKEND PARA TRACKING
+                    return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+                    cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
+                    status: 'pending',
+                    environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+                    sale_id: sale_id || null,
+                    created_by: req.userId || null,
+                    is_certification_test: true,
+                    
+                    // ✅ NUEVOS CAMPOS DE TRACKING Y ANÁLISIS
+                    user_type: finalUserType,
+                    payment_method: payment_method,
+                    user_bancard_id: finalUserBancardId,
+                    ip_address: clientIpAddress,
+                    user_agent: user_agent,
+                    payment_session_id: payment_session_id,
+                    device_type: device_type,
+                    cart_total_items: cart_total_items,
+                    referrer_url: referrer_url,
+                    order_notes: order_notes,
+                    delivery_method: delivery_method,
+                    invoice_number: invoice_number,
+                    tax_amount: parseFloat(tax_amount) || 0,
+                    utm_source: utm_source,
+                    utm_medium: utm_medium,
+                    utm_campaign: utm_campaign,
+                    
+                    // ✅ CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
+                    is_token_payment: false,
+                    alias_token: null
+                });
 
                     await newTransaction.save();
                     console.log("✅ Transacción guardada en BD (CERTIFICACIÓN):", newTransaction._id);
@@ -377,7 +418,7 @@ const createPaymentController = async (req, res) => {
                         return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
                         cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
                         bancard_config: {
-                            environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+                            environment: process.env.BANCARD_ENVIfRONMENT || 'staging',
                             base_url: getBancardBaseUrl(),
                             certification_mode: true
                         }

@@ -205,6 +205,19 @@ const createCardController = async (req, res) => {
  * ✅ LISTAR TARJETAS DE UN USUARIO - CORREGIDO
  */
 const getUserCardsController = async (req, res) => {
+    // ✅ VERIFICAR SI YA SE ENVIÓ UNA RESPUESTA (ANTI-BUCLE)
+if (res.headersSent) {
+    console.log("⚠️ Headers ya enviados, evitando respuesta duplicada");
+    return;
+}
+
+// ✅ VERIFICAR PROCESAMIENTO ÚNICO
+const requestKey = `${req.method}_${req.originalUrl}_${Date.now()}`;
+if (req.processing) {
+    console.log("⚠️ Request ya en procesamiento, evitando duplicación");
+    return;
+}
+req.processing = true;
     try {
         console.log("📋 === OBTENIENDO TARJETAS PARA USUARIO ===");
         
@@ -306,7 +319,7 @@ const getUserCardsController = async (req, res) => {
             });
         }
 
-    } catch (error) {
+       } catch (error) {
         console.error("❌ Error obteniendo tarjetas:", error);
         
         let errorMessage = "Error al obtener tarjetas";
@@ -323,6 +336,8 @@ const getUserCardsController = async (req, res) => {
             error: true,
             details: errorDetails
         });
+    } finally {
+        req.processing = false;
     }
 };
 
@@ -333,7 +348,7 @@ const chargeWithTokenController = async (req, res) => {
     try {
         console.log("💳 === PAGO CON ALIAS TOKEN ===");
         
-        const {
+       const {
             shop_process_id,
             amount,
             currency = 'PYG',
@@ -342,8 +357,24 @@ const chargeWithTokenController = async (req, res) => {
             description,
             return_url,
             additional_data = "",
-            customer_info, // ✅ AGREGAR PARA BD
-            items // ✅ AGREGAR PARA BD
+            customer_info,
+            items,
+            // ✅ NUEVOS CAMPOS DE TRACKING
+            user_type = 'REGISTERED',
+            payment_method = 'saved_card',
+            user_bancard_id = null,
+            user_agent = '',
+            payment_session_id = '',
+            device_type = 'unknown',
+            cart_total_items = 0,
+            referrer_url = '',
+            order_notes = '',
+            delivery_method = 'pickup',
+            invoice_number = '',
+            tax_amount = 0,
+            utm_source = '',
+            utm_medium = '',
+            utm_campaign = ''
         } = req.body;
 
         // ✅ VALIDACIONES PARA USUARIOS AUTENTICADOS
@@ -385,6 +416,8 @@ const chargeWithTokenController = async (req, res) => {
 
         // ✅ GENERAR shop_process_id SI NO SE PROPORCIONA
         const finalShopProcessId = shop_process_id || generateShopProcessId();
+      const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      const finalUserBancardId = user_bancard_id || req.bancardUserId || req.user?.bancardUserId;
         console.log("🆔 Shop Process ID:", finalShopProcessId);
 
         // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN
@@ -451,6 +484,25 @@ const chargeWithTokenController = async (req, res) => {
                 status: 'pending',
                 environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                 created_by: req.userId,
+                
+                // ✅ NUEVOS CAMPOS DE TRACKING Y ANÁLISIS
+                user_type: user_type,
+                payment_method: payment_method,
+                user_bancard_id: finalUserBancardId,
+                ip_address: clientIpAddress,
+                user_agent: user_agent,
+                payment_session_id: payment_session_id,
+                device_type: device_type,
+                cart_total_items: cart_total_items,
+                referrer_url: referrer_url,
+                order_notes: order_notes,
+                delivery_method: delivery_method,
+                invoice_number: invoice_number,
+                tax_amount: parseFloat(tax_amount) || 0,
+                utm_source: utm_source,
+                utm_medium: utm_medium,
+                utm_campaign: utm_campaign,
+                
                 // ✅ CAMPOS ESPECÍFICOS PARA PAGO CON TOKEN
                 is_token_payment: true,
                 alias_token: alias_token

@@ -215,25 +215,7 @@ router.post("/bancard/test-catastro", async (req, res) => {
     }
 });
 
-// Test de listar tarjetas
-router.get("/bancard/test-listar/:user_id", async (req, res) => {
-    try {
-        console.log("🧪 === TEST DE LISTAR TARJETAS ===");
-        console.log("👤 User ID:", req.params.user_id);
-        
-        // Usar el controlador existente
-        await getUserCardsController(req, res);
-        
-    } catch (error) {
-        console.error("❌ Error en test de listar:", error);
-        res.status(500).json({
-            message: "Error en test de listar tarjetas",
-            success: false,
-            error: true,
-            details: error.message
-        });
-    }
-});
+
 
 // Test de pago con token
 router.post("/bancard/test-pago-token", async (req, res) => {

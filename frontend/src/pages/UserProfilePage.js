@@ -7,6 +7,9 @@ import UserProfile from '../components/user/UserProfile';
 import CardManagementPage from '../components/user/CardManagementPage';
 import FavoritesPage from '../components/user/FavoritesPage';
 import SettingsPage from '../components/user/SettingsPage';
+import UserPurchases from '../components/user/UserPurchases';
+import { BiSolidPurchaseTag } from "react-icons/bi";
+
 import SummaryApi from '../common';
 import { 
   FaUser, 
@@ -376,6 +379,7 @@ const handleRegisterCard = async (cardData) => {
   const tabs = [
     { id: 'profile', label: 'Mi Perfil', icon: FaUser },
     { id: 'cards', label: 'Mis Tarjetas', icon: FaCreditCard },
+    { id: 'purchases', label:'Mis Compras', icon: BiSolidPurchaseTag},
     { id: 'favorites', label: 'Favoritos', icon: FaHeart },
     { id: 'settings', label: 'Configuración', icon: FaCog }
   ];

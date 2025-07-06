@@ -184,7 +184,11 @@ const SummaryApi = {
         },
         rollback: {
             url: `${backendDomain}/api/bancard/rollback`,
-            method: 'post'
+            method: 'post',
+        userPurchases: {
+            url: `${backendDomain}/api/bancard/transactions`,
+            method: 'get'
+        },
         },
         
         // ✅ RUTAS PARA GESTIÓN DE TRANSACCIONES

@@ -32,6 +32,8 @@ const CardManagementPage = ({
   const [showTestPayment, setShowTestPayment] = useState(false);
   const [testAmount, setTestAmount] = useState('10000');
   const [selectedCardForTest, setSelectedCardForTest] = useState(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+
 
   // ✅ CARGAR TARJETAS AL MONTAR EL COMPONENTE
   useEffect(() => {
@@ -39,7 +41,7 @@ const CardManagementPage = ({
     if (user?.id) {
       fetchUserCards();
     }
-  }, [user]);
+}, [user?.id]);
 
   const fetchUserCards = async () => {
     setLoading(true);
