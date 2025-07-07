@@ -214,7 +214,131 @@ router.post("/bancard/test-catastro", async (req, res) => {
         });
     }
 });
+router.get("/debug/database", authToken, async (req, res) => {
+    try {
+        console.log("🔍 === DEBUG DE BASE DE DATOS ===");
+        
+        // Verificar permisos de admin
+        if (req.userRole !== 'ADMIN') {
+            return res.status(403).json({
+                message: "Solo administradores pueden acceder al debug",
+                success: false,
+                error: true
+            });
+        }
 
+        const mongoose = require('mongoose');
+        const BancardTransactionModel = require('../models/bancardTransactionModel');
+
+        // Información de conexión
+        const connectionInfo = {
+            readyState: mongoose.connection.readyState,
+            readyStateText: {
+                0: 'disconnected',
+                1: 'connected',
+                2: 'connecting',
+                3: 'disconnecting'
+            }[mongoose.connection.readyState],
+            host: mongoose.connection.host,
+            port: mongoose.connection.port,
+            name: mongoose.connection.name
+        };
+
+        console.log("📊 Estado de conexión:", connectionInfo);
+
+        // Estadísticas de la colección
+        let collectionStats = null;
+        let sampleDocuments = [];
+        let totalDocuments = 0;
+
+        try {
+            // Contar documentos
+            totalDocuments = await BancardTransactionModel.countDocuments({});
+            console.log("📊 Total documentos:", totalDocuments);
+
+            // Obtener estadísticas de la colección
+            const db = mongoose.connection.db;
+            if (db) {
+                try {
+                    collectionStats = await db.collection('bancard_transactions').stats();
+                    console.log("📊 Stats de colección obtenidas");
+                } catch (statsError) {
+                    console.warn("⚠️ No se pudieron obtener stats:", statsError.message);
+                }
+            }
+
+            // Obtener documentos de ejemplo
+            if (totalDocuments > 0) {
+                sampleDocuments = await BancardTransactionModel
+                    .find({})
+                    .select('shop_process_id amount status createdAt user_bancard_id created_by')
+                    .sort({ createdAt: -1 })
+                    .limit(5)
+                    .lean();
+                
+                console.log("📋 Documentos de ejemplo obtenidos:", sampleDocuments.length);
+            }
+
+            // Verificar índices
+            const indexes = await BancardTransactionModel.collection.getIndexes();
+            console.log("📇 Índices disponibles:", Object.keys(indexes));
+
+        } catch (queryError) {
+            console.error("❌ Error en consultas:", queryError);
+        }
+
+        // Verificar modelo
+        const modelInfo = {
+            modelName: BancardTransactionModel.modelName,
+            collectionName: BancardTransactionModel.collection.name,
+            schemaFields: Object.keys(BancardTransactionModel.schema.paths)
+        };
+
+        console.log("📄 Información del modelo:", modelInfo);
+
+        // Respuesta completa
+        res.json({
+            message: "Debug de base de datos",
+            success: true,
+            error: false,
+            data: {
+                connection: connectionInfo,
+                collection: {
+                    name: 'bancard_transactions',
+                    totalDocuments,
+                    stats: collectionStats ? {
+                        size: collectionStats.size,
+                        count: collectionStats.count,
+                        avgObjSize: collectionStats.avgObjSize
+                    } : null,
+                    sampleDocuments: sampleDocuments.map(doc => ({
+                        _id: doc._id,
+                        shop_process_id: doc.shop_process_id,
+                        amount: doc.amount,
+                        status: doc.status,
+                        createdAt: doc.createdAt,
+                        user_bancard_id: doc.user_bancard_id,
+                        created_by: doc.created_by
+                    }))
+                },
+                model: modelInfo,
+                indexes: await BancardTransactionModel.collection.getIndexes().catch(() => ({})),
+                timestamp: new Date().toISOString(),
+                environment: process.env.NODE_ENV
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error en debug de BD:", error);
+        res.status(500).json({
+            message: "Error en debug de base de datos",
+            success: false,
+            error: true,
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
 const {
     getUserPurchasesController,
     getPurchaseDetailsController,

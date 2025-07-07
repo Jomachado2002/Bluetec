@@ -31,29 +31,19 @@ const Cart = () => {
     
     const context = useContext(Context);
     const navigate = useNavigate();
-    // ✅ FUNCIÓN PARA CAPTURAR DATOS DE TRACKING
-const captureTrackingData = () => {
-    return {
-        user_agent: navigator.userAgent,
-        device_type: window.innerWidth < 768 ? 'mobile' : 
-                     window.innerWidth < 1024 ? 'tablet' : 'desktop',
-        referrer_url: document.referrer || 'direct',
-        payment_session_id: sessionStorage.getItem('payment_session') || 
-                            `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        cart_total_items: totalQty,
-        order_notes: customerData.address || '', // usar dirección como notas por ahora
-        delivery_method: 'pickup', // valor por defecto
-        invoice_number: `INV-${Date.now()}`,
-        tax_amount: (totalPrice * 0.1).toFixed(2), // 10% IVA
-        utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
-        utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
-        utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || ''
-    };
-};
-    
+   
     // ✅ OBTENER USUARIO DEL STORE
     const user = useSelector(state => state?.user?.user);
     const isLoggedIn = !!user;
+
+    // ✅ FUNCIÓN PARA VERIFICAR PRODUCTOS VÁLIDOS (MOVIDA AL INICIO)
+    const isValidProduct = (product) => {
+        return product && product.productId && 
+               typeof product.productId === 'object' &&
+               product.productId.productImage &&
+               Array.isArray(product.productId.productImage) &&
+               product.productId.productImage.length > 0;
+    };
 
     // Función simplificada para cargar datos directamente desde localStorage
     const fetchData = () => {
@@ -72,53 +62,125 @@ const captureTrackingData = () => {
 
     // ✅ CARGAR TARJETAS GUARDADAS SI EL USUARIO ESTÁ LOGUEADO
     const fetchUserCards = useCallback(async () => {
-       if (!isLoggedIn || !user?.bancardUserId || loadingCards) return; // ← AGREGAR loadingCards
+       if (!isLoggedIn || !user?.bancardUserId) return;
 
-   
-   setLoadingCards(true);
-   try {
-       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/tarjetas/${user.bancardUserId}`, {
-           method: 'GET',
-           credentials: 'include'
-       });
+       console.log('🔍 Intentando cargar tarjetas para usuario:', user.bancardUserId);
+       console.log('🌐 Backend URL:', process.env.REACT_APP_BACKEND_URL);
+       
+       setLoadingCards(true);
+       try {
+           // ✅ VERIFICAR LA URL COMPLETA
+           const url = `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001'}/api/bancard/tarjetas/${user.bancardUserId}`;
+           console.log('📡 URL completa:', url);
+           
+           const response = await fetch(url, {
+               method: 'GET',
+               credentials: 'include',
+               headers: {
+                   'Content-Type': 'application/json'
+               }
+           });
 
-       const result = await response.json();
-       if (result.success && result.data?.cards) {
-           setRegisteredCards(result.data.cards);
-           console.log('Tarjetas cargadas:', result.data.cards);
+           console.log('📥 Response status:', response.status);
+           
+           if (!response.ok) {
+               throw new Error(`HTTP error! status: ${response.status}`);
+           }
+
+           const result = await response.json();
+           console.log('📋 Resultado completo:', result);
+           
+           if (result.success && result.data?.cards) {
+               console.log('✅ Tarjetas encontradas:', result.data.cards.length);
+               setRegisteredCards(result.data.cards);
+           } else {
+               console.log('⚠️ No se encontraron tarjetas o respuesta inválida');
+               setRegisteredCards([]);
+           }
+       } catch (error) {
+           console.error('❌ Error cargando tarjetas:', error);
+           setRegisteredCards([]);
+       } finally {
+           setLoadingCards(false);
        }
-   } catch (error) {
-       console.error('Error cargando tarjetas:', error);
-   } finally {
-       setLoadingCards(false);
-   }
-}, [isLoggedIn, user?.bancardUserId]);
+    }, [isLoggedIn, user?.bancardUserId]); // ✅ REMOVER loadingCards de dependencias
+
+    // Calcular cantidad total de productos
+    const totalQty = data.reduce((previousValue, currentValue) => 
+        previousValue + currentValue.quantity, 0);
+
+    // Calcular precio total
+    const totalPrice = data.reduce((prev, curr) => {
+        if (curr?.productId?.sellingPrice) {
+            return prev + (curr.quantity * curr.productId.sellingPrice);
+        }
+        return prev;
+    }, 0);
+
+    // Definir validProducts (AHORA DESPUÉS DE isValidProduct)
+    const validProducts = data.filter(isValidProduct);
+
+    // ✅ FUNCIÓN PARA CAPTURAR DATOS DE TRACKING
+    const captureTrackingData = useCallback(() => {
+        // ✅ CONVERTIR ADDRESS A STRING SI ES OBJETO
+        const getAddressString = (address) => {
+            if (!address) return '';
+            
+            if (typeof address === 'string') {
+                return address;
+            }
+            
+            if (typeof address === 'object') {
+                // Si es un objeto, convertirlo a string legible
+                const parts = [];
+                if (address.street) parts.push(address.street);
+                if (address.city) parts.push(address.city);
+                if (address.state && address.state !== address.city) parts.push(address.state);
+                if (address.zipCode) parts.push(address.zipCode);
+                if (address.country) parts.push(address.country);
+                return parts.join(', ');
+            }
+            
+            return String(address);
+        };
+
+        return {
+            user_agent: navigator.userAgent,
+            device_type: window.innerWidth < 768 ? 'mobile' : 
+                         window.innerWidth < 1024 ? 'tablet' : 'desktop',
+            referrer_url: document.referrer || 'direct',
+            payment_session_id: sessionStorage.getItem('payment_session') || 
+                                `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            cart_total_items: totalQty,
+            order_notes: getAddressString(customerData.address), // ✅ CONVERTIR A STRING
+            delivery_method: 'pickup',
+            invoice_number: `INV-${Date.now()}`,
+            tax_amount: (totalPrice * 0.1).toFixed(2),
+            utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
+            utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
+            utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || ''
+        };
+    }, [totalQty, totalPrice, customerData.address]);
 
     // Cargar datos al montar el componente
-   useEffect(() => {
-    fetchData();
-    if (isLoggedIn) {
-        fetchUserCards();
-        // Pre-llenar datos del usuario si está logueado
-        setCustomerData({
-            name: user.name || '',
-            email: user.email || '',
-            phone: user.phone || '',
-            address: user.address || ''
-        });
-    }
-}, [isLoggedIn, user?.bancardUserId]);
-
-
-
-    // Función para verificar que un producto tiene datos válidos
-    const isValidProduct = (product) => {
-        return product && product.productId && 
-               typeof product.productId === 'object' &&
-               product.productId.productImage &&
-               Array.isArray(product.productId.productImage) &&
-               product.productId.productImage.length > 0;
-    };
+    useEffect(() => {
+        console.log('🚀 Iniciando carga de datos del carrito...');
+        fetchData();
+        
+        if (isLoggedIn && user?.bancardUserId) {
+            console.log('👤 Usuario logueado detectado, cargando tarjetas...');
+            fetchUserCards();
+            // Pre-llenar datos del usuario si está logueado
+            setCustomerData({
+                name: user.name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                address: user.address || ''
+            });
+        } else {
+            console.log('🚫 Usuario no logueado o sin bancardUserId');
+        }
+    }, [isLoggedIn, user?.bancardUserId, fetchUserCards]);
 
     // Aumentar cantidad de producto
     const increaseQty = (id, qty) => {
@@ -182,21 +244,6 @@ const captureTrackingData = () => {
         }
     };
 
-    // Calcular cantidad total de productos
-    const totalQty = data.reduce((previousValue, currentValue) => 
-        previousValue + currentValue.quantity, 0);
-    
-    // Calcular precio total
-    const totalPrice = data.reduce((prev, curr) => {
-        if (curr?.productId?.sellingPrice) {
-            return prev + (curr.quantity * curr.productId.sellingPrice);
-        }
-        return prev;
-    }, 0);
-
-    // Definir validProducts
-    const validProducts = data.filter(isValidProduct);
-
     // ✅ FUNCIONES PARA BANCARD
     const handlePaymentStart = () => {
         console.log('Iniciando pago con Bancard...');
@@ -219,153 +266,144 @@ const captureTrackingData = () => {
         toast.error('Error al procesar el pago. Intenta nuevamente.');
     };
 
-    // ✅ FUNCIÓN CORREGIDA PARA PAGO CON TARJETA GUARDADA (SIN IVA)
-const handlePayWithSavedCard = async () => {
-    if (!selectedCard || !isLoggedIn) {
-        toast.error('Selecciona una tarjeta para continuar');
-        return;
-    }
-
-    if (!hasValidCustomerDataForPayment()) {
-        toast.error('Por favor completa todos los datos requeridos');
-        return;
-    }
-
-    try {
-        console.log('💳 === PROCESANDO PAGO CON TARJETA GUARDADA ===');
-        
-            // ✅ PREPARAR DATOS COMPLETOS PARA BD CON TRACKING
-        const trackingData = captureTrackingData();
-        
-        const paymentData = {
-            // Datos básicos del pago
-            amount: totalPrice.toFixed(2),
-            currency: 'PYG',
-            alias_token: selectedCard.alias_token,
-            number_of_payments: 1,
-            description: `Compra BlueTec - ${validProducts.length} productos`,
-            
-            // ✅ DATOS DEL CLIENTE PARA BD
-            customer_info: {
-                name: customerData.name,
-                email: customerData.email,
-                phone: customerData.phone,
-                address: customerData.address
-            },
-            
-            // ✅ ITEMS DEL CARRITO PARA BD
-            items: validProducts.map(product => ({
-                product_id: product.productId._id,
-                name: product.productId.productName,
-                quantity: product.quantity,
-                unitPrice: product.productId.sellingPrice,
-                total: product.quantity * product.productId.sellingPrice,
-                category: product.productId.category,
-                brand: product.productId.brandName
-            })),
-            
-            // ✅ DATOS DE TRACKING Y ANÁLISIS
-            user_type: 'REGISTERED',
-            payment_method: 'saved_card',
-            user_bancard_id: user.bancardUserId,
-            ip_address: '', // se captura en backend
-            user_agent: trackingData.user_agent,
-            payment_session_id: trackingData.payment_session_id,
-            device_type: trackingData.device_type,
-            cart_total_items: trackingData.cart_total_items,
-            referrer_url: trackingData.referrer_url,
-            order_notes: trackingData.order_notes,
-            delivery_method: trackingData.delivery_method,
-            invoice_number: trackingData.invoice_number,
-            tax_amount: trackingData.tax_amount,
-            utm_source: trackingData.utm_source,
-            utm_medium: trackingData.utm_medium,
-            utm_campaign: trackingData.utm_campaign,
-            
-            // ✅ DATOS ADICIONALES
-            additional_data: JSON.stringify({
-                user_id: user._id,
-                bancard_user_id: user.bancardUserId,
-                card_brand: selectedCard.card_brand,
-                card_masked: selectedCard.card_masked_number,
-                source: 'saved_card_payment',
-                total_amount_formatted: displayINRCurrency(totalPrice)
-            })
-        };
-
-        console.log('📤 Enviando datos de pago con tarjeta guardada:', {
-            ...paymentData,
-            alias_token: `${paymentData.alias_token.substring(0, 20)}...`,
-            items: paymentData.items.length
-        });
-
-        toast.info('Procesando pago con tarjeta guardada...');
-
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/pago-con-token`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include',
-            body: JSON.stringify(paymentData)
-        });
-
-        console.log('📥 Response status:', response.status);
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Error response:', errorText);
-            throw new Error(`Error HTTP ${response.status}`);
+    const handlePayWithSavedCard = async () => {
+        if (!selectedCard || !isLoggedIn) {
+            toast.error('Selecciona una tarjeta para continuar');
+            return;
         }
 
-        const result = await response.json();
-        console.log('📥 Resultado del pago:', result);
-        
-        if (result.success) {
-            if (result.requires3DS) {
-                console.log('🔐 Pago requiere verificación 3DS');
-                toast.info('🔐 Verificación 3DS requerida');
+        if (!hasValidCustomerDataForPayment()) {
+            toast.error('Por favor completa todos los datos requeridos');
+            return;
+        }
+
+        try {
+            console.log('💳 === PROCESANDO PAGO CON TARJETA GUARDADA ===');
+            
+            const trackingData = captureTrackingData();
+            
+            const paymentData = {
+                amount: totalPrice.toFixed(2),
+                currency: 'PYG',
+                alias_token: selectedCard.alias_token,
+                number_of_payments: 1,
+                description: `Compra BlueTec - ${validProducts.length} productos`,
                 
-                // ✅ SI HAY iframe_url, MOSTRAR IFRAME PARA 3DS
-                if (result.data?.iframe_url) {
-                    console.log('🖼️ Mostrando iframe para 3DS:', result.data.iframe_url);
+                customer_info: {
+                    name: customerData.name,
+                    email: customerData.email,
+                    phone: customerData.phone,
+                    address: customerData.address
+                },
+                
+                items: validProducts.map(product => ({
+                    product_id: product.productId._id,
+                    name: product.productId.productName,
+                    quantity: product.quantity,
+                    unitPrice: product.productId.sellingPrice,
+                    unit_price: product.productId.sellingPrice,
+                    total: product.quantity * product.productId.sellingPrice,
+                    category: product.productId.category,
+                    brand: product.productId.brandName
+                })),
+                
+                user_type: 'REGISTERED',
+                payment_method: 'saved_card',
+                user_bancard_id: user.bancardUserId,
+                ip_address: '',
+                user_agent: trackingData.user_agent,
+                payment_session_id: trackingData.payment_session_id,
+                device_type: trackingData.device_type,
+                cart_total_items: trackingData.cart_total_items,
+                referrer_url: trackingData.referrer_url,
+                order_notes: trackingData.order_notes,
+                delivery_method: trackingData.delivery_method,
+                invoice_number: trackingData.invoice_number,
+                tax_amount: trackingData.tax_amount,
+                utm_source: trackingData.utm_source,
+                utm_medium: trackingData.utm_medium,
+                utm_campaign: trackingData.utm_campaign,
+                
+                additional_data: JSON.stringify({
+                    user_id: user._id,
+                    bancard_user_id: user.bancardUserId,
+                    card_brand: selectedCard.card_brand,
+                    card_masked: selectedCard.card_masked_number,
+                    source: 'saved_card_payment',
+                    total_amount_formatted: displayINRCurrency(totalPrice)
+                })
+            };
+
+            console.log('📤 Enviando datos de pago con tarjeta guardada:', {
+                ...paymentData,
+                alias_token: `${paymentData.alias_token.substring(0, 20)}...`,
+                items: paymentData.items.length
+            });
+
+            toast.info('Procesando pago con tarjeta guardada...');
+
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/pago-con-token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(paymentData)
+            });
+
+            console.log('📥 Response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Error response:', errorText);
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('📥 Resultado del pago:', result);
+            
+            if (result.success) {
+                if (result.requires3DS) {
+                    console.log('🔐 Pago requiere verificación 3DS');
+                    toast.info('🔐 Verificación 3DS requerida');
                     
-                    // Guardar datos del pago para seguimiento
-                    sessionStorage.setItem('bancard_payment', JSON.stringify({
-                        shop_process_id: result.data.shop_process_id,
-                        process_id: result.data.process_id || result.data.bancard_process_id,
-                        amount: totalPrice,
-                        customer: customerData,
-                        requires3DS: true,
-                        timestamp: Date.now()
-                    }));
-                    
-                    // Redirigir al iframe 3DS o mostrar modal
-                    window.open(result.data.iframe_url, '_blank', 'width=800,height=600');
-                    
-                    toast.success('Ventana de verificación 3DS abierta');
+                    if (result.data?.iframe_url) {
+                        console.log('🖼️ Mostrando iframe para 3DS:', result.data.iframe_url);
+                        
+                        sessionStorage.setItem('bancard_payment', JSON.stringify({
+                            shop_process_id: result.data.shop_process_id,
+                            process_id: result.data.process_id || result.data.bancard_process_id,
+                            amount: totalPrice,
+                            customer: customerData,
+                            requires3DS: true,
+                            timestamp: Date.now()
+                        }));
+                        
+                        window.open(result.data.iframe_url, '_blank', 'width=800,height=600');
+                        
+                        toast.success('Ventana de verificación 3DS abierta');
+                    } else {
+                        toast.warning('Verificación 3DS requerida pero no se recibió URL');
+                    }
                 } else {
-                    toast.warning('Verificación 3DS requerida pero no se recibió URL');
+                    console.log('✅ Pago procesado directamente');
+                    toast.success('✅ Pago procesado exitosamente');
+                    
+                    setTimeout(() => {
+                        localCartHelper.clearCart();
+                        navigate('/pago-exitoso?shop_process_id=' + (result.data.shop_process_id || Date.now()));
+                    }, 1500);
                 }
             } else {
-                console.log('✅ Pago procesado directamente');
-                toast.success('✅ Pago procesado exitosamente');
-                
-                // ✅ LIMPIAR CARRITO Y REDIRIGIR
-                setTimeout(() => {
-                    localCartHelper.clearCart();
-                    navigate('/pago-exitoso?shop_process_id=' + (result.data.shop_process_id || Date.now()));
-                }, 1500);
+                console.error('❌ Error en el pago:', result);
+                toast.error(result.message || 'Error en el pago');
             }
-        } else {
-            console.error('❌ Error en el pago:', result);
-            toast.error(result.message || 'Error en el pago');
+        } catch (error) {
+            console.error('❌ Error crítico:', error);
+            toast.error('Error de conexión al procesar el pago');
         }
-    } catch (error) {
-        console.error('❌ Error crítico:', error);
-        toast.error('Error de conexión al procesar el pago');
-    }
-};
+    };
+
     // Función para verificar si hay datos de cliente válidos para el pago
     const hasValidCustomerDataForPayment = () => {
         return customerData.name.trim() && customerData.email.trim() && customerData.phone.trim();
@@ -392,6 +430,7 @@ const handlePayWithSavedCard = async () => {
             productId: product.productId,
             quantity: product.quantity,
             unitPrice: product.productId.sellingPrice,
+            unit_price: product.productId.sellingPrice,
             total: product.quantity * product.productId.sellingPrice
         }));
     };
@@ -409,7 +448,7 @@ const handlePayWithSavedCard = async () => {
         }
     };
 
-    // Generar PDF (función existente - mantener igual)
+    // Generar PDF
     const generatePDF = () => {
         if (!hasValidCustomerDataForBudget()) {
             toast.error("Por favor ingrese al menos el nombre del cliente");
@@ -612,7 +651,7 @@ const handlePayWithSavedCard = async () => {
         trackPDFDownload(customerData, totalPrice);
     };
 
-    // Función para enviar presupuesto por WhatsApp (mantener igual)
+    // Función para enviar presupuesto por WhatsApp
     const sendToWhatsApp = () => {
         if (!hasValidCustomerDataForBudget()) {
             toast.error("Por favor ingrese al menos el nombre del cliente");

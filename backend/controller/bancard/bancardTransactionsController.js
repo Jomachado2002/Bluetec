@@ -1,7 +1,5 @@
 // backend/controller/bancard/bancardTransactionsController.js - VERSIÓN CORREGIDA
 const BancardTransactionModel = require('../../models/bancardTransactionModel');
-// ✅ QUITAR REFERENCIA A SALE TEMPORALMENTE
-// const SaleModel = require('../../models/saleModel');
 const crypto = require('crypto');
 const axios = require('axios');
 const uploadProductPermission = require('../../helpers/permission');
@@ -11,18 +9,21 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ OBTENER TODAS LAS TRANSACCIONES BANCARD - SIN POPULATE SALE
+ * ✅ OBTENER TODAS LAS TRANSACCIONES BANCARD - CORREGIDO PARA USUARIOS INVITADOS
  */
 const getAllBancardTransactionsController = async (req, res) => {
     try {
-        const hasPermission = await uploadProductPermission(req.userId);
-        if (!hasPermission) {
-            return res.status(403).json({
-                message: "Permiso denegado",
-                error: true,
-                success: false
-            });
-        }
+        // ✅ VERIFICAR PERMISOS PERO NO RECHAZAR USUARIOS INVITADOS PARA SUS PROPIAS TRANSACCIONES
+        const hasAdminPermission = await uploadProductPermission(req.userId);
+        
+        console.log("🔍 === OBTENIENDO TRANSACCIONES BANCARD ===");
+        console.log("👤 Usuario:", {
+            userId: req.userId,
+            isAuthenticated: req.isAuthenticated,
+            userRole: req.userRole,
+            hasAdminPermission,
+            bancardUserId: req.bancardUserId
+        });
 
         const { 
             status, 
@@ -34,12 +35,40 @@ const getAllBancardTransactionsController = async (req, res) => {
             sortBy = 'createdAt', 
             sortOrder = 'desc',
             user_bancard_id,
-            payment_method 
+            payment_method,
+            created_by // ✅ AGREGAR NUEVO FILTRO
         } = req.query;
 
-        // Construir query
-        const query = {};
+        // ✅ CONSTRUIR QUERY MEJORADA
+        let query = {};
 
+        // ✅ SI NO ES ADMIN, SOLO MOSTRAR SUS PROPIAS TRANSACCIONES
+        if (!hasAdminPermission && req.isAuthenticated) {
+            console.log("🔒 Usuario sin permisos admin, filtrando por sus transacciones");
+            query.$or = [
+                { created_by: req.userId },
+                { user_bancard_id: req.bancardUserId || req.user?.bancardUserId }
+            ];
+        } else if (!hasAdminPermission && !req.isAuthenticated) {
+            // ✅ USUARIOS INVITADOS NO PUEDEN VER TRANSACCIONES SIN PARÁMETROS ESPECÍFICOS
+            console.log("🚫 Usuario invitado sin permisos, devolviendo array vacío");
+            return res.json({
+                message: "Acceso denegado para usuarios no autenticados",
+                data: {
+                    transactions: [],
+                    pagination: {
+                        total: 0,
+                        page: Number(page),
+                        limit: Number(limit),
+                        pages: 0
+                    }
+                },
+                success: true,
+                error: false
+            });
+        }
+
+        // ✅ FILTROS ADICIONALES
         if (status) query.status = status;
         
         if (startDate || endDate) {
@@ -47,55 +76,94 @@ const getAllBancardTransactionsController = async (req, res) => {
             if (startDate) query.transaction_date.$gte = new Date(startDate);
             if (endDate) query.transaction_date.$lte = new Date(endDate);
         }
-        if (user_bancard_id) query.user_bancard_id = user_bancard_id;
-        if (payment_method) query.payment_method = payment_method;
-        // ✅ FILTRO POR USUARIO CORREGIDO
+        
+        // ✅ FILTRO POR USUARIO MEJORADO
         if (user_bancard_id) {
-            // Buscar por ambos campos para mayor compatibilidad
+            if (query.$or) {
+                // Si ya hay $or, reemplazarlo con el filtro específico
+                query = { ...query };
+                delete query.$or;
+            }
             query.$or = [
                 { user_bancard_id: parseInt(user_bancard_id) },
-                { created_by: user_bancard_id } // Si se pasa ObjectId como string
+                { user_bancard_id: user_bancard_id },
+                { created_by: user_bancard_id }
             ];
+        }
+
+        if (created_by) {
+            if (query.$or) {
+                delete query.$or;
+            }
+            query.created_by = created_by;
         }
         
+        if (payment_method) query.payment_method = payment_method;
+        
         if (search) {
-            query.$or = [
-                { shop_process_id: { $regex: search, $options: 'i' } },
-                { bancard_process_id: { $regex: search, $options: 'i' } },
-                { description: { $regex: search, $options: 'i' } },
-                { 'customer_info.name': { $regex: search, $options: 'i' } },
-                { 'customer_info.email': { $regex: search, $options: 'i' } }
-            ];
+            const searchQuery = {
+                $or: [
+                    { shop_process_id: { $regex: search, $options: 'i' } },
+                    { bancard_process_id: { $regex: search, $options: 'i' } },
+                    { description: { $regex: search, $options: 'i' } },
+                    { 'customer_info.name': { $regex: search, $options: 'i' } },
+                    { 'customer_info.email': { $regex: search, $options: 'i' } },
+                    { invoice_number: { $regex: search, $options: 'i' } },
+                    { authorization_number: { $regex: search, $options: 'i' } }
+                ]
+            };
+            
+            // Si ya hay $or en query, combinarlo con AND
+            if (query.$or) {
+                query = {
+                    $and: [
+                        { $or: query.$or },
+                        searchQuery
+                    ],
+                    ...Object.fromEntries(Object.entries(query).filter(([key]) => key !== '$or'))
+                };
+            } else {
+                query = { ...query, ...searchQuery };
+            }
         }
 
-        // Ordenamiento
+        // ✅ ORDENAMIENTO
         const sort = {};
         sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-        // ✅ DEBUG: Mostrar query construida
-        // Paginación
+
+        // ✅ PAGINACIÓN
         const skip = (page - 1) * limit;
 
-        // ✅ DEBUG: Mostrar query construida
         console.log("📋 Query de búsqueda construida:", {
-            query,
+            query: JSON.stringify(query, null, 2),
             sort,
             skip,
             limit: Number(limit),
-            hasUserFilter: !!user_bancard_id
+            hasUserFilter: !!(user_bancard_id || created_by),
+            isAdminRequest: hasAdminPermission
         });
 
-        // ✅ SIN POPULATE POR AHORA
+        // ✅ EJECUTAR CONSULTA
         const transactions = await BancardTransactionModel
             .find(query)
             .populate('rollback_by', 'name email')
+            .populate('created_by', 'name email') // ✅ AGREGAR POPULATE PARA created_by
             .sort(sort)
             .skip(skip)
-            .limit(Number(limit));
+            .limit(Number(limit))
+            .lean(); // ✅ USAR LEAN PARA MEJOR PERFORMANCE
 
         const total = await BancardTransactionModel.countDocuments(query);
 
+        console.log("📊 Resultados de consulta:", {
+            transactionsFound: transactions.length,
+            totalCount: total,
+            firstTransactionId: transactions[0]?._id,
+            queryExecuted: !!transactions
+        });
+
         res.json({
-            message: "Lista de transacciones Bancard",
+            message: `Lista de transacciones Bancard${!hasAdminPermission ? ' (filtradas por usuario)' : ''}`,
             data: {
                 transactions,
                 pagination: {
@@ -103,6 +171,11 @@ const getAllBancardTransactionsController = async (req, res) => {
                     page: Number(page),
                     limit: Number(limit),
                     pages: Math.ceil(total / limit)
+                },
+                query_info: {
+                    filters_applied: Object.keys(query).length,
+                    is_admin_view: hasAdminPermission,
+                    user_filtered: !hasAdminPermission && req.isAuthenticated
                 }
             },
             success: true,
@@ -121,26 +194,26 @@ const getAllBancardTransactionsController = async (req, res) => {
 };
 
 /**
- * ✅ OBTENER DETALLES DE UNA TRANSACCIÓN - SIN POPULATE SALE
+ * ✅ OBTENER DETALLES DE UNA TRANSACCIÓN - MEJORADO
  */
 const getBancardTransactionByIdController = async (req, res) => {
     try {
-        const hasPermission = await uploadProductPermission(req.userId);
-        if (!hasPermission) {
-            return res.status(403).json({
-                message: "Permiso denegado",
-                error: true,
-                success: false
-            });
-        }
-
+        const hasAdminPermission = await uploadProductPermission(req.userId);
+        
         const { transactionId } = req.params;
 
-        // ✅ SIN POPULATE POR AHORA
+        console.log("🔍 Obteniendo transacción por ID:", {
+            transactionId,
+            userId: req.userId,
+            hasAdminPermission,
+            isAuthenticated: req.isAuthenticated
+        });
+
         const transaction = await BancardTransactionModel
             .findById(transactionId)
             .populate('rollback_by', 'name email')
-            .populate('created_by', 'name email');
+            .populate('created_by', 'name email')
+            .lean();
 
         if (!transaction) {
             return res.status(404).json({
@@ -148,6 +221,23 @@ const getBancardTransactionByIdController = async (req, res) => {
                 error: true,
                 success: false
             });
+        }
+
+        // ✅ VERIFICAR PERMISOS DE ACCESO
+        if (!hasAdminPermission) {
+            const userCanAccess = req.isAuthenticated && (
+                transaction.created_by?.toString() === req.userId ||
+                transaction.user_bancard_id === req.bancardUserId ||
+                transaction.user_bancard_id === req.user?.bancardUserId
+            );
+
+            if (!userCanAccess) {
+                return res.status(403).json({
+                    message: "No tienes permisos para ver esta transacción",
+                    error: true,
+                    success: false
+                });
+            }
         }
 
         res.json({
@@ -189,7 +279,6 @@ const rollbackBancardTransactionController = async (req, res) => {
         console.log("Transaction ID:", transactionId);
         console.log("Reason:", reason);
 
-        // Buscar la transacción
         const transaction = await BancardTransactionModel.findById(transactionId);
         if (!transaction) {
             return res.status(404).json({
@@ -199,7 +288,6 @@ const rollbackBancardTransactionController = async (req, res) => {
             });
         }
 
-        // Verificar que la transacción esté aprobada
         if (transaction.status !== 'approved') {
             return res.status(400).json({
                 message: "Solo se pueden reversar transacciones aprobadas",
@@ -208,7 +296,6 @@ const rollbackBancardTransactionController = async (req, res) => {
             });
         }
 
-        // Verificar que no esté ya reversa
         if (transaction.is_rolled_back) {
             return res.status(400).json({
                 message: "Esta transacción ya fue reversada",
@@ -217,7 +304,6 @@ const rollbackBancardTransactionController = async (req, res) => {
             });
         }
 
-        // Validar configuración de Bancard
         const configValidation = validateBancardConfig();
         if (!configValidation.isValid) {
             return res.status(500).json({
@@ -227,7 +313,6 @@ const rollbackBancardTransactionController = async (req, res) => {
             });
         }
 
-        // ✅ GENERAR TOKEN PARA ROLLBACK
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${transaction.shop_process_id}rollback0.00`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
@@ -237,7 +322,6 @@ const rollbackBancardTransactionController = async (req, res) => {
                 token: token,
                 shop_process_id: transaction.shop_process_id
             }
-            // ✅ SIN test_client según instrucciones de Bancard
         };
 
         console.log("📤 Payload de rollback:", JSON.stringify(payload, null, 2));
@@ -255,7 +339,6 @@ const rollbackBancardTransactionController = async (req, res) => {
         console.log("📥 Respuesta de Bancard:", response.status, JSON.stringify(response.data, null, 2));
 
         if (response.status === 200 && response.data.status === 'success') {
-            // ✅ ACTUALIZAR TRANSACCIÓN COMO REVERSADA
             await BancardTransactionModel.findByIdAndUpdate(transactionId, {
                 is_rolled_back: true,
                 rollback_date: new Date(),
@@ -263,14 +346,6 @@ const rollbackBancardTransactionController = async (req, res) => {
                 rollback_by: req.userId,
                 status: 'rolled_back'
             });
-
-            // ✅ COMENTAR ACTUALIZACIÓN DE SALE TEMPORALMENTE
-            // if (transaction.sale_id) {
-            //     await SaleModel.findByIdAndUpdate(transaction.sale_id, {
-            //         paymentStatus: 'cancelled',
-            //         notes: `${transaction.notes || ''}\n\nPago reversado: ${reason || 'Sin razón especificada'}`
-            //     });
-            // }
 
             console.log("✅ Rollback exitoso");
 
@@ -288,7 +363,6 @@ const rollbackBancardTransactionController = async (req, res) => {
         } else {
             console.error("❌ Error en rollback de Bancard:", response.data);
             
-            // Verificar si es error por transacción ya confirmada
             const isAlreadyConfirmed = response.data.messages?.some(msg => 
                 msg.key === 'TransactionAlreadyConfirmed'
             );
@@ -358,7 +432,6 @@ const checkBancardTransactionStatusController = async (req, res) => {
             });
         }
 
-        // Validar configuración
         const configValidation = validateBancardConfig();
         if (!configValidation.isValid) {
             return res.status(500).json({
@@ -368,7 +441,6 @@ const checkBancardTransactionStatusController = async (req, res) => {
             });
         }
 
-        // ✅ USAR EL shop_process_id DE LA TRANSACCIÓN, NO null
         const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${transaction.shop_process_id}get_confirmation`;
         const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
 
@@ -376,7 +448,7 @@ const checkBancardTransactionStatusController = async (req, res) => {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
                 token: token,
-                shop_process_id: transaction.shop_process_id // ✅ USAR VALOR REAL, NO null
+                shop_process_id: transaction.shop_process_id
             }
         };
 
@@ -416,7 +488,7 @@ const checkBancardTransactionStatusController = async (req, res) => {
 };
 
 /**
- * ✅ CREAR/GUARDAR TRANSACCIÓN BANCARD
+ * ✅ CREAR/GUARDAR TRANSACCIÓN BANCARD - MEJORADO
  */
 const createBancardTransactionController = async (req, res) => {
     try {
@@ -433,15 +505,39 @@ const createBancardTransactionController = async (req, res) => {
             sale_id
         } = req.body;
 
-        // Crear nueva transacción
+        // ✅ NORMALIZAR CUSTOMER_INFO
+        const normalizedCustomerInfo = {
+            name: customer_info?.name || '',
+            email: customer_info?.email || '',
+            phone: customer_info?.phone || '',
+            address: typeof customer_info?.address === 'string' 
+                ? customer_info.address 
+                : (customer_info?.address?.street || ''),
+            document_type: customer_info?.document_type || 'CI',
+            document_number: customer_info?.document_number || ''
+        };
+
+        // ✅ NORMALIZAR ITEMS
+        const normalizedItems = (items || []).map(item => ({
+            product_id: item.product_id || item._id || '',
+            name: item.name || item.productName || 'Producto',
+            quantity: parseInt(item.quantity) || 1,
+            unit_price: parseFloat(item.unitPrice || item.unit_price || 0),
+            unitPrice: parseFloat(item.unitPrice || item.unit_price || 0),
+            total: parseFloat(item.total || ((item.quantity || 1) * (item.unitPrice || item.unit_price || 0))),
+            category: item.category || '',
+            brand: item.brand || '',
+            sku: item.sku || ''
+        }));
+
         const newTransaction = new BancardTransactionModel({
             shop_process_id,
             bancard_process_id,
             amount,
             currency,
             description,
-            customer_info,
-            items,
+            customer_info: normalizedCustomerInfo,
+            items: normalizedItems,
             return_url,
             cancel_url,
             sale_id,
