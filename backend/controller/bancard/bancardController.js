@@ -224,8 +224,8 @@ const createPaymentController = async (req, res) => {
         } = req.body;
 
         // ✅ DECLARAR VARIABLES DE TRACKING AL INICIO
-        const finalUserType = req.isAuthenticated ? 'REGISTERED' : user_type;
-        const finalUserBancardId = req.isAuthenticated ? (req.bancardUserId || req.user?.bancardUserId) : user_bancard_id;
+      const finalUserType = req.isAuthenticated === true ? 'REGISTERED' : 'GUEST';
+const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || req.user?.bancardUserId) : null;
         const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
         console.log("🔍 Variables de tracking declaradas:", {
@@ -290,6 +290,8 @@ const createPaymentController = async (req, res) => {
                 description: description.substring(0, 20),
                 return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
                 cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
+                confirmation_url: `${process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL}/api/bancard/confirm`  // ✅ AGREGAR ESTA LÍNEA
+
             }
         };
 
@@ -380,7 +382,7 @@ const createPaymentController = async (req, res) => {
                         device_type: device_type,
                         cart_total_items: cart_total_items || normalizedItems.length,
                         referrer_url: referrer_url || req.headers.referer || '',
-                        order_notes: order_notes,
+                        order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
                         delivery_method: delivery_method,
                         invoice_number: invoice_number,
                         tax_amount: parseFloat(tax_amount) || 0,

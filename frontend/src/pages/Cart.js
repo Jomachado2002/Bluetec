@@ -152,7 +152,7 @@ const Cart = () => {
             payment_session_id: sessionStorage.getItem('payment_session') || 
                                 `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             cart_total_items: totalQty,
-            order_notes: getAddressString(customerData.address), // ✅ CONVERTIR A STRING
+            order_notes: String(getAddressString(customerData.address) || ''),// ✅ CONVERTIR A STRING
             delivery_method: 'pickup',
             invoice_number: `INV-${Date.now()}`,
             tax_amount: (totalPrice * 0.1).toFixed(2),
@@ -386,13 +386,19 @@ const Cart = () => {
                         toast.warning('Verificación 3DS requerida pero no se recibió URL');
                     }
                 } else {
-                    console.log('✅ Pago procesado directamente');
-                    toast.success('✅ Pago procesado exitosamente');
-                    
-                    setTimeout(() => {
-                        localCartHelper.clearCart();
-                        navigate('/pago-exitoso?shop_process_id=' + (result.data.shop_process_id || Date.now()));
-                    }, 1500);
+    // ✅ VERIFICAR SI EL PAGO FUE REALMENTE EXITOSO
+                    if (result.data?.operation?.response_code === '00') {
+                        console.log('✅ Pago procesado directamente');
+                        toast.success('✅ Pago procesado exitosamente');
+                        
+                        setTimeout(() => {
+                            localCartHelper.clearCart();
+                            navigate('/pago-exitoso?shop_process_id=' + (result.data.shop_process_id || Date.now()));
+                        }, 1500);
+                    } else {
+                        console.log('❌ Pago rechazado por Bancard');
+                        toast.error(`Pago rechazado: ${result.data?.operation?.response_description || 'Error desconocido'}`);
+                    }
                 }
             } else {
                 console.error('❌ Error en el pago:', result);

@@ -563,7 +563,8 @@ const chargeWithTokenController = async (req, res) => {
                             response_description: response.data.operation.response_description,
                             authorization_number: response.data.operation.authorization_number,
                             ticket_number: response.data.operation.ticket_number,
-                            status: response.data.operation.response === 'S' ? 'approved' : 'rejected'
+                            status: (response.data.operation.response === 'S' && response.data.operation.response_code === '00') ? 'approved' : 'rejected'
+
                         })
                     }
                 );
@@ -571,7 +572,8 @@ const chargeWithTokenController = async (req, res) => {
             } catch (dbError) {
                 console.error("⚠️ Error actualizando transacción:", dbError);
             }
-
+            const isReallySuccessful = response.data?.operation?.response === 'S' && 
+                          response.data?.operation?.response_code === '00';
             if (requiresAuth) {
                 console.log("🔐 Pago requiere autenticación 3DS");
                 res.json({

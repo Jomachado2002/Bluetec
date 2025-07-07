@@ -138,7 +138,7 @@ const {
 router.post("/bancard/confirm", bancardConfirmController);
 router.get("/bancard/confirm", bancardConfirmGetController);
 
-router.post("/bancard/create-payment", createPaymentController);
+router.post("/bancard/create-payment", authToken, createPaymentController);
 router.get("/bancard/status/:transactionId", getTransactionStatusController);
 router.get("/bancard/health", bancardHealthController);
 router.post("/bancard/rollback", rollbackPaymentController);
