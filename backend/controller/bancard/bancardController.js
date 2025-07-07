@@ -290,7 +290,7 @@ const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || 
                 description: description.substring(0, 20),
                 return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
                 cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
-                confirmation_url: `${process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL}/api/bancard/confirm`  // ✅ AGREGAR ESTA LÍNEA
+               
 
             }
         };
