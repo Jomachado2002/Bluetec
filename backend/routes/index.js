@@ -149,6 +149,7 @@ router.get("/bancard/transactions/:transactionId", authToken, getBancardTransact
 router.post("/bancard/transactions/:transactionId/rollback", authToken, rollbackBancardTransactionController);
 router.get("/bancard/transactions/:transactionId/status", authToken, checkBancardTransactionStatusController);
 router.post("/bancard/transactions", authToken, createBancardTransactionController);
+const { updateUserLocation, getUserLocation } = require('../controller/user/userLocationController');
 
 // ===========================================
 // ✅ NUEVAS RUTAS DE PERFIL DE USUARIO
@@ -161,6 +162,7 @@ router.put("/perfil", authToken, updateUserProfileController);
 
 // Subir imagen de perfil
 router.post("/perfil/imagen", authToken, uploadProfileImageController);
+router.put("/usuario/ubicacion", authToken, updateUserLocation);
 
 // Cambiar contraseña
 router.post("/perfil/cambiar-contrasena", authToken, changePasswordController);

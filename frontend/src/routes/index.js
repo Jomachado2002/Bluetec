@@ -48,6 +48,7 @@ import PurchaseDetails from "../pages/PurchaseDetails"
 import FinancialDashboard from "../pages/FinancialDashboard"
 import CatastroResult from "../pages/CatastroResult"
 
+
 const router = createBrowserRouter([
     {
         path: "/",
@@ -232,6 +233,7 @@ const router = createBrowserRouter([
                         path: "analisis-rentabilidad/:analysisId",
                         element: <ProfitabilityAnalysisDetails />
                     }
+                
                 ]
             }
         ]

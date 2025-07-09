@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import ProfileHeader from './ProfileHeader';
 import ProfileImageSection from './ProfileImageSection';
 import PersonalInfoSection from './PersonalInfoSection';
 import AddressSection from './AddressSection';
 import SecurityInfoBanner from './SecurityInfoBanner';
+import { UserLocationSection } from '../location/LocationSelector';
 
 const UserProfile = ({ user, onUpdateProfile, onUploadImage }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -23,6 +25,33 @@ const UserProfile = ({ user, onUpdateProfile, onUploadImage }) => {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const handleUpdateLocation = async (locationData) => {
+  try {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/usuario/ubicacion`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(locationData)
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      setFormData(prev => ({
+        ...prev,
+        location: result.data
+      }));
+      toast.success('Ubicación guardada exitosamente');
+    } else {
+      toast.error(result.message || 'Error al guardar ubicación');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    toast.error('Error de conexión');
+  }
+};
 
   // Cargar datos del usuario al montar
   useEffect(() => {
@@ -194,6 +223,12 @@ const UserProfile = ({ user, onUpdateProfile, onUploadImage }) => {
             address={formData.address}
             isEditing={isEditing}
             onChange={handleInputChange}
+          />
+        </div>
+        <div className="mt-6">
+          <UserLocationSection
+            user={formData}
+            onUpdateLocation={handleUpdateLocation}
           />
         </div>
 

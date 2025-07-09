@@ -56,7 +56,15 @@ const SummaryApi = {
         changePassword: {
             url: `${backendDomain}/api/perfil/cambiar-contrasena`,
             method: 'post'
-        }
+        },
+        updateLocation: {
+        url: `${backendDomain}/api/usuario/ubicacion`,
+        method: 'put'
+        },
+        getLocation: {
+            url: `${backendDomain}/api/usuario/ubicacion`,
+            method: 'get'
+        },
     },
 
     // ===========================================

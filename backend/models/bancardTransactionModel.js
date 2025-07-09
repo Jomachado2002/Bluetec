@@ -252,6 +252,31 @@ const bancardTransactionSchema = mongoose.Schema({
         type: Date,
         required: false
     },
+    // ✅ UBICACIÓN DE ENTREGA CON GOOGLE MAPS - AGREGAR DESPUÉS DE delivery_address
+delivery_location: {
+    lat: { 
+        type: Number,
+        min: -90,
+        max: 90
+    },
+    lng: { 
+        type: Number,
+        min: -180,
+        max: 180
+    },
+    address: {
+        type: String,
+        trim: true
+    },
+    googleMapsUrl: {
+        type: String,
+        trim: true
+    },
+    timestamp: {
+        type: Date,
+        default: Date.now
+    }
+},
     
     // ===== INFORMACIÓN ADICIONAL =====
     order_notes: {

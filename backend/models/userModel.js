@@ -1,4 +1,4 @@
-// backend/models/userModel.js - VERSIÓN CON BANCARD USER ID MEJORADO
+// backend/models/userModel.js - VERSIÓN CON BANCARD USER ID MEJORADO Y CORREGIDA
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -95,6 +95,32 @@ const userSchema = new mongoose.Schema({
     
     emailVerificationToken: {
         type: String
+    },
+    
+    // ✅ CAMPO LOCATION CORREGIDO - MOVIDO FUERA DE ADDRESS
+    location: {
+        lat: { 
+            type: Number,
+            min: -90,
+            max: 90
+        },
+        lng: { 
+            type: Number,
+            min: -180,
+            max: 180
+        },
+        address: {
+            type: String,
+            trim: true
+        },
+        googleMapsUrl: {
+            type: String,
+            trim: true
+        },
+        timestamp: {
+            type: Date,
+            default: Date.now
+        }
     }
     
 }, {
