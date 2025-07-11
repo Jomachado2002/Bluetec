@@ -385,21 +385,35 @@ const Cart = () => {
                     } else {
                         toast.warning('Verificación 3DS requerida pero no se recibió URL');
                     }
+               } else {
+                // ✅ VERIFICAR SI EL PAGO FUE REALMENTE EXITOSO - CORREGIDO
+                const responseData = result.data?.operation || result.data?.confirmation || result.data;
+                const isApproved = (responseData?.response === 'S' && responseData?.response_code === '00') || 
+                                result.data?.transaction_approved === true;
+
+                console.log('🔍 Verificando estado del pago:', {
+                    responseData: responseData ? {
+                        response: responseData.response,
+                        response_code: responseData.response_code,
+                        authorization_number: responseData.authorization_number
+                    } : null,
+                    transaction_approved: result.data?.transaction_approved,
+                    isApproved
+                });
+
+                if (isApproved) {
+                    console.log('✅ Pago procesado directamente');
+                    toast.success('✅ Pago procesado exitosamente');
+                    
+                    setTimeout(() => {
+                        localCartHelper.clearCart();
+                        navigate('/pago-exitoso?shop_process_id=' + (result.data.shop_process_id || Date.now()));
+                    }, 1500);
                 } else {
-    // ✅ VERIFICAR SI EL PAGO FUE REALMENTE EXITOSO
-                    if (result.data?.operation?.response_code === '00') {
-                        console.log('✅ Pago procesado directamente');
-                        toast.success('✅ Pago procesado exitosamente');
-                        
-                        setTimeout(() => {
-                            localCartHelper.clearCart();
-                            navigate('/pago-exitoso?shop_process_id=' + (result.data.shop_process_id || Date.now()));
-                        }, 1500);
-                    } else {
-                        console.log('❌ Pago rechazado por Bancard');
-                        toast.error(`Pago rechazado: ${result.data?.operation?.response_description || 'Error desconocido'}`);
-                    }
+                    console.log('❌ Pago rechazado por Bancard');
+                    toast.error(`Pago rechazado: ${responseData?.response_description || 'Error desconocido'}`);
                 }
+            }
             } else {
                 console.error('❌ Error en el pago:', result);
                 toast.error(result.message || 'Error en el pago');

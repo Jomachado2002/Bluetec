@@ -1,4 +1,4 @@
-// backend/controller/bancard/bancardCardsController.js - VERSIÓN CORREGIDA PARA BANCARD
+// backend/controller/bancard/bancardCardsController.js - VERSIÓN FINAL CORREGIDA
 
 const crypto = require('crypto');
 const axios = require('axios');
@@ -11,11 +11,11 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ PAGO CON ALIAS TOKEN - CORREGIDO SEGÚN DOCUMENTACIÓN BANCARD
+ * ✅ PAGO CON ALIAS TOKEN - VERSIÓN FINAL CORREGIDA
  */
 const chargeWithTokenController = async (req, res) => {
     try {
-        console.log("💳 === PAGO CON ALIAS TOKEN - VERSIÓN CORREGIDA ===");
+        console.log("💳 === PAGO CON ALIAS TOKEN - VERSIÓN FINAL ===");
 
         const {
             shop_process_id,
@@ -25,12 +25,10 @@ const chargeWithTokenController = async (req, res) => {
             number_of_payments = 1,
             description,
             return_url,
-            // ✅ IMPORTANTE: additional_data SOLO para promociones específicas
-            additional_data = "", // Por defecto vacío
-            promotion_code = "", // Campo específico para promociones
+            additional_data = "",
+            promotion_code = "",
             customer_info,
             items,
-            // ✅ CAMPOS DE TRACKING
             user_type = 'REGISTERED',
             payment_method = 'saved_card',
             user_bancard_id = null,
@@ -105,7 +103,7 @@ const chargeWithTokenController = async (req, res) => {
 
         const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
 
-        // ✅ PAYLOAD CORREGIDO - additional_data SOLO SI HAY PROMOCIÓN
+        // ✅ PAYLOAD CORREGIDO - SIN extra_response_attributes
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
@@ -114,26 +112,18 @@ const chargeWithTokenController = async (req, res) => {
                 amount: formattedAmount,
                 number_of_payments: parseInt(number_of_payments),
                 currency: currency,
-                additional_data: "", 
+                additional_data: "",
                 description: description || "Pago BlueTec con tarjeta registrada",
                 alias_token: alias_token,
-                return_url: `${backendUrl}/api/bancard/redirect/success`,
-                extra_response_attributes: ["confirmation.process_id"]
+                return_url: `${backendUrl}/api/bancard/redirect/success`
             }
         };
 
-        // ✅ IMPORTANTE: Solo agregar additional_data si hay una promoción específica válida
-        // Según documentación Bancard (páginas 12-13), el formato debe ser:
-        // Entidad (3 dígitos) + Marca (2 caracteres) + Producto (3 caracteres) + Afinidad (6 dígitos)
-        // Ejemplo válido: "099VS ORO000045"
-        
+        // Solo agregar promoción si es válida
         if (promotion_code && promotion_code.trim() !== "") {
-            // Validar formato de promoción
             const promotionRegex = /^\d{3}[A-Z]{2}\s[A-Z]{3}\d{6}$/;
-            const cleanPromotionCode = promotion_code.trim();
-            
-            if (promotionRegex.test(cleanPromotionCode)) {
-                payload.operation.additional_data = cleanPromotionCode;
+            if (promotionRegex.test(promotion_code.trim())) {
+                payload.operation.additional_data = promotion_code.trim();
                 console.log("🎟️ Promoción válida aplicada:", {
                     promotion_code: promotion_code,
                     additional_data: payload.operation.additional_data
@@ -143,7 +133,6 @@ const chargeWithTokenController = async (req, res) => {
                 console.log("💡 Formato requerido: '099VS ORO000045' (Entidad+Marca+Producto+Afinidad)");
             }
         } else if (additional_data && additional_data.trim() !== "") {
-            // ✅ Si viene additional_data directamente, validar formato
             const promotionRegex = /^\d{3}[A-Z]{2}\s[A-Z]{3}\d{6}$/;
             const cleanAdditionalData = additional_data.trim();
             
@@ -155,16 +144,15 @@ const chargeWithTokenController = async (req, res) => {
                 console.log("💡 Formato requerido según documentación Bancard: '099VS ORO000045'");
             }
         }
-        // ✅ Si no hay promoción válida, NO incluir additional_data en el payload
 
-        console.log("📤 Payload de pago con token (CORREGIDO):", {
+        console.log("📤 Payload de pago con token (FINAL):", {
             shop_process_id: payload.operation.shop_process_id,
             amount: payload.operation.amount,
             currency: payload.operation.currency,
             alias_token: `${payload.operation.alias_token.substring(0, 20)}...`,
             description: payload.operation.description,
             has_promotion: !!payload.operation.additional_data,
-            additional_data: payload.operation.additional_data || "NO INCLUIDO",
+            additional_data: payload.operation.additional_data || "VACÍO",
             is_token_payment: true
         });
 
@@ -206,8 +194,6 @@ const chargeWithTokenController = async (req, res) => {
                 status: 'pending',
                 environment: process.env.BANCARD_ENVIRONMENT || 'staging',
                 created_by: req.userId,
-                
-                // ✅ CAMPOS DE TRACKING
                 user_type: finalUserType,
                 payment_method: payment_method,
                 user_bancard_id: finalUserBancardId,
@@ -224,12 +210,8 @@ const chargeWithTokenController = async (req, res) => {
                 utm_source: utm_source,
                 utm_medium: utm_medium,
                 utm_campaign: utm_campaign,
-                
-                // ✅ CAMPOS ESPECÍFICOS PARA PAGO CON TOKEN
                 is_token_payment: true,
                 alias_token: alias_token,
-                
-                // ✅ GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
                 promotion_code: promotion_code || null,
                 has_promotion: !!payload.operation.additional_data
             });
@@ -238,8 +220,7 @@ const chargeWithTokenController = async (req, res) => {
             console.log("✅ Transacción guardada exitosamente:", {
                 id: savedTransaction._id,
                 shop_process_id: savedTransaction.shop_process_id,
-                has_promotion: savedTransaction.has_promotion,
-                promotion_code: savedTransaction.promotion_code
+                has_promotion: savedTransaction.has_promotion
             });
 
         } catch (dbError) {
@@ -268,30 +249,64 @@ const chargeWithTokenController = async (req, res) => {
         console.log("📥 Respuesta de pago con token:", response.status, JSON.stringify(response.data, null, 2));
 
         if (response.status === 200) {
-            const requiresAuth = response.data?.operation?.process_id && 
-                               !response.data?.operation?.response;
+            console.log("📥 Respuesta completa de Bancard:", JSON.stringify(response.data, null, 2));
+            
+            // ✅ BANCARD PUEDE DEVOLVER DATOS EN DIFERENTES UBICACIONES
+            const operationData = response.data?.operation || response.data?.confirmation || response.data;
+            
+            // ✅ VERIFICAR SI REQUIERE 3DS
+            const requiresAuth = response.data?.operation?.process_id && !operationData?.response;
+            
+            console.log("🔍 Datos extraídos:", {
+                hasOperation: !!response.data?.operation,
+                hasConfirmation: !!response.data?.confirmation,
+                response: operationData?.response,
+                response_code: operationData?.response_code,
+                authorization_number: operationData?.authorization_number,
+                requiresAuth
+            });
 
-            // ✅ ACTUALIZAR TRANSACCIÓN CON process_id DE BANCARD
+            // ✅ ACTUALIZAR TRANSACCIÓN INMEDIATAMENTE CON TODOS LOS DATOS
             try {
+                const updateData = {
+                    bancard_process_id: operationData?.process_id || response.data?.process_id,
+                    is_token_payment: true,
+                    alias_token: alias_token,
+                    user_bancard_id: finalUserBancardId
+                };
+
+                // ✅ SI HAY RESPUESTA INMEDIATA, GUARDAR TODOS LOS DATOS
+                if (operationData?.response) {
+                    const isApproved = operationData.response === 'S' && operationData.response_code === '00';
+                    
+                    updateData.response = operationData.response;
+                    updateData.response_code = operationData.response_code;
+                    updateData.response_description = operationData.response_description;
+                    updateData.extended_response_description = operationData.extended_response_description;
+                    updateData.authorization_number = operationData.authorization_number;
+                    updateData.ticket_number = operationData.ticket_number;
+                    updateData.status = isApproved ? 'approved' : 'rejected';
+                    updateData.bancard_confirmed = true;
+                    updateData.confirmation_date = new Date();
+                    
+                    if (operationData.security_information) {
+                        updateData.security_information = operationData.security_information;
+                    }
+                    
+                    console.log("✅ Actualizando transacción con datos completos:", {
+                        response: operationData.response,
+                        response_code: operationData.response_code,
+                        status: updateData.status,
+                        authorization_number: operationData.authorization_number
+                    });
+                }
+
                 await BancardTransactionModel.findOneAndUpdate(
                     { shop_process_id: parseInt(finalShopProcessId) },
-                    { 
-                        bancard_process_id: response.data?.operation?.process_id || response.data?.process_id,
-                        is_token_payment: true,
-                        alias_token: alias_token,
-                        user_bancard_id: finalUserBancardId,
-                        // Si no requiere 3DS y hay respuesta inmediata, actualizar estado
-                        ...(response.data?.operation?.response && {
-                            response: response.data.operation.response,
-                            response_code: response.data.operation.response_code,
-                            response_description: response.data.operation.response_description,
-                            authorization_number: response.data.operation.authorization_number,
-                            ticket_number: response.data.operation.ticket_number,
-                            status: (response.data.operation.response === 'S' && response.data.operation.response_code === '00') ? 'approved' : 'rejected'
-                        })
-                    }
+                    updateData
                 );
-                console.log("✅ Transacción actualizada con process_id de Bancard");
+                
+                console.log("✅ Transacción actualizada exitosamente");
             } catch (dbError) {
                 console.error("⚠️ Error actualizando transacción:", dbError);
             }
@@ -311,34 +326,29 @@ const chargeWithTokenController = async (req, res) => {
                     }
                 });
             } else {
-                console.log("✅ Pago procesado directamente (sin 3DS)");
+                // ✅ PAGO PROCESADO DIRECTAMENTE
+                const isApproved = operationData?.response === 'S' && operationData?.response_code === '00';
                 
-                // ✅ ACTUALIZAR ESTADO FINAL DE LA TRANSACCIÓN
-                try {
-                    const finalStatus = response.data?.operation?.response === 'S' && 
-                                      response.data?.operation?.response_code === '00' ? 'approved' : 'rejected';
-                    
-                    await BancardTransactionModel.findOneAndUpdate(
-                        { shop_process_id: parseInt(finalShopProcessId) },
-                        { 
-                            status: finalStatus,
-                            bancard_confirmed: true,
-                            confirmation_date: new Date()
-                        }
-                    );
-                    console.log(`✅ Transacción marcada como: ${finalStatus}`);
-                } catch (updateError) {
-                    console.error("⚠️ Error actualizando estado final:", updateError);
-                }
+                console.log("✅ Pago procesado directamente:", {
+                    response: operationData?.response,
+                    response_code: operationData?.response_code,
+                    isApproved,
+                    authorization: operationData?.authorization_number
+                });
 
                 res.json({
-                    message: "Pago con token procesado exitosamente",
-                    success: true,
-                    error: false,
+                    message: isApproved ? "Pago procesado exitosamente" : "Pago rechazado por el banco",
+                    success: isApproved,
+                    error: !isApproved,
                     requires3DS: false,
                     data: {
                         ...response.data,
-                        shop_process_id: finalShopProcessId
+                        shop_process_id: finalShopProcessId,
+                        payment_status: isApproved ? 'approved' : 'rejected',
+                        transaction_approved: isApproved,
+                        authorization_number: operationData?.authorization_number,
+                        ticket_number: operationData?.ticket_number,
+                        response_description: operationData?.response_description
                     }
                 });
             }
@@ -367,7 +377,6 @@ const chargeWithTokenController = async (req, res) => {
     } catch (error) {
         console.error("❌ Error en pago con token:", error);
         
-        // ✅ ACTUALIZAR TRANSACCIÓN COMO ERROR
         if (req.body.shop_process_id || error.shop_process_id) {
             try {
                 await BancardTransactionModel.findOneAndUpdate(
@@ -399,7 +408,6 @@ const chargeWithTokenController = async (req, res) => {
     }
 };
 
-// ✅ MANTENER OTROS CONTROLADORES IGUAL
 const createCardController = async (req, res) => {
     try {
         console.log("💳 === INICIANDO CATASTRO DE TARJETA ===");
