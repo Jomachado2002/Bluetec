@@ -178,7 +178,7 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
  */
 const createPaymentController = async (req, res) => {
     try {
-        console.log("🛒 === INICIO PROCESO DE PAGO OCASIONAL BANCARD ===");
+        console.log("🛒 === INICIO PROCESO DE PAGO OCASIONAL BANCARD - VERSIÓN CORREGIDA ===");
         console.log("📦 Request body:", JSON.stringify(req.body, null, 2));
         console.log("👤 Usuario autenticado:", req.isAuthenticated);
         console.log("🆔 User ID:", req.userId);
@@ -205,6 +205,8 @@ const createPaymentController = async (req, res) => {
             customer_info,
             items,
             sale_id,
+            // ✅ CAMPO DE PROMOCIÓN ESPECÍFICO
+            promotion_code = "",
             // ✅ CAMPOS DE TRACKING CORREGIDOS
             user_type = 'GUEST',
             payment_method = 'new_card',
@@ -224,8 +226,8 @@ const createPaymentController = async (req, res) => {
         } = req.body;
 
         // ✅ DECLARAR VARIABLES DE TRACKING AL INICIO
-      const finalUserType = req.isAuthenticated === true ? 'REGISTERED' : 'GUEST';
-const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || req.user?.bancardUserId) : null;
+        const finalUserType = req.isAuthenticated === true ? 'REGISTERED' : 'GUEST';
+        const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || req.user?.bancardUserId) : null;
         const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
         console.log("🔍 Variables de tracking declaradas:", {
@@ -279,7 +281,7 @@ const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || 
         const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
         console.log("🔗 Backend URL para redirecciones:", backendUrl);
 
-        // ✅ PAYLOAD CORREGIDO PARA PAGO OCASIONAL
+        // ✅ PAYLOAD CORREGIDO PARA PAGO OCASIONAL - SIN additional_data POR DEFECTO
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
@@ -289,13 +291,40 @@ const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || 
                 currency: currency,
                 description: description.substring(0, 20),
                 return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-                cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
-               
-
+                cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`
             }
         };
 
-        console.log("📤 Payload para Bancard (PAGO OCASIONAL):", JSON.stringify(payload, null, 2));
+        // ✅ IMPORTANTE: Solo agregar additional_data si hay una promoción válida
+        // Según documentación Bancard (páginas 12-13), el formato debe ser:
+        // Entidad (3 dígitos) + Marca (2 caracteres) + Producto (3 caracteres) + Afinidad (6 dígitos)
+        // Ejemplo válido: "099VS ORO000045"
+        
+        if (promotion_code && promotion_code.trim() !== "") {
+            // Validar formato de promoción
+            const promotionRegex = /^\d{3}[A-Z]{2}\s[A-Z]{3}\d{6}$/;
+            const cleanPromotionCode = promotion_code.trim();
+            
+            if (promotionRegex.test(cleanPromotionCode)) {
+                payload.operation.additional_data = cleanPromotionCode;
+                console.log("🎟️ Promoción válida aplicada al pago ocasional:", {
+                    promotion_code: promotion_code,
+                    additional_data: payload.operation.additional_data
+                });
+            } else {
+                console.log("⚠️ Formato de promoción inválido para pago ocasional, ignorando:", promotion_code);
+                console.log("💡 Formato requerido: '099VS ORO000045' (Entidad+Marca+Producto+Afinidad)");
+            }
+        }
+        // ✅ Si no hay promoción válida, NO incluir additional_data en el payload
+
+        console.log("📤 Payload para Bancard (PAGO OCASIONAL CORREGIDO):", {
+            ...JSON.parse(JSON.stringify(payload, null, 2)),
+            operation: {
+                ...payload.operation,
+                token: "***OCULTO***" // Ocultar token en logs
+            }
+        });
 
         const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/single_buy`;
         console.log("🌐 URL de Bancard:", bancardUrl);
@@ -353,7 +382,8 @@ const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || 
                     console.log("📋 Datos normalizados:", {
                         customer_info: normalizedCustomerInfo,
                         items: normalizedItems.length,
-                        user_type: finalUserType
+                        user_type: finalUserType,
+                        has_promotion: !!payload.operation.additional_data
                     });
 
                     const newTransaction = new BancardTransactionModel({
@@ -392,11 +422,19 @@ const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || 
                         
                         // ✅ CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
                         is_token_payment: false,
-                        alias_token: null
+                        alias_token: null,
+                        
+                        // ✅ GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
+                        promotion_code: promotion_code || null,
+                        has_promotion: !!payload.operation.additional_data
                     });
 
                     const savedTransaction = await newTransaction.save();
-                    console.log("✅ Transacción de pago ocasional guardada en BD:", savedTransaction._id);
+                    console.log("✅ Transacción de pago ocasional guardada en BD:", {
+                        id: savedTransaction._id,
+                        shop_process_id: savedTransaction.shop_process_id,
+                        has_promotion: savedTransaction.has_promotion
+                    });
 
                 } catch (dbError) {
                     console.error("⚠️ Error guardando transacción en BD:", dbError);
@@ -419,6 +457,8 @@ const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || 
                         amount: formattedAmount,
                         currency: currency,
                         description: description,
+                        has_promotion: !!payload.operation.additional_data,
+                        promotion_applied: payload.operation.additional_data || null,
                         
                         // ✅ DATOS PARA EL IFRAME
                         iframe_config: {

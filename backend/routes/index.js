@@ -188,15 +188,15 @@ router.post("/bancard/pago-con-token", authToken, chargeWithTokenController);
 // ===========================================
 
 // Test de catastro de tarjeta
-router.post("/bancard/test-catastro", async (req, res) => {
+router.post("/bancard/test-catastro", authToken, async (req, res) => {
     try {
         console.log("🧪 === TEST DE CATASTRO BANCARD ===");
         
         const testData = {
             card_id: Math.floor(Math.random() * 100000) + 11000, // ID único
-            user_id: 1, // Usuario de prueba
-            user_cell_phone: "12345678",
-            user_mail: "example@mail.com",
+            user_id: req.bancardUserId || req.user?.bancardUserId || 1,
+            user_cell_phone: req.user?.phone || "12345678",
+            user_mail: req.user?.email || "test@bluetec.com",
             return_url: `${process.env.FRONTEND_URL}/mi-perfil?tab=cards`
         };
 
@@ -357,36 +357,46 @@ router.get("/usuario/estadisticas-compras", authToken, getUserPurchaseStatsContr
 router.get("/admin/todas-compras", authToken, getAllUserPurchasesController);
 
 // Test de pago con token
-router.post("/bancard/test-pago-token", async (req, res) => {
+router.post("/bancard/test-pago-token", authToken, async (req, res) => {
     try {
-        console.log("🧪 === TEST DE PAGO CON TOKEN ===");
+        console.log("🧪 === TEST DE PAGO CON TOKEN - VERSIÓN CORREGIDA ===");
         
-        const { alias_token } = req.body;
+        const { alias_token, amount, description, promotion_code } = req.body;
         
         if (!alias_token) {
             return res.status(400).json({
                 message: "alias_token es requerido para el test",
                 success: false,
                 error: true,
-                example: { alias_token: "token-de-prueba" },
+                example: { 
+                    alias_token: "token-de-prueba",
+                    amount: "151241.00",
+                    description: "Test de pago BlueTec",
+                    promotion_code: "099VS ORO000045" // OPCIONAL: Solo si hay promoción
+                },
                 instructions: "Primero ejecuta test-listar para obtener un alias_token válido"
             });
         }
 
         const testPaymentData = {
             shop_process_id: Math.floor(Math.random() * 1000000) + 600000,
-            amount: "151241.00",
+            amount: amount || "151241.00",
             currency: "PYG",
             alias_token: alias_token,
             number_of_payments: 1,
-            description: "Test de pago con token BlueTec",
+            description: description || "Test de pago con token BlueTec - SIN additional_data",
             return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-        
+            // ✅ IMPORTANTE: Solo incluir promotion_code si es válido
+            ...(promotion_code && /^\d{3}[A-Z]{2}\s[A-Z]{3}\d{6}$/.test(promotion_code.trim()) && {
+                promotion_code: promotion_code.trim()
+            })
+            // ✅ NO incluir additional_data por defecto
         };
 
-        console.log("📤 Datos de test de pago:", testPaymentData);
+        console.log("📤 Datos de test de pago (SIN additional_data problemático):", testPaymentData);
+        console.log("⚠️ NOTA: additional_data removido para evitar error de promoción");
 
-        // Usar el controlador existente
+        // Usar el controlador corregido
         req.body = testPaymentData;
         await chargeWithTokenController(req, res);
         

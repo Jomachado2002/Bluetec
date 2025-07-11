@@ -1,4 +1,5 @@
-// backend/controller/bancard/bancardCardsController.js - VERSIÓN CORREGIDA
+// backend/controller/bancard/bancardCardsController.js - VERSIÓN CORREGIDA PARA BANCARD
+
 const crypto = require('crypto');
 const axios = require('axios');
 const BancardTransactionModel = require('../../models/bancardTransactionModel');
@@ -10,8 +11,395 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ CATASTRAR NUEVA TARJETA - MANTENER IGUAL
+ * ✅ PAGO CON ALIAS TOKEN - CORREGIDO SEGÚN DOCUMENTACIÓN BANCARD
  */
+const chargeWithTokenController = async (req, res) => {
+    try {
+        console.log("💳 === PAGO CON ALIAS TOKEN - VERSIÓN CORREGIDA ===");
+
+        const {
+            shop_process_id,
+            amount,
+            currency = 'PYG',
+            alias_token,
+            number_of_payments = 1,
+            description,
+            return_url,
+            // ✅ IMPORTANTE: additional_data SOLO para promociones específicas
+            additional_data = "", // Por defecto vacío
+            promotion_code = "", // Campo específico para promociones
+            customer_info,
+            items,
+            // ✅ CAMPOS DE TRACKING
+            user_type = 'REGISTERED',
+            payment_method = 'saved_card',
+            user_bancard_id = null,
+            user_agent = '',
+            payment_session_id = '',
+            device_type = 'unknown',
+            cart_total_items = 0,
+            referrer_url = '',
+            order_notes = '',
+            delivery_method = 'pickup',
+            invoice_number = '',
+            tax_amount = 0,
+            utm_source = '',
+            utm_medium = '',
+            utm_campaign = ''
+        } = req.body;
+
+        // ✅ VALIDACIONES INICIALES
+        if (!req.isAuthenticated) {
+            return res.status(401).json({
+                message: "Debes iniciar sesión para realizar pagos",
+                success: false,
+                error: true
+            });
+        }
+
+        if (!amount || !alias_token) {
+            return res.status(400).json({
+                message: "amount y alias_token son requeridos",
+                success: false,
+                error: true,
+                requiredFields: ['amount', 'alias_token']
+            });
+        }
+
+        if (amount <= 0) {
+            return res.status(400).json({
+                message: "El monto debe ser mayor a 0",
+                success: false,
+                error: true
+            });
+        }
+
+        const configValidation = validateBancardConfig();
+        if (!configValidation.isValid) {
+            return res.status(500).json({
+                message: "Error de configuración del sistema",
+                success: false,
+                error: true
+            });
+        }
+
+        // ✅ VARIABLES DE TRACKING
+        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
+        const finalUserBancardId = user_bancard_id || req.bancardUserId || req.user?.bancardUserId;
+        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+        const finalShopProcessId = shop_process_id || generateShopProcessId();
+        const formattedAmount = formatAmount(amount);
+
+        // ✅ GENERAR TOKEN SEGÚN DOCUMENTACIÓN BANCARD
+        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${finalShopProcessId}charge${formattedAmount}${currency}${alias_token}`;
+        const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
+
+        console.log("🔐 Token generado para pago con alias:", {
+            shop_process_id: finalShopProcessId,
+            formattedAmount,
+            currency,
+            alias_token: `${alias_token.substring(0, 20)}...`,
+            token
+        });
+
+        const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
+
+        // ✅ PAYLOAD CORREGIDO - additional_data SOLO SI HAY PROMOCIÓN
+        const payload = {
+            public_key: process.env.BANCARD_PUBLIC_KEY,
+            operation: {
+                token: token,
+                shop_process_id: parseInt(finalShopProcessId),
+                amount: formattedAmount,
+                number_of_payments: parseInt(number_of_payments),
+                currency: currency,
+                additional_data: "", 
+                description: description || "Pago BlueTec con tarjeta registrada",
+                alias_token: alias_token,
+                return_url: `${backendUrl}/api/bancard/redirect/success`,
+                extra_response_attributes: ["confirmation.process_id"]
+            }
+        };
+
+        // ✅ IMPORTANTE: Solo agregar additional_data si hay una promoción específica válida
+        // Según documentación Bancard (páginas 12-13), el formato debe ser:
+        // Entidad (3 dígitos) + Marca (2 caracteres) + Producto (3 caracteres) + Afinidad (6 dígitos)
+        // Ejemplo válido: "099VS ORO000045"
+        
+        if (promotion_code && promotion_code.trim() !== "") {
+            // Validar formato de promoción
+            const promotionRegex = /^\d{3}[A-Z]{2}\s[A-Z]{3}\d{6}$/;
+            const cleanPromotionCode = promotion_code.trim();
+            
+            if (promotionRegex.test(cleanPromotionCode)) {
+                payload.operation.additional_data = cleanPromotionCode;
+                console.log("🎟️ Promoción válida aplicada:", {
+                    promotion_code: promotion_code,
+                    additional_data: payload.operation.additional_data
+                });
+            } else {
+                console.log("⚠️ Formato de promoción inválido, ignorando:", promotion_code);
+                console.log("💡 Formato requerido: '099VS ORO000045' (Entidad+Marca+Producto+Afinidad)");
+            }
+        } else if (additional_data && additional_data.trim() !== "") {
+            // ✅ Si viene additional_data directamente, validar formato
+            const promotionRegex = /^\d{3}[A-Z]{2}\s[A-Z]{3}\d{6}$/;
+            const cleanAdditionalData = additional_data.trim();
+            
+            if (promotionRegex.test(cleanAdditionalData)) {
+                payload.operation.additional_data = cleanAdditionalData;
+                console.log("🎟️ additional_data válido aplicado:", cleanAdditionalData);
+            } else {
+                console.log("⚠️ additional_data con formato inválido, ignorando:", additional_data);
+                console.log("💡 Formato requerido según documentación Bancard: '099VS ORO000045'");
+            }
+        }
+        // ✅ Si no hay promoción válida, NO incluir additional_data en el payload
+
+        console.log("📤 Payload de pago con token (CORREGIDO):", {
+            shop_process_id: payload.operation.shop_process_id,
+            amount: payload.operation.amount,
+            currency: payload.operation.currency,
+            alias_token: `${payload.operation.alias_token.substring(0, 20)}...`,
+            description: payload.operation.description,
+            has_promotion: !!payload.operation.additional_data,
+            additional_data: payload.operation.additional_data || "NO INCLUIDO",
+            is_token_payment: true
+        });
+
+        // ✅ GUARDAR TRANSACCIÓN EN BD ANTES DE ENVIAR A BANCARD
+        try {
+            const normalizedCustomerInfo = {
+                name: customer_info?.name || req.user?.name || '',
+                email: customer_info?.email || req.user?.email || '',
+                phone: customer_info?.phone || req.user?.phone || '',
+                address: typeof customer_info?.address === 'string' 
+                    ? customer_info.address 
+                    : (customer_info?.address?.street || ''),
+                document_type: customer_info?.document_type || 'CI',
+                document_number: customer_info?.document_number || ''
+            };
+
+            const normalizedItems = (items || []).map(item => ({
+                product_id: item.product_id || item._id || '',
+                name: item.name || item.productName || 'Producto',
+                quantity: parseInt(item.quantity) || 1,
+                unit_price: parseFloat(item.unitPrice || item.unit_price || 0),
+                unitPrice: parseFloat(item.unitPrice || item.unit_price || 0),
+                total: parseFloat(item.total || ((item.quantity || 1) * (item.unitPrice || item.unit_price || 0))),
+                category: item.category || '',
+                brand: item.brand || '',
+                sku: item.sku || ''
+            }));
+
+            const newTransaction = new BancardTransactionModel({
+                shop_process_id: parseInt(finalShopProcessId),
+                bancard_process_id: null,
+                amount: parseFloat(formattedAmount),
+                currency: currency,
+                description: description || "Pago BlueTec con tarjeta registrada",
+                customer_info: normalizedCustomerInfo,
+                items: normalizedItems,
+                return_url: `${backendUrl}/api/bancard/redirect/success`,
+                cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
+                status: 'pending',
+                environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+                created_by: req.userId,
+                
+                // ✅ CAMPOS DE TRACKING
+                user_type: finalUserType,
+                payment_method: payment_method,
+                user_bancard_id: finalUserBancardId,
+                ip_address: clientIpAddress,
+                user_agent: user_agent || req.headers['user-agent'] || '',
+                payment_session_id: payment_session_id,
+                device_type: device_type,
+                cart_total_items: cart_total_items || normalizedItems.length,
+                referrer_url: referrer_url || req.headers.referer || '',
+                order_notes: order_notes,
+                delivery_method: delivery_method,
+                invoice_number: invoice_number,
+                tax_amount: parseFloat(tax_amount) || 0,
+                utm_source: utm_source,
+                utm_medium: utm_medium,
+                utm_campaign: utm_campaign,
+                
+                // ✅ CAMPOS ESPECÍFICOS PARA PAGO CON TOKEN
+                is_token_payment: true,
+                alias_token: alias_token,
+                
+                // ✅ GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
+                promotion_code: promotion_code || null,
+                has_promotion: !!payload.operation.additional_data
+            });
+
+            const savedTransaction = await newTransaction.save();
+            console.log("✅ Transacción guardada exitosamente:", {
+                id: savedTransaction._id,
+                shop_process_id: savedTransaction.shop_process_id,
+                has_promotion: savedTransaction.has_promotion,
+                promotion_code: savedTransaction.promotion_code
+            });
+
+        } catch (dbError) {
+            console.error("❌ Error crítico guardando transacción en BD:", dbError);
+            return res.status(500).json({
+                message: "Error al guardar transacción en base de datos",
+                success: false,
+                error: true,
+                details: dbError.message
+            });
+        }
+
+        // ✅ ENVIAR REQUEST A BANCARD
+        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/charge`;
+        console.log("🌐 URL de Bancard:", bancardUrl);
+        
+        const response = await axios.post(bancardUrl, payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'BlueTec-eCommerce/1.0',
+                'Accept': 'application/json'
+            },
+            timeout: 30000
+        });
+
+        console.log("📥 Respuesta de pago con token:", response.status, JSON.stringify(response.data, null, 2));
+
+        if (response.status === 200) {
+            const requiresAuth = response.data?.operation?.process_id && 
+                               !response.data?.operation?.response;
+
+            // ✅ ACTUALIZAR TRANSACCIÓN CON process_id DE BANCARD
+            try {
+                await BancardTransactionModel.findOneAndUpdate(
+                    { shop_process_id: parseInt(finalShopProcessId) },
+                    { 
+                        bancard_process_id: response.data?.operation?.process_id || response.data?.process_id,
+                        is_token_payment: true,
+                        alias_token: alias_token,
+                        user_bancard_id: finalUserBancardId,
+                        // Si no requiere 3DS y hay respuesta inmediata, actualizar estado
+                        ...(response.data?.operation?.response && {
+                            response: response.data.operation.response,
+                            response_code: response.data.operation.response_code,
+                            response_description: response.data.operation.response_description,
+                            authorization_number: response.data.operation.authorization_number,
+                            ticket_number: response.data.operation.ticket_number,
+                            status: (response.data.operation.response === 'S' && response.data.operation.response_code === '00') ? 'approved' : 'rejected'
+                        })
+                    }
+                );
+                console.log("✅ Transacción actualizada con process_id de Bancard");
+            } catch (dbError) {
+                console.error("⚠️ Error actualizando transacción:", dbError);
+            }
+
+            if (requiresAuth) {
+                console.log("🔐 Pago requiere autenticación 3DS");
+                res.json({
+                    message: "Pago requiere autenticación 3DS",
+                    success: true,
+                    error: false,
+                    requires3DS: true,
+                    data: {
+                        ...response.data,
+                        shop_process_id: finalShopProcessId,
+                        iframe_url: response.data?.operation?.process_id ? 
+                            `${getBancardBaseUrl()}/checkout/new/${response.data.operation.process_id}` : null
+                    }
+                });
+            } else {
+                console.log("✅ Pago procesado directamente (sin 3DS)");
+                
+                // ✅ ACTUALIZAR ESTADO FINAL DE LA TRANSACCIÓN
+                try {
+                    const finalStatus = response.data?.operation?.response === 'S' && 
+                                      response.data?.operation?.response_code === '00' ? 'approved' : 'rejected';
+                    
+                    await BancardTransactionModel.findOneAndUpdate(
+                        { shop_process_id: parseInt(finalShopProcessId) },
+                        { 
+                            status: finalStatus,
+                            bancard_confirmed: true,
+                            confirmation_date: new Date()
+                        }
+                    );
+                    console.log(`✅ Transacción marcada como: ${finalStatus}`);
+                } catch (updateError) {
+                    console.error("⚠️ Error actualizando estado final:", updateError);
+                }
+
+                res.json({
+                    message: "Pago con token procesado exitosamente",
+                    success: true,
+                    error: false,
+                    requires3DS: false,
+                    data: {
+                        ...response.data,
+                        shop_process_id: finalShopProcessId
+                    }
+                });
+            }
+        } else {
+            // ✅ ACTUALIZAR TRANSACCIÓN COMO FALLIDA
+            try {
+                await BancardTransactionModel.findOneAndUpdate(
+                    { shop_process_id: parseInt(finalShopProcessId) },
+                    { 
+                        status: 'failed',
+                        response_description: response.data?.message || 'Error en Bancard'
+                    }
+                );
+            } catch (dbError) {
+                console.error("⚠️ Error actualizando transacción fallida:", dbError);
+            }
+
+            res.status(response.status).json({
+                message: "Error en pago con token",
+                success: false,
+                error: true,
+                data: response.data
+            });
+        }
+
+    } catch (error) {
+        console.error("❌ Error en pago con token:", error);
+        
+        // ✅ ACTUALIZAR TRANSACCIÓN COMO ERROR
+        if (req.body.shop_process_id || error.shop_process_id) {
+            try {
+                await BancardTransactionModel.findOneAndUpdate(
+                    { shop_process_id: parseInt(req.body.shop_process_id || error.shop_process_id) },
+                    { 
+                        status: 'failed',
+                        response_description: error.message || 'Error interno'
+                    }
+                );
+            } catch (dbError) {
+                console.error("⚠️ Error actualizando transacción en catch:", dbError);
+            }
+        }
+        
+        let errorMessage = "Error al procesar pago con token";
+        let errorDetails = error.message;
+        
+        if (error.response) {
+            errorDetails = error.response.data;
+            console.error("📥 Error response de Bancard:", error.response.data);
+        }
+        
+        res.status(500).json({
+            message: errorMessage,
+            success: false,
+            error: true,
+            details: errorDetails
+        });
+    }
+};
+
+// ✅ MANTENER OTROS CONTROLADORES IGUAL
 const createCardController = async (req, res) => {
     try {
         console.log("💳 === INICIANDO CATASTRO DE TARJETA ===");
@@ -185,9 +573,6 @@ const createCardController = async (req, res) => {
     }
 };
 
-/**
- * ✅ LISTAR TARJETAS DE UN USUARIO - MANTENER IGUAL
- */
 const getUserCardsController = async (req, res) => {
     if (res.headersSent) {
         console.log("⚠️ Headers ya enviados, evitando respuesta duplicada");
@@ -314,372 +699,6 @@ const getUserCardsController = async (req, res) => {
     }
 };
 
-/**
- * ✅ PAGO CON ALIAS TOKEN - CORREGIDO COMPLETAMENTE
- */
-const chargeWithTokenController = async (req, res) => {
-    try {
-        console.log("💳 === PAGO CON ALIAS TOKEN ===");
-
-        const {
-            shop_process_id,
-            amount,
-            currency = 'PYG',
-            alias_token,
-            number_of_payments = 1,
-            description,
-            return_url,
-            additional_data = "",
-            customer_info,
-            items,
-            // ✅ CAMPOS DE TRACKING
-            user_type = 'REGISTERED',
-            payment_method = 'saved_card',
-            user_bancard_id = null,
-            user_agent = '',
-            payment_session_id = '',
-            device_type = 'unknown',
-            cart_total_items = 0,
-            referrer_url = '',
-            order_notes = '',
-            delivery_method = 'pickup',
-            invoice_number = '',
-            tax_amount = 0,
-            utm_source = '',
-            utm_medium = '',
-            utm_campaign = ''
-        } = req.body;
-
-        // ✅ DECLARAR VARIABLES AL INICIO PARA EVITAR ERROR
-        const finalUserType = req.isAuthenticated ? 'REGISTERED' : 'GUEST';
-        const finalUserBancardId = user_bancard_id || req.bancardUserId || req.user?.bancardUserId;
-        const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-
-        console.log("🔍 Variables de tracking inicializadas:", {
-            finalUserType,
-            finalUserBancardId,
-            clientIpAddress,
-            isAuthenticated: req.isAuthenticated,
-            userId: req.userId
-        });
-
-        if (!req.isAuthenticated) {
-            return res.status(401).json({
-                message: "Debes iniciar sesión para realizar pagos",
-                success: false,
-                error: true
-            });
-        }
-
-        if (!amount || !alias_token) {
-            return res.status(400).json({
-                message: "amount y alias_token son requeridos",
-                success: false,
-                error: true,
-                requiredFields: ['amount', 'alias_token']
-            });
-        }
-
-        if (amount <= 0) {
-            return res.status(400).json({
-                message: "El monto debe ser mayor a 0",
-                success: false,
-                error: true
-            });
-        }
-
-        const configValidation = validateBancardConfig();
-        if (!configValidation.isValid) {
-            return res.status(500).json({
-                message: "Error de configuración del sistema",
-                success: false,
-                error: true
-            });
-        }
-
-        const finalShopProcessId = shop_process_id || generateShopProcessId();
-        console.log("🆔 Shop Process ID:", finalShopProcessId);
-
-        const formattedAmount = formatAmount(amount);
-        const tokenString = `${process.env.BANCARD_PRIVATE_KEY}${finalShopProcessId}charge${formattedAmount}${currency}${alias_token}`;
-        const token = crypto.createHash('md5').update(tokenString, 'utf8').digest('hex');
-
-        console.log("🔐 Token generado para pago con alias:", {
-            shop_process_id: finalShopProcessId,
-            formattedAmount,
-            currency,
-            alias_token: `${alias_token.substring(0, 20)}...`,
-            token
-        });
-
-        const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
-
-        const payload = {
-            public_key: process.env.BANCARD_PUBLIC_KEY,
-            operation: {
-                token: token,
-                shop_process_id: parseInt(finalShopProcessId),
-                amount: formattedAmount,
-                number_of_payments: parseInt(number_of_payments),
-                currency: currency,
-                additional_data: additional_data,
-                description: description || "Pago BlueTec con tarjeta registrada",
-                alias_token: alias_token,
-                return_url: `${backendUrl}/api/bancard/redirect/success`,
-                extra_response_attributes: ["confirmation.process_id"]
-            }
-        };
-
-        console.log("📤 Payload de pago con token:", {
-            shop_process_id: payload.operation.shop_process_id,
-            amount: payload.operation.amount,
-            currency: payload.operation.currency,
-            alias_token: `${payload.operation.alias_token.substring(0, 20)}...`,
-            description: payload.operation.description,
-            is_token_payment: true
-        });
-
-        // ✅ GUARDAR TRANSACCIÓN EN BD ANTES DE ENVIAR A BANCARD CON DATOS NORMALIZADOS
-        try {
-            // ✅ NORMALIZAR CUSTOMER_INFO
-            const normalizedCustomerInfo = {
-                name: customer_info?.name || req.user?.name || '',
-                email: customer_info?.email || req.user?.email || '',
-                phone: customer_info?.phone || req.user?.phone || '',
-                address: typeof customer_info?.address === 'string' 
-                    ? customer_info.address 
-                    : (customer_info?.address?.street || ''),
-                document_type: customer_info?.document_type || 'CI',
-                document_number: customer_info?.document_number || ''
-            };
-
-            // ✅ NORMALIZAR ITEMS
-            const normalizedItems = (items || []).map(item => ({
-                product_id: item.product_id || item._id || '',
-                name: item.name || item.productName || 'Producto',
-                quantity: parseInt(item.quantity) || 1,
-                unit_price: parseFloat(item.unitPrice || item.unit_price || 0),
-                unitPrice: parseFloat(item.unitPrice || item.unit_price || 0),
-                total: parseFloat(item.total || ((item.quantity || 1) * (item.unitPrice || item.unit_price || 0))),
-                category: item.category || '',
-                brand: item.brand || '',
-                sku: item.sku || ''
-            }));
-
-            console.log("📋 Datos normalizados para BD:", {
-                customer_info: normalizedCustomerInfo,
-                items: normalizedItems.length,
-                user_type: finalUserType
-            });
-
-            const newTransaction = new BancardTransactionModel({
-                shop_process_id: parseInt(finalShopProcessId),
-                bancard_process_id: null,
-                amount: parseFloat(formattedAmount),
-                currency: currency,
-                description: description || "Pago BlueTec con tarjeta registrada",
-                customer_info: normalizedCustomerInfo,
-                items: normalizedItems,
-                return_url: `${backendUrl}/api/bancard/redirect/success`,
-                cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
-                status: 'pending',
-                environment: process.env.BANCARD_ENVIRONMENT || 'staging',
-                created_by: req.userId,
-                
-                // ✅ CAMPOS DE TRACKING CORREGIDOS
-                user_type: finalUserType,
-                payment_method: payment_method,
-                user_bancard_id: finalUserBancardId,
-                ip_address: clientIpAddress,
-                user_agent: user_agent || req.headers['user-agent'] || '',
-                payment_session_id: payment_session_id,
-                device_type: device_type,
-                cart_total_items: cart_total_items || normalizedItems.length,
-                referrer_url: referrer_url || req.headers.referer || '',
-                order_notes: order_notes,
-                delivery_method: delivery_method,
-                invoice_number: invoice_number,
-                tax_amount: parseFloat(tax_amount) || 0,
-                utm_source: utm_source,
-                utm_medium: utm_medium,
-                utm_campaign: utm_campaign,
-                
-                // ✅ CAMPOS ESPECÍFICOS PARA PAGO CON TOKEN
-                is_token_payment: true,
-                alias_token: alias_token
-            });
-
-            const savedTransaction = await newTransaction.save();
-            console.log("✅ Transacción guardada exitosamente:", {
-                id: savedTransaction._id,
-                shop_process_id: savedTransaction.shop_process_id,
-                user_bancard_id: finalUserBancardId,
-                user_type: finalUserType,
-                amount: savedTransaction.amount,
-                created_by: req.userId
-            });
-
-        } catch (dbError) {
-            console.error("❌ Error crítico guardando transacción en BD:", dbError);
-            return res.status(500).json({
-                message: "Error al guardar transacción en base de datos",
-                success: false,
-                error: true,
-                details: dbError.message
-            });
-        }
-
-        const bancardUrl = `${getBancardBaseUrl()}/vpos/api/0.3/charge`;
-        console.log("🌐 URL de Bancard:", bancardUrl);
-        
-        const response = await axios.post(bancardUrl, payload, {
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'BlueTec-eCommerce/1.0',
-                'Accept': 'application/json'
-            },
-            timeout: 30000
-        });
-
-        console.log("📥 Respuesta de pago con token:", response.status, JSON.stringify(response.data, null, 2));
-
-        if (response.status === 200) {
-            const requiresAuth = response.data?.operation?.process_id && 
-                               !response.data?.operation?.response;
-
-            // ✅ ACTUALIZAR TRANSACCIÓN CON process_id DE BANCARD
-            try {
-                await BancardTransactionModel.findOneAndUpdate(
-                    { shop_process_id: parseInt(finalShopProcessId) },
-                    { 
-                        bancard_process_id: response.data?.operation?.process_id || response.data?.process_id,
-                        is_token_payment: true,
-                        alias_token: alias_token,
-                        user_bancard_id: finalUserBancardId,
-                        // Si no requiere 3DS y hay respuesta inmediata, actualizar estado
-                        ...(response.data?.operation?.response && {
-                            response: response.data.operation.response,
-                            response_code: response.data.operation.response_code,
-                            response_description: response.data.operation.response_description,
-                            authorization_number: response.data.operation.authorization_number,
-                            ticket_number: response.data.operation.ticket_number,
-                            status: (response.data.operation.response === 'S' && response.data.operation.response_code === '00') ? 'approved' : 'rejected'
-
-                        })
-                    }
-                );
-                console.log("✅ Transacción actualizada con process_id de Bancard");
-            } catch (dbError) {
-                console.error("⚠️ Error actualizando transacción:", dbError);
-            }
-            const isReallySuccessful = response.data?.operation?.response === 'S' && 
-                          response.data?.operation?.response_code === '00';
-            if (requiresAuth) {
-                console.log("🔐 Pago requiere autenticación 3DS");
-                res.json({
-                    message: "Pago requiere autenticación 3DS",
-                    success: true,
-                    error: false,
-                    requires3DS: true,
-                    data: {
-                        ...response.data,
-                        shop_process_id: finalShopProcessId,
-                        iframe_url: response.data?.operation?.process_id ? 
-                            `${getBancardBaseUrl()}/checkout/new/${response.data.operation.process_id}` : null
-                    }
-                });
-            } else {
-                console.log("✅ Pago procesado directamente");
-                
-                // ✅ ACTUALIZAR ESTADO FINAL DE LA TRANSACCIÓN
-                try {
-                    const finalStatus = response.data?.operation?.response === 'S' && 
-                                      response.data?.operation?.response_code === '00' ? 'approved' : 'rejected';
-                    
-                    await BancardTransactionModel.findOneAndUpdate(
-                        { shop_process_id: parseInt(finalShopProcessId) },
-                        { 
-                            status: finalStatus,
-                            bancard_confirmed: true,
-                            confirmation_date: new Date()
-                        }
-                    );
-                    console.log(`✅ Transacción marcada como: ${finalStatus}`);
-                } catch (updateError) {
-                    console.error("⚠️ Error actualizando estado final:", updateError);
-                }
-
-                res.json({
-                    message: "Pago con token procesado exitosamente",
-                    success: true,
-                    error: false,
-                    requires3DS: false,
-                    data: {
-                        ...response.data,
-                        shop_process_id: finalShopProcessId
-                    }
-                });
-            }
-        } else {
-            // ✅ ACTUALIZAR TRANSACCIÓN COMO FALLIDA
-            try {
-                await BancardTransactionModel.findOneAndUpdate(
-                    { shop_process_id: parseInt(finalShopProcessId) },
-                    { 
-                        status: 'failed',
-                        response_description: response.data?.message || 'Error en Bancard'
-                    }
-                );
-            } catch (dbError) {
-                console.error("⚠️ Error actualizando transacción fallida:", dbError);
-            }
-
-            res.status(response.status).json({
-                message: "Error en pago con token",
-                success: false,
-                error: true,
-                data: response.data
-            });
-        }
-
-    } catch (error) {
-        console.error("❌ Error en pago con token:", error);
-        
-        // ✅ ACTUALIZAR TRANSACCIÓN COMO ERROR
-        if (req.body.shop_process_id || error.shop_process_id) {
-            try {
-                await BancardTransactionModel.findOneAndUpdate(
-                    { shop_process_id: parseInt(req.body.shop_process_id || error.shop_process_id) },
-                    { 
-                        status: 'failed',
-                        response_description: error.message || 'Error interno'
-                    }
-                );
-            } catch (dbError) {
-                console.error("⚠️ Error actualizando transacción en catch:", dbError);
-            }
-        }
-        
-        let errorMessage = "Error al procesar pago con token";
-        let errorDetails = error.message;
-        
-        if (error.response) {
-            errorDetails = error.response.data;
-            console.error("📥 Error response de Bancard:", error.response.data);
-        }
-        
-        res.status(500).json({
-            message: errorMessage,
-            success: false,
-            error: true,
-            details: errorDetails
-        });
-    }
-};
-
-/**
- * ✅ ELIMINAR TARJETA - MANTENER IGUAL
- */
 const deleteCardController = async (req, res) => {
     try {
         console.log("🗑️ === ELIMINANDO TARJETA ===");
