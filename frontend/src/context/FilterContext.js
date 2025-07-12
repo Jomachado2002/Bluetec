@@ -1,7 +1,6 @@
-// src/context/FilterContext.js - Asegurar que la ruta sea correcta (sin 's')
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import SummaryApi from '../common';
 import productCategory from '../helpers/productCategory';
 
@@ -76,10 +75,7 @@ export const FilterProvider = ({ children }) => {
     setFilterCount(count);
   }, [filterCategoryList, filterSubcategoryList, filterBrands, specFilters, priceRange]);
   
-  // Cargar datos cuando cambian los filtros
-  useEffect(() => {
-    fetchData();
-  }, [filterCategoryList, filterSubcategoryList, filterBrands, specFilters]);
+  
   
   // Aplicar ordenamiento y filtro de precio a los datos
   useEffect(() => {
@@ -148,55 +144,79 @@ export const FilterProvider = ({ children }) => {
     }
   };
   
-  // Función para cargar datos con filtros
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(SummaryApi.filterProduct.url, {
-        method: SummaryApi.filterProduct.method,
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          category: filterCategoryList,
-          subcategory: filterSubcategoryList,
-          brandName: filterBrands,
-          specifications: specFilters
-        })
-      });
+// ✅ REACT QUERY PARA FILTROS - CARGA TODOS LOS PRODUCTOS
+const queryClient = useQueryClient();
+const { data: queryData, isLoading: queryLoading } = useQuery({
+  queryKey: ['filter-products', filterCategoryList, filterSubcategoryList, filterBrands, specFilters],
+  queryFn: async () => {
+    // ✅ PRIMERO: Intentar obtener datos del caché individual
+    if (filterCategoryList.length === 1 && filterSubcategoryList.length === 1 && 
+        filterBrands.length === 0 && Object.keys(specFilters).length === 0) {
+      
+      const cachedData = queryClient.getQueryData(['category-products', filterCategoryList[0], filterSubcategoryList[0]]);
+      if (cachedData && cachedData.length > 0) {
+        console.log('✅ Usando datos del caché individual');
+        return {
+          data: cachedData,
+          filters: { brands: [], specifications: {} }
+        };
+      }
+    }
+    
+    // ✅ SI NO ESTÁ EN CACHÉ: Hacer consulta completa con filtros
+    console.log('🔄 Cargando datos con filtros desde servidor');
+    const response = await fetch(SummaryApi.filterProduct.url, {
+      method: SummaryApi.filterProduct.method,
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        category: filterCategoryList,
+        subcategory: filterSubcategoryList,
+        brandName: filterBrands,
+        specifications: specFilters
+      })
+    });
 
-      const dataResponse = await response.json();
-      if (dataResponse.success) {
-        setRawData(dataResponse.data || []);
-        
-        // Guardar filtros disponibles
-        const newFilters = {
+    const dataResponse = await response.json();
+    if (dataResponse.success) {
+      return {
+        data: dataResponse.data || [],
+        filters: {
           brands: dataResponse.filters?.brands || [],
           specifications: dataResponse.filters?.specifications || {}
-        };
-        
-        setAvailableFilters(newFilters);
-        
-        // Preestablecer los acordeones de especificaciones
-        if (dataResponse.filters?.specifications) {
-          const specKeys = Object.keys(dataResponse.filters.specifications);
-          const newAccordions = { ...activeAccordions };
-          
-          // Abrir solo las primeras 3 especificaciones por defecto
-          specKeys.slice(0, 3).forEach(key => {
-            newAccordions[`spec-${key}`] = true;
-          });
-          
-          setActiveAccordions(newAccordions);
         }
-      }
-    } catch (error) {
-      console.error('Error al cargar productos:', error);
-      setRawData([]);
-    } finally {
-      setLoading(false);
+      };
     }
-  };
+    
+    throw new Error('Error al cargar productos');
+  },
+  staleTime: 3 * 60 * 1000, // 3 minutos para filtros
+  cacheTime: 10 * 60 * 1000, // 10 minutos
+  retry: 1,
+  refetchOnWindowFocus: false,
+});
+
+// ✅ SINCRONIZAR CON ESTADOS LOCALES
+useEffect(() => {
+  if (queryData) {
+    setRawData(queryData.data || []);
+    setAvailableFilters(queryData.filters || { brands: [], specifications: {} });
+    
+    // Preestablecer los acordeones de especificaciones
+    if (queryData.filters?.specifications) {
+      const specKeys = Object.keys(queryData.filters.specifications);
+      const newAccordions = { ...activeAccordions };
+      
+      specKeys.slice(0, 3).forEach(key => {
+        newAccordions[`spec-${key}`] = true;
+      });
+      
+      setActiveAccordions(newAccordions);
+    }
+  }
+  setLoading(queryLoading);
+}, [queryData, queryLoading]);
   
   // Manejar selección de categoría
   const handleSelectCategory = (category) => {
@@ -398,7 +418,6 @@ export const FilterProvider = ({ children }) => {
     clearAllFilters,
     hasActiveFilters,
     findParentCategory,
-    fetchData
   };
   
   return (

@@ -6,6 +6,9 @@ import { FaAngleRight } from 'react-icons/fa';
 import BannerProduct from '../components/BannerProduct';
 
 import VerticalCardProduct from '../components/VerticalCardProduct';
+import InfiniteCarousel from '../components/products/InfiniteCarousel';
+import { useHomeProducts } from '../hooks/useProducts';
+import { useQueryClient } from '@tanstack/react-query';
 import BrandCarousel from '../components/BrandCarousel';
 import NotebookBanner from '../components/NotebookBanner';
 import LatestProductsMix from '../components/LatestProductsMix';
@@ -38,6 +41,20 @@ const staggerChildren = {
 };
 
 const Home = () => {
+  // ✅ HOOK PARA CARGAR PRODUCTOS OPTIMIZADOS
+  const { data: homeData, isLoading: homeLoading } = useHomeProducts();
+
+// ✅ PRE-LLENAR CACHÉ INDIVIDUAL
+const queryClient = useQueryClient();
+useEffect(() => {
+  if (homeData?.data) {
+    Object.entries(homeData.data).forEach(([category, subcategories]) => {
+      Object.entries(subcategories).forEach(([subcategory, products]) => {
+        queryClient.setQueryData(['category-products', category, subcategory], products);
+      });
+    });
+  }
+}, [homeData, queryClient]);
   // Lazy load imágenes y componentes
   useEffect(() => {
     // Asegurarse de que la página se cargue desde arriba al entrar
@@ -174,7 +191,7 @@ const Home = () => {
                     </Link>
                   </div>
                   
-                  <VerticalCardProduct
+                 <VerticalCardProduct
                     category="informatica"
                     subcategory="notebooks"
                     heading=""

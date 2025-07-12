@@ -14,24 +14,29 @@ const VerticalCard = ({ loading, data = [] }) => {
     const [hoveredProductId, setHoveredProductId] = useState(null);
     const [hoverTimeout, setHoverTimeout] = useState(null);
 
-    // Cache simple para imágenes
-    useEffect(() => {
-        if (data.length > 0) {
-            // Precargar primeras 6 imágenes
-            const firstSix = data.slice(0, 6);
-            firstSix.forEach(product => {
-                if (product?.productImage?.[0]) {
-                    const img = new Image();
-                    img.src = product.productImage[0];
+   // ✅ PRELOAD INTELIGENTE Y PROGRESIVO
+useEffect(() => {
+    if (data.length > 0) {
+        // Solo precargar primeras 8 imágenes principales
+        const firstEight = data.slice(0, 8);
+        
+        // Precargar con prioridad
+        firstEight.forEach((product, index) => {
+            if (product?.productImage?.[0]) {
+                const img = new Image();
+                img.src = product.productImage[0];
+                
+                // Solo precargar segunda imagen para los primeros 4
+                if (index < 4 && product?.productImage?.[1]) {
+                    setTimeout(() => {
+                        const img2 = new Image();
+                        img2.src = product.productImage[1];
+                    }, 100 * index); // Espaciar la carga
                 }
-                // Precargar segunda imagen si existe
-                if (product?.productImage?.[1]) {
-                    const img2 = new Image();
-                    img2.src = product.productImage[1];
-                }
-            });
-        }
-    }, [data]);
+            }
+        });
+    }
+}, [data]);
 
     const handleAddToCart = (e, product) => {
         e.stopPropagation();
@@ -139,6 +144,8 @@ const VerticalCard = ({ loading, data = [] }) => {
                                         }`}
                                         loading="lazy"
                                         onError={() => handleImageError(product._id)}
+                                        decoding="async"
+                                        style={{ contentVisibility: 'auto' }}
                                     />
                                     
                                     {/* Imagen de hover (segunda imagen) */}
@@ -149,6 +156,9 @@ const VerticalCard = ({ loading, data = [] }) => {
                                             className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
                                                 showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
                                             }`}
+                                            loading="lazy"
+                                            decoding="async"
+                                            style={{ contentVisibility: 'auto' }}
                                         />
                                     )}
                                 </>

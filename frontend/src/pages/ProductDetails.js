@@ -8,6 +8,8 @@ import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import { trackWhatsAppContact, trackAddToCart } from '../components/MetaPixelTracker';
 import VerticalCardProduct from '../components/VerticalCardProduct';
+import { useQuery } from '@tanstack/react-query';
+
 
 // Lista de todas las posibles especificaciones por categoría
 const specificationsByCategory = {
@@ -402,10 +404,12 @@ const ProductDetails = () => {
     return specs;
   };
 
-  const fetchProductDetails = async () => {
-    setLoading(true);
+ // ✅ PRODUCTO CON CACHÉ AUTOMÁTICO
+const { data: productData, isLoading: productLoading } = useQuery({
+  queryKey: ['product-details', params?.id],
+  queryFn: async () => {
+    // Primero intentamos buscar por ID
     try {
-      // Primero intentamos buscar por ID (para mantener compatibilidad)
       const response = await fetch(SummaryApi.productDetails.url, {
         method: SummaryApi.productDetails.method,
         headers: { "content-type": "application/json" },
@@ -415,68 +419,41 @@ const ProductDetails = () => {
       const dataResponse = await response.json();
       
       if (dataResponse?.success) {
-        setLoading(false);
-        const productData = dataResponse?.data;
-        setData(productData);
-        setCurrentProductId(productData?._id);
-        
-        // Solo actualizamos la imagen activa si hay imágenes disponibles
-        if (productData?.productImage && productData?.productImage.length > 0) {
-          setActiveImage(productData?.productImage[0]);
-        }
-        
+        return dataResponse.data;
       } else {
-        // Si no se encuentra por ID, intentamos buscar por slug
-        try {
-          const slugResponse = await fetch(`${SummaryApi.productDetailsBySlug?.url || '/api/producto-por-slug'}/${params?.id}`);
-          const slugData = await slugResponse.json();
-          
-          if (slugData?.success) {
-            setLoading(false);
-            const productData = slugData?.data;
-            setData(productData);
-            setCurrentProductId(productData?._id);
-            
-            // Solo actualizamos la imagen activa si hay imágenes disponibles
-            if (productData?.productImage && productData?.productImage.length > 0) {
-              setActiveImage(productData?.productImage[0]);
-            }
-            
-          } else {
-            setLoading(false);
-            console.error("Producto no encontrado");
-          }
-        } catch (slugErr) {
-          console.error("Error al buscar por slug:", slugErr);
-          setLoading(false);
+        // Si no se encuentra por ID, intentar por slug
+        const slugResponse = await fetch(`${SummaryApi.productDetailsBySlug?.url || '/api/producto-por-slug'}/${params?.id}`);
+        const slugData = await slugResponse.json();
+        
+        if (slugData?.success) {
+          return slugData.data;
         }
+        
+        throw new Error('Producto no encontrado');
       }
-    } catch (err) {
-      console.error("Error al obtener detalles del producto:", err);
-      setLoading(false);
+    } catch (error) {
+      throw new Error('Error al cargar producto: ' + error.message);
     }
-  };
+  },
+  staleTime: 5 * 60 * 1000, // 5 minutos
+  cacheTime: 10 * 60 * 1000, // 10 minutos
+  retry: 1,
+});
 
-  useEffect(() => {
-    // Resetear el estado cuando cambia el producto
-    setData({
-      productName: "",
-      brandName: "",
-      category: "",
-      productImage: [],
-      description: "",
-      price: "",
-      sellingPrice: ""
-    });
-    setLoading(true);
-    setActiveImage("");
-    setZoomImage(false);
-    setZoomImageCoordinate({ x: 0, y: 0 });
+// ✅ SINCRONIZAR CON ESTADO LOCAL
+useEffect(() => {
+  if (productData) {
+    setData(productData);
+    setCurrentProductId(productData._id);
+    setLoading(false);
     
-    fetchProductDetails();
-    // Scroll al inicio de la página
-    window.scrollTo(0, 0);
-  }, [params.id]); // Dependencia explícita de params.id
+    if (productData.productImage && productData.productImage.length > 0) {
+      setActiveImage(productData.productImage[0]);
+    }
+  } else {
+    setLoading(productLoading);
+  }
+}, [productData, productLoading]);
 
   // Redirección canónica para SEO
   useEffect(() => {

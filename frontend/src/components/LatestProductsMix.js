@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import displayPYGCurrency from '../helpers/displayCurrency';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FaAngleLeft, FaAngleRight, FaShoppingCart, FaExpand } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import addToCart from '../helpers/addToCart';
@@ -38,83 +39,76 @@ const LatestProductsMix = ({ limit = 5 }) => {
         };
     };
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            // Obtener todos los productos
-            const response = await fetch(SummaryApi.allProduct.url);
-            const responseData = await response.json();
-            
-            if (responseData.success) {
-                const allProducts = responseData.data || [];
-                
-                // Ordenar por fecha de creación (más recientes primero)
-                allProducts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                
-                // Agrupar productos por subcategoría
-                const productsBySubcategory = {};
-                
-                allProducts.forEach(product => {
-                    const key = product.subcategory;
-                    if (!productsBySubcategory[key]) {
-                        productsBySubcategory[key] = [];
-                    }
-                    productsBySubcategory[key].push(product);
-                });
-                
-                // Tomar los primeros 5 productos de cada subcategoría
-                const subcategories = Object.keys(productsBySubcategory);
-                let productsToShow = [];
-                
-                subcategories.forEach(subcategory => {
-                    const subcategoryProducts = productsBySubcategory[subcategory]
-                        .slice(0, limit); // Tomar hasta 5 productos por subcategoría
-                    productsToShow = [...productsToShow, ...subcategoryProducts];
-                });
-                
-                // Intercalar productos
-                // Primero los ordenamos por subcategoría y luego por fecha
-                // Esto garantiza que los productos estén agrupados por subcategoría
-                productsToShow.sort((a, b) => {
-                    // Si son de diferentes subcategorías, ordenar alfabéticamente por subcategoría
-                    if (a.subcategory !== b.subcategory) {
-                        return a.subcategory.localeCompare(b.subcategory);
-                    }
-                    
-                    // Si son de la misma subcategoría, ordenar por fecha (más reciente primero)
-                    return new Date(b.createdAt) - new Date(a.createdAt);
-                });
-                
-                // Ahora intercalamos los productos
-                const interleavedProducts = [];
-                const maxProductsPerSubcategory = Math.min(
-                    limit,
-                    Math.max(...Object.values(productsBySubcategory).map(arr => arr.length))
-                );
-                
-                // Para cada posición (0-4)
-                for (let i = 0; i < maxProductsPerSubcategory; i++) {
-                    // Para cada subcategoría
-                    subcategories.forEach(subcategory => {
-                        const productList = productsBySubcategory[subcategory];
-                        if (i < productList.length) {
-                            interleavedProducts.push(productList[i]);
-                        }
-                    });
-                }
-                
-                setData(interleavedProducts);
-            }
-        } catch (error) {
-            console.error("Error al cargar productos destacados:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // ✅ USAR DATOS DEL CACHÉ DE HOME
+const queryClient = useQueryClient();
 
-    useEffect(() => {
-        fetchData();
-    }, [limit]);
+useEffect(() => {
+    // Intentar obtener datos del caché de home-products
+    const homeCache = queryClient.getQueryData(['category-products', 'all']);
+    
+    if (homeCache && homeCache.data) {
+        console.log('✅ Usando productos del caché para destacados');
+        setLoading(false);
+        
+        // Procesar datos del caché organizado
+        const allCachedProducts = [];
+        
+        // Extraer productos de todas las categorías cacheadas
+        Object.values(homeCache.data).forEach(categoryData => {
+            Object.values(categoryData).forEach(products => {
+                if (Array.isArray(products)) {
+                    allCachedProducts.push(...products);
+                }
+            });
+        });
+        
+        if (allCachedProducts.length > 0) {
+            // Ordenar por fecha de creación (más recientes primero)
+            allCachedProducts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            // Tomar solo los primeros 15 productos más recientes
+            const latestProducts = allCachedProducts.slice(0, 15);
+            setData(latestProducts);
+            return;
+        }
+    }
+    
+    // Si no hay caché, cargar datos
+    fetchDataFromServer();
+}, [queryClient]);
+
+const fetchDataFromServer = async () => {
+    setLoading(true);
+    try {
+        console.log('🔄 Cargando productos destacados desde servidor');
+        const response = await fetch(SummaryApi.allProduct.url, {
+            method: SummaryApi.allProduct.method,
+            credentials: 'include'
+            });
+        const responseData = await response.json();
+        
+        if (responseData.success) {
+            const allProducts = responseData.data || [];
+            
+            // Filtrar productos con stock
+            const filteredProducts = allProducts.filter(product => 
+                product?.stock === undefined || product?.stock === null || product?.stock > 0
+            );
+            
+            // Ordenar por fecha y tomar solo los más recientes
+            filteredProducts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const latestProducts = filteredProducts.slice(0, 15);
+            
+            setData(latestProducts);
+        }
+    } catch (error) {
+        console.error("Error al cargar productos destacados:", error);
+    } finally {
+        setLoading(false);
+    }
+};
+
+    
 
     const scrollRight = () => {
         scrollElement.current.scrollBy({ left: 300, behavior: 'smooth' });

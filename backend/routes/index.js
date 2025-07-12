@@ -12,7 +12,7 @@ const userLogout = require('../controller/user/userLogout');
 const allUsers = require('../controller/user/allUser');
 const updateUser = require('../controller/user/updateUser');
 const UploadProductController = require('../controller/product/uploadProduct');
-const getProductController = require('../controller/product/getProduct');
+const { getProductController, getHomeProductsController } = require('../controller/product/getProduct');
 const { updateProductController} = require('../controller/product/updateProduct');
 const getCategoryProduct = require('../controller/product/getCategoryProduct');
 const getCategoryWiseProduct = require('../controller/product/getCategoryWiseProduct');
@@ -769,7 +769,7 @@ router.post("/actualizar-usuario", authToken, updateUser);
 // RUTAS DE PRODUCTOS
 // ===========================================
 router.post("/cargar-producto", authToken, UploadProductController);
-router.get("/obtener-productos", getProductController);
+router.get("/obtener-productos-home", getHomeProductsController);
 router.post("/actualizar-producto", authToken, updateProductController);
 router.get("/obtener-categorias", getCategoryProduct);
 router.post("/productos-por-categoria", getCategoryWiseProduct);

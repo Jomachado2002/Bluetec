@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import fetchCategoryWiseProduct from '../helpers/fetchCategoryWiseProduct';
 import displayPYGCurrency from '../helpers/displayCurrency';
 import { FaAngleLeft, FaAngleRight, FaShoppingCart } from 'react-icons/fa';
@@ -26,52 +27,64 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
         fetchUserAddToCart();
     };
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const categoryProduct = await fetchCategoryWiseProduct(category, subcategory);
-            let products = categoryProduct?.data || [];
-            
-            // Filtrar productos sin stock
-            products = products.filter(product => 
-                product?.stock === undefined || product?.stock === null || product?.stock > 0
-            );
-            
-            // 🚀 NUEVA VALIDACIÓN: Limitar a 6 productos en móvil
-                const isMobile = window.innerWidth < 768;
-                if (isMobile && products.length > 6) {
-                    // Ordenar productos por precio
-                    const sortedByPrice = [...products].sort((a, b) => a.sellingPrice - b.sellingPrice);
-                    
-                    // Dividir en 3 rangos de precios
-                    const total = sortedByPrice.length;
-                    const tercio = Math.floor(total / 3);
-                    
-                    const baratos = sortedByPrice.slice(0, tercio); // 33% más baratos
-                    const medios = sortedByPrice.slice(tercio, tercio * 2); // 33% precio medio  
-                    const caros = sortedByPrice.slice(tercio * 2); // 33% más caros
-                    
-                    // Seleccionar 2 de cada rango
-                    const seleccionados = [
-                        ...baratos.slice(0, 2),
-                        ...medios.slice(0, 2),
-                        ...caros.slice(0, 2)
-                    ];
-                    
-                    products = seleccionados;
-                }
-            
-            setData(products);
-        } catch (error) {
-            console.error("Error al cargar productos:", error);
-        } finally {
-            setLoading(false);
+    // ✅ QUERY CON CACHÉ Y LÍMITES INTELIGENTES
+const { data: queryData, isLoading: queryLoading } = useQuery({
+    queryKey: ['category-products', category, subcategory],
+    queryFn: async () => {
+        const categoryProduct = await fetchCategoryWiseProduct(category, subcategory);
+        let products = categoryProduct?.data || [];
+        
+        // Filtrar productos sin stock
+        products = products.filter(product => 
+            product?.stock === undefined || product?.stock === null || product?.stock > 0
+        );
+        
+        // 🚀 LÍMITES INTELIGENTES POR CATEGORÍA
+        const limits = {
+            // Categorías pequeñas
+            'mouses': 12,
+            'teclados': 12,
+            'auriculares': 12,
+            'microfonos': 12,
+            // Categorías medianas  
+            'notebooks': 20,
+            'monitores': 20,
+            'memorias_ram': 20,
+            'discos_duros': 20,
+            'tarjeta_grafica': 20,
+            'gabinetes': 20,
+            'procesador': 20,
+            'placas_madre': 20,
+            // Por defecto
+            'default': 20
+        };
+        
+        const limit = limits[subcategory] || limits['default'];
+        
+        // Aplicar límite
+        if (products.length > limit) {
+            products = products.slice(0, limit);
         }
-    };
+        
+        return products;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    cacheTime: 10 * 60 * 1000, // 10 minutos
+    retry: 1,
+    refetchOnWindowFocus: false,
+});
 
+// Sincronizar con estado local
+useEffect(() => {
+    if (queryData) {
+        setData(queryData);
+    }
+    setLoading(queryLoading);
+}, [queryData, queryLoading]);
     // Precargar todas las imágenes cuando se cargan los datos
     useEffect(() => {
         if (data.length > 0) {
+            
             data.forEach(product => {
                 // Precargar primera imagen
                 if (product?.productImage?.[0]) {
@@ -87,9 +100,7 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
         }
     }, [data]);
 
-    useEffect(() => {
-        fetchData();
-    }, [category, subcategory]);
+  
 
     const scrollRight = () => {
         scrollElement.current.scrollBy({ left: 300, behavior: 'smooth' });
