@@ -445,8 +445,8 @@ async function generateBudgetPDF(budgetId) {
     doc.fontSize(12).fillColor(primaryColor).text('DATOS DE LA EMPRESA', 50, 140);
     doc.fontSize(9).fillColor(secondaryColor);
     doc.text('BlueTec EAS', 50, 160);
-    doc.text('Teodoro S. Mongelos casi Radio Operadores del Chaco n 3934', 50, 175, { width: 200 });
-    doc.text('Teléfono: +595 972 971353', 50, 200);
+    doc.text('Avda Mariscal Lopez casi Libertad Paseo Dylan 2do Piso', 50, 175, { width: 200 });
+    doc.text('Teléfono: +595 984 133 733', 50, 200);
     doc.text('Email: ventas@bluetec.com.py', 50, 215);
     doc.text('RUC: 80136342-0', 50, 230);
     
