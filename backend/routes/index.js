@@ -89,6 +89,15 @@ const {
     getSupplierProfitabilitySummaryController
 } = require('../controller/profitability/profitabilityController');
 
+// ===== CONTROLADORES DE UBICACIÓN =====
+const {
+    reverseGeocodeController,
+    geocodeAddressController,
+    saveUserLocationController,
+    getUserLocationController,
+    saveGuestLocationController
+} = require('../controller/location/locationController');
+
 // ===== CONTROLADORES DE VENTAS Y COMPRAS =====
 const {
     createSaleController,
@@ -862,6 +871,15 @@ router.delete("/finanzas/compras/:purchaseId", authToken, deletePurchaseControll
 router.get("/finanzas/dashboard", authToken, getDashboardSummaryController);
 router.get("/finanzas/estado-cuenta", authToken, getAccountStatementController);
 router.get("/finanzas/metricas-anuales", authToken, getYearlyMetricsController);
+
+// ===========================================
+// RUTAS DE UBICACIÓN Y GEOCODIFICACIÓN
+// ===========================================
+router.post("/ubicacion/reverse-geocode", reverseGeocodeController);
+router.post("/ubicacion/geocode", geocodeAddressController);
+router.post("/ubicacion/usuario", authToken, saveUserLocationController);
+router.get("/ubicacion/usuario", authToken, getUserLocationController);
+router.post("/ubicacion/invitado", saveGuestLocationController);
 
 // ===========================================
 // RUTAS DE SALUD Y MONITOREO

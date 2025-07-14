@@ -141,7 +141,19 @@ const BannerProduct = () => {
         { icon: <CreditCard className="w-3 h-3 md:w-4 md:h-4" />, text: "Financiación" },
         { icon: <Truck className="w-3 h-3 md:w-4 md:h-4" />, text: "Envío express" }
       ]
-    }
+    },
+{
+  title: "",
+  subtitle: "",
+  description: "",
+  icon: null,
+  bgColor: "fondogabinete", 
+  action: "",
+  category: "",
+  subcategory: "",
+  badge: "",
+  features: []
+}
   ];
 
   const nextSlide = () => {
@@ -387,13 +399,25 @@ const BannerProduct = () => {
   }, [activeTab]);
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-0 sm:py-4 mt-2 sm:mt-0">
+    <div className="w-full px-0 py-0 sm:py-4 mt-2 sm:mt-0">
       <div className="relative h-80 sm:h-80 md:h-96 lg:h-96 w-full overflow-hidden rounded-xl sm:rounded-2xl shadow-lg sm:shadow-2xl">
         {/* Background with gradient */}
-        <div
-          className={`absolute inset-0 bg-gradient-to-r ${bannerData[activeTab].bgColor} transition-all duration-700 ease-in-out`}
-        ></div>
-
+    <div 
+  className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+    bannerData[activeTab].bgColor === 'fondogabinete' 
+      ? 'banner-image-background' 
+      : ''
+  }`}
+  style={{
+    backgroundImage: bannerData[activeTab].bgColor === 'fondogabinete' 
+      ? 'url(/fondogabinete.png)' 
+      : undefined
+  }}
+>
+  {bannerData[activeTab].bgColor !== 'fondogabinete' && (
+    <div className={`absolute inset-0 bg-gradient-to-r ${bannerData[activeTab].bgColor}`}></div>
+  )}
+</div>
         {/* Animated pattern overlay */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 bg-grid-pattern animate-pulse"></div>

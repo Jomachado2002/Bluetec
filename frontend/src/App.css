@@ -66,3 +66,16 @@ body.modal-open {
 .admin-content {
     padding-top: 20px;
 }
+.banner-image-background {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+/* Para móviles - usar stretch para mostrar toda la imagen */
+@media (max-width: 640px) {
+  .banner-image-background {
+    background-size: 100% 100% !important;
+    background-position: center !important;
+  }
+}
