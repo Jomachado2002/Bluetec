@@ -1,4 +1,4 @@
-// backend/models/userModel.js - VERSIÓN CON BANCARD USER ID MEJORADO Y CORREGIDA
+// backend/models/userModel.js - CORRECCIÓN DEL CAMPO LOCATION
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -97,31 +97,81 @@ const userSchema = new mongoose.Schema({
         type: String
     },
     
-    // ✅ CAMPO LOCATION CORREGIDO - MOVIDO FUERA DE ADDRESS
+    // ✅ CAMPO LOCATION CORREGIDO - AHORA OPCIONAL
     location: {
-        lat: { 
-            type: Number,
-            min: -90,
-            max: 90
+        type: {
+            lat: { 
+                type: Number,
+                min: -90,
+                max: 90
+            },
+            lng: { 
+                type: Number,
+                min: -180,
+                max: 180
+            },
+            address: {
+                type: String,
+                trim: true
+            },
+            googleMapsUrl: {
+                type: String,
+                trim: true
+            },
+            timestamp: {
+                type: Date,
+                default: Date.now
+            }
         },
-        lng: { 
-            type: Number,
-            min: -180,
-            max: 180
-        },
-        address: {
+        required: false  // ✅ AHORA ESTÁ EN EL LUGAR CORRECTO
+    },
+    // ✅ PREFERENCIAS DE PEDIDOS (AGREGAR DESPUÉS DE LOCATION)
+    orderPreferences: {
+        preferredPaymentMethod: {
             type: String,
-            trim: true
+            enum: ['bancard', 'bank_transfer', 'none'],
+            default: 'none'
         },
-        googleMapsUrl: {
+        defaultDeliveryAddress: {
+            street: {
+                type: String,
+                trim: true
+            },
+            city: {
+                type: String,
+                trim: true
+            },
+            coordinates: {
+                lat: {
+                    type: Number,
+                    min: -90,
+                    max: 90
+                },
+                lng: {
+                    type: Number,
+                    min: -180,
+                    max: 180
+                }
+            },
+            isDefault: {
+                type: Boolean,
+                default: false
+            }
+        },
+        receiveOrderNotifications: {
+            type: Boolean,
+            default: true
+        },
+        receivePromotions: {
+            type: Boolean,
+            default: true
+        },
+        preferredContactMethod: {
             type: String,
-            trim: true
-        },
-        timestamp: {
-            type: Date,
-            default: Date.now
+            enum: ['email', 'whatsapp', 'both'],
+            default: 'email'
         }
-    }
+    },
     
 }, {
     timestamps: true

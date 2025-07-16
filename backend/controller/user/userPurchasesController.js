@@ -3,6 +3,8 @@
 const BancardTransactionModel = require('../../models/bancardTransactionModel');
 const SaleModel = require('../../models/saleModel');
 const userModel = require('../../models/userModel');
+const OrderModel = require('../../models/orderModel'); // AGREGAR ESTA LÍNEA
+
 
 /**
  * ✅ OBTENER COMPRAS DE UN USUARIO ESPECÍFICO
@@ -93,6 +95,7 @@ const getUserPurchasesController = async (req, res) => {
 
         // ✅ PROCESAR DATOS PARA RESPUESTA
         const processedPurchases = transactions.map(transaction => {
+            
             return {
                 id: transaction._id,
                 shop_process_id: transaction.shop_process_id,
@@ -141,24 +144,71 @@ const getUserPurchasesController = async (req, res) => {
                 } : null
             };
         });
+        // ✅ OBTENER TAMBIÉN PEDIDOS DEL NUEVO SISTEMA
+const unifiedOrders = await OrderModel.findUserOrders(req.userId, {
+    payment_method: { $in: ['bank_transfer', 'quote'] }
+});
+
+// ✅ COMBINAR TRANSACCIONES BANCARD CON PEDIDOS UNIFICADOS
+const allPurchases = [...processedPurchases];
+
+// Agregar pedidos por transferencia/presupuesto
+unifiedOrders.forEach(order => {
+    allPurchases.push({
+        id: order._id,
+        order_id: order.order_id,
+        shop_process_id: order.order_id, // Para compatibilidad
+        amount: order.total_amount,
+        currency: 'PYG',
+        description: `Pedido ${order.order_id}`,
+        status: order.payment_status,
+        payment_method: order.payment_method,
+        is_unified_order: true, // Identificador
+        
+        // Información del cliente
+        customer_info: order.customer_info,
+        
+        // Items comprados
+        items: order.items,
+        
+        // Fechas
+        purchase_date: order.createdAt,
+        confirmation_date: order.confirmation_date,
+        
+        // Ubicación de entrega
+        delivery_location: order.delivery_location,
+        
+        // Información adicional
+        user_type: order.user_id ? 'REGISTERED' : 'GUEST',
+        device_type: order.device_type,
+        cart_total_items: order.items.length,
+        
+        // Estado específico para transferencias
+        transfer_status: order.payment_method === 'bank_transfer' ? order.payment_status : null,
+        order_notes: order.order_notes
+    });
+});
+
+// ✅ ORDENAR TODOS LOS PEDIDOS POR FECHA
+allPurchases.sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date));
 
         // ✅ CALCULAR ESTADÍSTICAS DEL USUARIO
         const userStats = await calculateUserPurchaseStats(req.userId);
 
         console.log(`✅ Encontradas ${processedPurchases.length} compras para el usuario`);
 
-        res.json({
+       res.json({
             message: "Compras obtenidas exitosamente",
             success: true,
             error: false,
             data: {
-                purchases: processedPurchases,
+                purchases: allPurchases, // CAMBIAR ESTA LÍNEA
                 pagination: {
                     current_page: Number(page),
-                    total_pages: Math.ceil(totalTransactions / limit),
-                    total_items: totalTransactions,
+                    total_pages: Math.ceil(allPurchases.length / limit), // CAMBIAR ESTA LÍNEA
+                    total_items: allPurchases.length, // CAMBIAR ESTA LÍNEA
                     items_per_page: Number(limit),
-                    has_next: page * limit < totalTransactions,
+                    has_next: page * limit < allPurchases.length, // CAMBIAR ESTA LÍNEA
                     has_prev: page > 1
                 },
                 user_statistics: userStats

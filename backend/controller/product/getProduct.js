@@ -176,8 +176,49 @@ const getHomeProductsController = async(req, res) => {
         });
     }
 };
+const getAllProductsAdminController = async(req, res) => {
+    try {
+        // ✅ VERIFICAR QUE SEA ADMIN
+        if (req.userRole !== 'ADMIN') {
+            return res.status(403).json({
+                message: "Solo administradores pueden ver todos los productos",
+                success: false,
+                error: true
+            });
+        }
 
+        console.log("🔥 Admin solicitando TODOS los productos");
+
+        // ✅ SIN LÍMITE - TODOS LOS PRODUCTOS PARA ADMIN
+        const products = await productModel
+            .find({})
+            .sort({ createdAt: -1 }) // Más recientes primero
+            .lean(); // Para mejor rendimiento
+
+        console.log(`✅ Devolviendo ${products.length} productos al admin`);
+
+        res.json({
+            message: `${products.length} productos obtenidos para administrador`,
+            success: true,
+            error: false,
+            data: products,
+            admin: true,
+            totalProducts: products.length
+        });
+
+    } catch(err) {
+        console.error("❌ Error obteniendo productos para admin:", err);
+        res.status(400).json({
+            message: err.message || err,
+            error: true,
+            success: false
+        });
+    }
+}
+
+// ✅ ACTUALIZAR LA EXPORTACIÓN
 module.exports = {
     getProductController,
-    getHomeProductsController
+    getHomeProductsController,
+    getAllProductsAdminController  // ← AGREGAR ESTA LÍNEA
 };

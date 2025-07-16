@@ -12,7 +12,7 @@ const userLogout = require('../controller/user/userLogout');
 const allUsers = require('../controller/user/allUser');
 const updateUser = require('../controller/user/updateUser');
 const UploadProductController = require('../controller/product/uploadProduct');
-const { getProductController, getHomeProductsController } = require('../controller/product/getProduct');
+const { getProductController, getHomeProductsController, getAllProductsAdminController } = require('../controller/product/getProduct');
 const { updateProductController} = require('../controller/product/updateProduct');
 const getCategoryProduct = require('../controller/product/getCategoryProduct');
 const getCategoryWiseProduct = require('../controller/product/getCategoryWiseProduct');
@@ -48,6 +48,39 @@ const {
     checkBancardTransactionStatusController,
     createBancardTransactionController
 } = require('../controller/bancard/bancardTransactionsController');
+
+// ✅ CONTROLADORES DE PEDIDOS Y TRANSFERENCIAS (AGREGAR DESPUÉS DE LA LÍNEA 34)
+const {
+    createOrderController,
+    getOrderByIdController,
+    getUserOrdersController,
+    updateOrderStatusController,
+    cancelOrderController,
+    getOrderStatsController
+} = require('../controller/order/orderController');
+
+const {
+    createBankTransferController,
+    uploadTransferProofController,
+    getTransferByIdController,
+    getPendingTransfersController,
+    approveTransferController,
+    rejectTransferController,
+    getTransferStatsController
+} = require('../controller/bankTransfer/bankTransferController');
+
+// ✅ MIDDLEWARES DE VALIDACIÓN (AGREGAR DESPUÉS DE LAS IMPORTACIONES ANTERIORES)
+const {
+    validateCreateOrder,
+    validateUpdateOrderStatus,
+    validateBankTransfer,
+    validateTransferApproval,
+    validateAdminPermissions,
+    validateAuthentication,
+    validatePagination,
+    validateOrderId,
+    validateTransferId
+} = require('../middleware/orderValidation');
 
 // ===== CONTROLADORES DE CLIENTES =====
 const { 
@@ -88,6 +121,8 @@ const {
     deleteAnalysisController,
     getSupplierProfitabilitySummaryController
 } = require('../controller/profitability/profitabilityController');
+const { updateUserLocation, getUserLocation } = require('../controller/user/userLocationController');
+
 
 // ===== CONTROLADORES DE UBICACIÓN =====
 const {
@@ -158,7 +193,6 @@ router.get("/bancard/transactions/:transactionId", authToken, getBancardTransact
 router.post("/bancard/transactions/:transactionId/rollback", authToken, rollbackBancardTransactionController);
 router.get("/bancard/transactions/:transactionId/status", authToken, checkBancardTransactionStatusController);
 router.post("/bancard/transactions", authToken, createBancardTransactionController);
-const { updateUserLocation, getUserLocation } = require('../controller/user/userLocationController');
 
 // ===========================================
 // ✅ NUEVAS RUTAS DE PERFIL DE USUARIO
@@ -172,6 +206,8 @@ router.put("/perfil", authToken, updateUserProfileController);
 // Subir imagen de perfil
 router.post("/perfil/imagen", authToken, uploadProfileImageController);
 router.put("/usuario/ubicacion", authToken, updateUserLocation);
+router.get("/usuario/ubicacion", authToken, getUserLocation);
+
 
 // Cambiar contraseña
 router.post("/perfil/cambiar-contrasena", authToken, changePasswordController);
@@ -779,6 +815,8 @@ router.post("/actualizar-usuario", authToken, updateUser);
 // ===========================================
 router.post("/cargar-producto", authToken, UploadProductController);
 router.get("/obtener-productos-home", getHomeProductsController);
+router.get("/obtener-productos", getProductController);
+router.get("/obtener-todos-productos-admin", authToken, getAllProductsAdminController);
 router.post("/actualizar-producto", authToken, updateProductController);
 router.get("/obtener-categorias", getCategoryProduct);
 router.post("/productos-por-categoria", getCategoryWiseProduct);
@@ -880,6 +918,57 @@ router.post("/ubicacion/geocode", geocodeAddressController);
 router.post("/ubicacion/usuario", authToken, saveUserLocationController);
 router.get("/ubicacion/usuario", authToken, getUserLocationController);
 router.post("/ubicacion/invitado", saveGuestLocationController);
+
+// ===========================================
+// ✅ RUTAS DE PEDIDOS UNIFICADOS - NUEVO SISTEMA
+// ===========================================
+
+// Crear pedido
+router.post("/orders", authToken, validateCreateOrder, createOrderController);
+
+// Obtener pedidos del usuario
+router.get("/orders", authToken, validateAuthentication, validatePagination, getUserOrdersController);
+
+// Obtener pedido específico
+router.get("/orders/:orderId", authToken, validateOrderId, getOrderByIdController);
+
+// Actualizar estado del pedido
+router.put("/orders/:orderId/status", authToken, validateOrderId, validateUpdateOrderStatus, updateOrderStatusController);
+
+// Cancelar pedido
+router.delete("/orders/:orderId", authToken, validateOrderId, cancelOrderController);
+
+// ===========================================
+// ✅ RUTAS DE TRANSFERENCIAS BANCARIAS - NUEVO SISTEMA
+// ===========================================
+
+// Crear transferencia para un pedido
+router.post("/orders/:orderId/bank-transfer", authToken, validateOrderId, validateBankTransfer, createBankTransferController);
+
+// Subir comprobante de transferencia
+router.post("/bank-transfers/:transferId/proof", authToken, validateTransferId, uploadTransferProofController);
+
+// Obtener transferencia específica
+router.get("/bank-transfers/:transferId", authToken, validateTransferId, getTransferByIdController);
+
+// ===========================================
+// ✅ RUTAS DE ADMINISTRACIÓN - GESTIÓN DE PEDIDOS Y TRANSFERENCIAS
+// ===========================================
+
+// Obtener estadísticas de pedidos (solo admin)
+router.get("/admin/orders/stats", authToken, validateAdminPermissions, getOrderStatsController);
+
+// Obtener transferencias pendientes (solo admin)
+router.get("/admin/bank-transfers/pending", authToken, validateAdminPermissions, validatePagination, getPendingTransfersController);
+
+// Aprobar transferencia (solo admin)
+router.put("/admin/bank-transfers/:transferId/approve", authToken, validateAdminPermissions, validateTransferId, validateTransferApproval, approveTransferController);
+
+// Rechazar transferencia (solo admin)
+router.put("/admin/bank-transfers/:transferId/reject", authToken, validateAdminPermissions, validateTransferId, validateTransferApproval, rejectTransferController);
+
+// Obtener estadísticas de transferencias (solo admin)
+router.get("/admin/bank-transfers/stats", authToken, validateAdminPermissions, getTransferStatsController);
 
 // ===========================================
 // RUTAS DE SALUD Y MONITOREO
