@@ -6,7 +6,7 @@ const orderSchema = new mongoose.Schema({
     order_id: {
         type: String,
         unique: true,
-        required: true
+        required: false
     },
     
     // ✅ USUARIO (puede ser null para invitados)
@@ -328,8 +328,8 @@ orderSchema.statics.findByOrderId = function(orderId) {
     return this.findOne({ order_id: orderId })
         .populate('user_id', 'name email phone')
         .populate('items.product_id', 'productName category brandName')
-        .populate('bancard_transaction_id')
-        .populate('bank_transfer_id');
+        //.populate('bancard_transaction_id')
+        //.populate('bank_transfer_id');
 };
 
 orderSchema.statics.findUserOrders = function(userId, options = {}) {

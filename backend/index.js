@@ -19,6 +19,9 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
 require('dotenv').config();
+const BancardTransactionModel = require('./models/bancardTransactionModel');
+const OrderModel = require('./models/orderModel');
+const BankTransferModel = require('./models/bankTransferModel');
 const connectDB = require('./config/db');
 const router = require('./routes');
 

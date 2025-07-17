@@ -44,17 +44,21 @@ const Checkout = () => {
     // Calcular totales
     const totals = calculateTotals();
 
-    // Manejar guardado de ubicación
-    const handleLocationSave = (locationData) => {
-        updateDeliveryLocation({
-            lat: locationData.lat,
-            lng: locationData.lng,
-            address: locationData.address,
-            googleMapsUrl: locationData.googleMapsUrl
-        });
-        toast.success('Ubicación guardada correctamente');
-    };
-
+   const handleLocationSave = (locationData) => {
+    console.log('🗺️ GUARDANDO UBICACIÓN:', locationData);
+    
+    // Si no hay address, crear uno con las coordenadas
+    const address = locationData.address || `Ubicación: ${locationData.lat}, ${locationData.lng}`;
+    
+    updateDeliveryLocation({
+        lat: locationData.lat,
+        lng: locationData.lng,
+        address: address,
+        googleMapsUrl: locationData.googleMapsUrl || `https://www.google.com/maps?q=${locationData.lat},${locationData.lng}`
+    });
+    
+    toast.success('Ubicación guardada correctamente');
+};
     // Manejar finalización del pedido
     const handleFinishOrder = async () => {
         if (!validateCurrentStep()) {
@@ -319,10 +323,12 @@ const Checkout = () => {
                                     ))}
                                 </div>
                             </div>
+                             
 
                             {/* Botones de navegación */}
                             <div className="space-y-3">
                                 {currentStep < 4 ? (
+                                    
                                     <>
                                         {currentStep > 1 && (
                                             <button
@@ -333,7 +339,11 @@ const Checkout = () => {
                                                 Paso Anterior
                                             </button>
                                         )}
-                                        
+                                        {console.log('🔍 VALIDACIÓN BOTÓN:', {
+                                                currentStep,
+                                                isValid: validateCurrentStep(),
+                                                checkoutData: checkoutData
+                                            })}
                                         <button
                                             onClick={nextStep}
                                             disabled={!validateCurrentStep()}

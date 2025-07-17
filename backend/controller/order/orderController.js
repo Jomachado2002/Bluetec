@@ -1,7 +1,7 @@
-// backend/controller/order/orderController.js - CONTROLADOR DE PEDIDOS
 const OrderModel = require('../../models/orderModel');
 const BankTransferModel = require('../../models/bankTransferModel');
 const userModel = require('../../models/userModel');
+const BancardTransactionModel = require('../../models/bancardTransactionModel');
 
 /**
  * ✅ CREAR PEDIDO UNIFICADO

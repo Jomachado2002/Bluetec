@@ -110,8 +110,9 @@ const useCheckout = () => {
     };
 
     // ✅ ACTUALIZAR UBICACIÓN DE ENTREGA
-    const updateDeliveryLocation = (locationData) => {
-        setCheckoutData(prev => ({
+    const updateDeliveryLocation = (locationData, callback) => {
+    setCheckoutData(prev => {
+        const newData = {
             ...prev,
             delivery_location: {
                 lat: locationData.lat,
@@ -119,38 +120,76 @@ const useCheckout = () => {
                 address: locationData.address,
                 googleMapsUrl: locationData.googleMapsUrl || `https://www.google.com/maps?q=${locationData.lat},${locationData.lng}`
             }
-        }));
-    };
+        };
+        
+        console.log('📍 Estado actualizado:', newData.delivery_location);
+        
+        // Ejecutar callback después de actualizar
+        if (callback) setTimeout(callback, 0);
+        
+        return newData;
+    });
+};
 
     // ✅ VALIDAR PASO ACTUAL
     const validateCurrentStep = () => {
     switch (currentStep) {
-        case 1: // Datos del cliente
-            const { name, email, phone } = checkoutData.customer_info;
-            if (!name.trim()) {
-                return false;
-            }
-            if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
-                return false;
-            }
-            if (!phone.trim()) {
-                return false;
-            }
-            return true;
+       case 1: // Datos del cliente
+    const customerInfo = checkoutData?.customer_info || {};
+    const { name = '', email = '', phone = '' } = customerInfo;
+    
+    console.log('👤 VALIDANDO PASO 1:', {
+        customerInfo,
+        name: `"${name}"`,
+        email: `"${email}"`,
+        phone: `"${phone}"`,
+        nameValid: !!name.trim(),
+        emailValid: !!(email.trim() && /\S+@\S+\.\S+/.test(email)),
+        phoneValid: !!phone.trim()
+    });
+    
+    if (!name.trim()) {
+        console.log('❌ Falta nombre');
+        return false;
+    }
+    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+        console.log('❌ Falta email válido');
+        return false;
+    }
+    if (!phone.trim()) {
+        console.log('❌ Falta teléfono');
+        return false;
+    }
+    console.log('✅ Paso 1 válido');
+    return true;
             
         // Resto igual pero SIN toast.error
 
         case 2: // Ubicación de entrega
-            const deliveryLocation = checkoutData?.delivery_location || {};
-            const { lat, lng, address = '' } = deliveryLocation;
-            
-            if (!lat || !lng) {
-                return false;
-            }
-            if (!address.trim()) {
-                return false;
-            }
-            return true;
+    const deliveryLocation = checkoutData?.delivery_location || {};
+    const { lat, lng, address = '' } = deliveryLocation;
+    
+    console.log('🗺️ VALIDANDO UBICACIÓN:', {
+        deliveryLocation,
+        lat,
+        lng,
+        address,
+        hasLatLng: !!(lat && lng),
+        hasAddress: !!address.trim(),
+        passesValidation: !!(lat && lng && address.trim())
+    });
+    
+    if (!lat || !lng) {
+        console.log('❌ Falta lat/lng');
+        return false;
+    }
+    if (!address.trim()) {
+        console.log('❌ Falta address');
+        return false;
+    }
+    console.log('✅ Validación ubicación OK');
+    return true;
+    
 
         case 3: // Método de pago
             if (!checkoutData?.payment_method) {
@@ -204,14 +243,14 @@ const useCheckout = () => {
         try {
             const totals = calculateTotals();
             const orderData = {
-                customer_info: checkoutData.customer_info,
-                delivery_location: checkoutData.delivery_location,
-                items: prepareOrderItems(),
-                payment_method: checkoutData.payment_method,
-                order_notes: checkoutData.order_notes || '',
-                device_type: window.innerWidth < 768 ? 'mobile' : 
-                            window.innerWidth < 1024 ? 'tablet' : 'desktop'
-            };
+    customer_info: checkoutData.customer_info,
+    delivery_location: checkoutData.delivery_location,
+    items: prepareOrderItems(),
+    payment_method: checkoutData.payment_method,
+    order_notes: checkoutData.order_notes || '',
+    device_type: window.innerWidth < 768 ? 'mobile' : 
+                window.innerWidth < 1024 ? 'tablet' : 'desktop'
+};
 
             console.log('📦 Creando pedido:', orderData);
 
@@ -224,7 +263,11 @@ const useCheckout = () => {
                 body: JSON.stringify(orderData)
             });
 
+            console.log('📡 Response status:', response.status);
+            console.log('📡 Response ok:', response.ok);
+
             const result = await response.json();
+            console.log('📋 Backend response:', result);
 
             if (result.success) {
                 console.log('✅ Pedido creado exitosamente:', result.data);
@@ -249,9 +292,14 @@ const useCheckout = () => {
                 return null;
             }
         } catch (error) {
-            console.error('❌ Error creando pedido:', error);
-            toast.error('Error de conexión al crear pedido');
-            return null;
+    console.error('❌ Error completo:', {
+        message: error.message,
+        stack: error.stack,
+        url: SummaryApi.orders.create.url,
+        method: SummaryApi.orders.create.method
+    });
+    toast.error('Error de conexión al crear pedido');
+    return null;
         } finally {
             setLoading(false);
         }

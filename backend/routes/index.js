@@ -175,6 +175,8 @@ const {
     chargeWithTokenController,
     deleteCardController
 } = require('../controller/bancard/bancardCardsController');
+const BancardTransactionModel = require('../models/bancardTransactionModel');
+
 
 // ===========================================
 // RUTAS DE BANCARD (PAGOS) - ✅ MEJORADAS PARA CERTIFICACIÓN
@@ -275,7 +277,7 @@ router.get("/debug/database", authToken, async (req, res) => {
         }
 
         const mongoose = require('mongoose');
-        const BancardTransactionModel = require('../models/bancardTransactionModel');
+        
 
         // Información de conexión
         const connectionInfo = {
