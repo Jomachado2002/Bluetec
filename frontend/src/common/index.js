@@ -486,6 +486,90 @@
                     method: 'post'
                 }
             },
+            // ===========================================
+        // ✅ GESTIÓN DE PEDIDOS UNIFICADOS - NUEVO SISTEMA
+        // ===========================================
+        orders: {
+            // Crear pedido
+            create: {
+                url: `${backendDomain}/api/orders`,
+                method: 'post'
+            },
+            // Obtener pedidos del usuario
+            getUserOrders: {
+                url: `${backendDomain}/api/orders`,
+                method: 'get'
+            },
+            // Obtener pedido específico
+            getById: {
+                url: `${backendDomain}/api/orders`, // + /:orderId
+                method: 'get'
+            },
+            // Actualizar estado del pedido
+            updateStatus: {
+                url: `${backendDomain}/api/orders`, // + /:orderId/status
+                method: 'put'
+            },
+            // Cancelar pedido
+            cancel: {
+                url: `${backendDomain}/api/orders`, // + /:orderId
+                method: 'delete'
+            }
+        },
+
+        // ===========================================
+        // ✅ GESTIÓN DE TRANSFERENCIAS BANCARIAS - NUEVO SISTEMA
+        // ===========================================
+        bankTransfers: {
+            // Crear transferencia para un pedido
+            create: {
+                url: `${backendDomain}/api/orders`, // + /:orderId/bank-transfer
+                method: 'post'
+            },
+            // Subir comprobante de transferencia
+            uploadProof: {
+                url: `${backendDomain}/api/bank-transfers`, // + /:transferId/proof
+                method: 'post'
+            },
+            // Obtener transferencia específica
+            getById: {
+                url: `${backendDomain}/api/bank-transfers`, // + /:transferId
+                method: 'get'
+            },
+            // Admin: Obtener transferencias pendientes
+            getPending: {
+                url: `${backendDomain}/api/admin/bank-transfers/pending`,
+                method: 'get'
+            },
+            // Admin: Aprobar transferencia
+            approve: {
+                url: `${backendDomain}/api/admin/bank-transfers`, // + /:transferId/approve
+                method: 'put'
+            },
+            // Admin: Rechazar transferencia
+            reject: {
+                url: `${backendDomain}/api/admin/bank-transfers`, // + /:transferId/reject
+                method: 'put'
+            },
+            // Admin: Estadísticas de transferencias
+            getStats: {
+                url: `${backendDomain}/api/admin/bank-transfers/stats`,
+                method: 'get'
+            }
+        },
+
+        // ===========================================
+        // ✅ ADMINISTRACIÓN DE PEDIDOS - NUEVO SISTEMA
+        // ===========================================
+        admin: {
+            orders: {
+                // Estadísticas de pedidos
+                getStats: {
+                    url: `${backendDomain}/api/admin/orders/stats`,
+                    method: 'get'
+                }
+            }
+        },
     };
 
     export default SummaryApi;

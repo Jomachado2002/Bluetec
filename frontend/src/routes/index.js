@@ -15,6 +15,13 @@ import SearchProduct from "../pages/SearchProduct"
 import MobileCategoriesPage from "../pages/MobileCategoriesPage"
 import ResetPassword from "../pages/ResetPassword"
 import Nosotros from "../pages/Nosotros"
+// ✅ NUEVAS PÁGINAS DE CHECKOUT Y PEDIDOS
+import Checkout from "../pages/Checkout"
+import OrderConfirmation from "../pages/OrderConfirmation"
+import BankTransferInstructions from "../pages/BankTransferInstructions"
+// ✅ NUEVAS PÁGINAS DE ADMINISTRACIÓN
+//import OrderManagement from "../pages/OrderManagement"
+//import BankTransferManagement from "../pages/BankTransferManagement"
 
 // ✅ NUEVA PÁGINA DE PERFIL DE USUARIO
 import UserProfilePage from "../pages/UserProfilePage"
@@ -128,6 +135,20 @@ const router = createBrowserRouter([
                 path: "api/bancard/confirm-payment",
                 element: <BancardConfirmProxy />
             },
+
+            // ✅ NUEVAS RUTAS DE CHECKOUT Y PEDIDOS
+            {
+                path: "checkout",
+                element: <Checkout />
+            },
+            {
+                path: "confirmacion-pedido/:orderId",
+                element: <OrderConfirmation />
+            },
+            {
+                path: "instrucciones-transferencia/:orderId",
+                element: <BankTransferInstructions />
+            },
             
             // Panel de admin separado
             {
@@ -152,6 +173,15 @@ const router = createBrowserRouter([
                         path: "transacciones-bancard",
                         element: <BancardTransactions />
                     },
+                    // ✅ NUEVAS RUTAS DE ADMINISTRACIÓN
+                    //{
+                      //  path: "gestion-pedidos",
+                       // element: <OrderManagement />
+                    //},
+                    //{
+                     //   path: "transferencias-bancarias",
+                       // element: <BankTransferManagement />
+                    //},
                     
                     // Rutas financieras
                     {
