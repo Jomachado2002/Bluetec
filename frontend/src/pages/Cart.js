@@ -14,7 +14,15 @@ import { trackWhatsAppContact, trackPDFDownload } from '../components/MetaPixelT
 import BancardPayButton from '../components/BancardPayButton';
 
 const Cart = () => {
-    const [data, setData] = useState([]);
+    const [data, setData] = useState(() => {
+    // Cargar datos del carrito inmediatamente al inicializar
+    try {
+        return localCartHelper.getCart() || [];
+    } catch (error) {
+        console.error('Error cargando carrito inicial:', error);
+        return [];
+    }
+});
     const [loading, setLoading] = useState(false);
     const [customerData, setCustomerData] = useState({
         name: '',
@@ -36,14 +44,33 @@ const Cart = () => {
     const user = useSelector(state => state?.user?.user);
     const isLoggedIn = !!user;
 
-    // ✅ FUNCIÓN PARA VERIFICAR PRODUCTOS VÁLIDOS (MOVIDA AL INICIO)
-    const isValidProduct = (product) => {
-        return product && product.productId && 
-               typeof product.productId === 'object' &&
-               product.productId.productImage &&
-               Array.isArray(product.productId.productImage) &&
-               product.productId.productImage.length > 0;
-    };
+    // ✅ FUNCIÓN PARA VERIFICAR PRODUCTOS VÁLIDOS (CORREGIDA)
+const isValidProduct = (product) => {
+    console.log('🔍 Validando producto:', product);
+    
+    if (!product) {
+        console.log('❌ Producto es null/undefined');
+        return false;
+    }
+    
+    if (!product.productId) {
+        console.log('❌ Producto sin productId');
+        return false;
+    }
+    
+    if (!product.productId.productName) {
+        console.log('❌ Producto sin nombre');
+        return false;
+    }
+    
+    if (!product.productId.sellingPrice) {
+        console.log('❌ Producto sin precio');
+        return false;
+    }
+    
+    console.log('✅ Producto válido:', product.productId.productName);
+    return true;
+};
 
     // Función simplificada para cargar datos directamente desde localStorage
     const fetchData = () => {
@@ -62,10 +89,23 @@ const Cart = () => {
 
     // ✅ CARGAR TARJETAS GUARDADAS SI EL USUARIO ESTÁ LOGUEADO
     const fetchUserCards = useCallback(async () => {
-       if (!isLoggedIn || !user?.bancardUserId) return;
+   if (!isLoggedIn) {
+       console.log('👤 Usuario invitado - omitiendo carga de tarjetas guardadas');
+       setRegisteredCards([]);
+       return;
+   }
 
-       console.log('🔍 Intentando cargar tarjetas para usuario:', user.bancardUserId);
-       console.log('🌐 Backend URL:', process.env.REACT_APP_BACKEND_URL);
+   if (!user?.bancardUserId) {
+       console.log('⚠️ Usuario logueado pero sin bancardUserId - omitiendo carga de tarjetas');
+       setRegisteredCards([]);
+       return;
+   }
+
+   console.log('🔍 Cargando tarjetas para usuario logueado:', {
+       userId: user._id,
+       bancardUserId: user.bancardUserId,
+       name: user.name
+   });
        
        setLoadingCards(true);
        try {
@@ -98,7 +138,8 @@ const Cart = () => {
                setRegisteredCards([]);
            }
        } catch (error) {
-           console.error('❌ Error cargando tarjetas:', error);
+           console.log('📝 Info: No se pudieron cargar tarjetas guardadas:', error.message);
+           // No mostrar error al usuario - es normal para usuarios nuevos
            setRegisteredCards([]);
        } finally {
            setLoadingCards(false);
@@ -106,20 +147,28 @@ const Cart = () => {
     }, [isLoggedIn, user?.bancardUserId]); // ✅ REMOVER loadingCards de dependencias
 
     // Calcular cantidad total de productos
-    const totalQty = data.reduce((previousValue, currentValue) => 
-        previousValue + currentValue.quantity, 0);
+    // Calcular cantidad total de productos
+const totalQty = data.reduce((previousValue, currentValue) => 
+    previousValue + currentValue.quantity, 0);
 
-    // Calcular precio total
-    const totalPrice = data.reduce((prev, curr) => {
-        if (curr?.productId?.sellingPrice) {
-            return prev + (curr.quantity * curr.productId.sellingPrice);
-        }
-        return prev;
-    }, 0);
+// Calcular precio total  
+const totalPrice = data.reduce((prev, curr) => {
+    if (curr?.productId?.sellingPrice) {
+        return prev + (curr.quantity * curr.productId.sellingPrice);
+    }
+    return prev;
+}, 0);
 
-    // Definir validProducts (AHORA DESPUÉS DE isValidProduct)
-    const validProducts = data.filter(isValidProduct);
+// ✅ USAR DIRECTAMENTE data SIN FILTRAR
+const validProducts = data;
 
+console.log('📊 Estado del carrito:', {
+    loading,
+    totalProductos: data.length,
+    totalQty,
+    totalPrice,
+    deberaMostrarCarrito: !loading && data.length > 0
+});
     // ✅ FUNCIÓN PARA CAPTURAR DATOS DE TRACKING
     const captureTrackingData = useCallback(() => {
         // ✅ CONVERTIR ADDRESS A STRING SI ES OBJETO
@@ -167,8 +216,8 @@ const Cart = () => {
         console.log('🚀 Iniciando carga de datos del carrito...');
         fetchData();
         
-        if (isLoggedIn && user?.bancardUserId) {
-            console.log('👤 Usuario logueado detectado, cargando tarjetas...');
+        if (isLoggedIn) {
+            console.log('👤 Usuario logueado detectado:', user.name);
             fetchUserCards();
             // Pre-llenar datos del usuario si está logueado
             setCustomerData({
@@ -178,7 +227,7 @@ const Cart = () => {
                 address: user.address || ''
             });
         } else {
-            console.log('🚫 Usuario no logueado o sin bancardUserId');
+            console.log('👤 Usuario invitado - modo checkout sin tarjetas guardadas');
         }
     }, [isLoggedIn, user?.bancardUserId, fetchUserCards]);
 
@@ -752,7 +801,7 @@ const Cart = () => {
                 </div>
 
                 {/* Carrito vacío */}
-                {validProducts.length === 0 && !loading && (
+                {data.length === 0 && totalQty === 0 && (
                     <div className="bg-white rounded-xl shadow-lg p-8 text-center max-w-2xl mx-auto border border-gray-100">
                         <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
                             <MdShoppingCart className="text-5xl text-[#2A3190]" />
@@ -769,7 +818,7 @@ const Cart = () => {
                 )}
 
                 {/* Contenido del carrito */}
-                {validProducts.length > 0 && (
+                {!loading && data.length > 0 && (
                     <div className="flex flex-col lg:flex-row gap-8">
                         {/* Lista de productos */}
                         <div className="flex-grow">
@@ -905,6 +954,14 @@ const Cart = () => {
                                 <div className="mt-8">
                                     <Link
                                         to="/checkout"
+                                        onClick={() => {
+                                            console.log('🔗 NAVEGANDO A CHECKOUT:', {
+                                                productosEnCarrito: data.length,
+                                                totalPrice,
+                                                validProducts: data,
+                                                localStorage: localStorage.getItem('cart')
+                                            });
+                                        }}
                                         className="w-full bg-[#2A3190] text-white py-4 px-6 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-3 font-semibold text-lg shadow-lg transform hover:scale-105"
                                     >
                                         <FaCreditCard className="text-xl" />

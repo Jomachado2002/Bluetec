@@ -1,4 +1,4 @@
-// frontend/src/routes/index.js - ACTUALIZADO CON PERFIL DE USUARIO
+// frontend/src/routes/index.js - ACTUALIZADO CON GESTIÓN DE PEDIDOS Y TRANSFERENCIAS
 import { createBrowserRouter } from "react-router-dom"
 import App from "../App"
 import Home from "../pages/Home"
@@ -15,15 +15,18 @@ import SearchProduct from "../pages/SearchProduct"
 import MobileCategoriesPage from "../pages/MobileCategoriesPage"
 import ResetPassword from "../pages/ResetPassword"
 import Nosotros from "../pages/Nosotros"
-// ✅ NUEVAS PÁGINAS DE CHECKOUT Y PEDIDOS
+
+// ✅ PÁGINAS DE CHECKOUT Y PEDIDOS
 import Checkout from "../pages/Checkout"
 import OrderConfirmation from "../pages/OrderConfirmation"
 import BankTransferInstructions from "../pages/BankTransferInstructions"
-// ✅ NUEVAS PÁGINAS DE ADMINISTRACIÓN
-//import OrderManagement from "../pages/OrderManagement"
-//import BankTransferManagement from "../pages/BankTransferManagement"
 
-// ✅ NUEVA PÁGINA DE PERFIL DE USUARIO
+// ✅ PÁGINAS DE ADMINISTRACIÓN - NUEVAS
+import OrderManagement from "../pages/OrderManagement"
+import BankTransferManagement from "../pages/BankTransferManagement"
+import UnifiedOrderManagement from "../pages/UnifiedOrderManagement"
+
+// ✅ PÁGINA DE PERFIL DE USUARIO
 import UserProfilePage from "../pages/UserProfilePage"
 
 // ✅ PÁGINAS DE BANCARD
@@ -32,7 +35,7 @@ import PaymentCancelled from "../pages/PaymentCancelled"
 import BancardConfirmProxy from "../pages/BancardConfirmProxy"
 import BancardTransactions from "../pages/BancardTransactions"
 
-// Importar el nuevo componente de dashboard
+// Importar el componente de dashboard
 import AdminDashboard from "../pages/AdminDashboard"
 
 // Importar páginas financieras
@@ -54,7 +57,6 @@ import SaleDetails from "../pages/SaleDetails"
 import PurchaseDetails from "../pages/PurchaseDetails"
 import FinancialDashboard from "../pages/FinancialDashboard"
 import CatastroResult from "../pages/CatastroResult"
-
 
 const router = createBrowserRouter([
     {
@@ -110,7 +112,7 @@ const router = createBrowserRouter([
                 element: <SearchProduct />
             },
             
-            // ✅ NUEVA RUTA PARA PERFIL DE USUARIO
+            // ✅ RUTA PARA PERFIL DE USUARIO
             {
                 path: "mi-perfil",
                 element: <UserProfilePage />
@@ -136,7 +138,7 @@ const router = createBrowserRouter([
                 element: <BancardConfirmProxy />
             },
 
-            // ✅ NUEVAS RUTAS DE CHECKOUT Y PEDIDOS
+            // ✅ RUTAS DE CHECKOUT Y PEDIDOS
             {
                 path: "checkout",
                 element: <Checkout />
@@ -173,15 +175,20 @@ const router = createBrowserRouter([
                         path: "transacciones-bancard",
                         element: <BancardTransactions />
                     },
-                    // ✅ NUEVAS RUTAS DE ADMINISTRACIÓN
-                    //{
-                      //  path: "gestion-pedidos",
-                       // element: <OrderManagement />
-                    //},
-                    //{
-                     //   path: "transferencias-bancarias",
-                       // element: <BankTransferManagement />
-                    //},
+                    
+                    // ✅ NUEVAS RUTAS DE ADMINISTRACIÓN DE PEDIDOS
+                    {
+                        path: "gestion-pedidos",
+                        element: <UnifiedOrderManagement />
+                    },
+                    {
+                        path: "transferencias-bancarias",
+                        element: <BankTransferManagement />
+                    },
+                    {
+                        path: "pedidos-legacy",
+                        element: <OrderManagement />
+                    },
                     
                     // Rutas financieras
                     {
@@ -263,13 +270,10 @@ const router = createBrowserRouter([
                         path: "analisis-rentabilidad/:analysisId",
                         element: <ProfitabilityAnalysisDetails />
                     }
-                
                 ]
             }
         ]
     }
 ])
-
-//
 
 export default router

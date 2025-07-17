@@ -34,11 +34,12 @@ const Checkout = () => {
 
     // Verificar si hay productos en el carrito
     useEffect(() => {
-        if (cartItems.length === 0) {
-            toast.error('Tu carrito está vacío');
-            navigate('/carrito');
-        }
-    }, [cartItems, navigate]);
+    console.log('🏪 CHECKOUT - cartItems recibidos:', cartItems.length, cartItems);
+    if (cartItems.length === 0) {
+        toast.error('Tu carrito está vacío');
+        navigate('/carrito');
+    }
+}, [cartItems, navigate]);;
 
     // Calcular totales
     const totals = calculateTotals();

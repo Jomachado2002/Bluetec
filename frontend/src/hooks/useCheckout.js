@@ -14,7 +14,18 @@ const useCheckout = () => {
     // ✅ ESTADO DEL CHECKOUT
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
-    const [cartItems, setCartItems] = useState([]);
+    const [cartItems, setCartItems] = useState(() => {
+    console.log('🚀 Inicializando cartItems en useCheckout');
+    const items = localCartHelper.getCart();
+    const validItems = items.filter(item => 
+        item.productId && 
+        typeof item.productId === 'object' &&
+        item.productId.productName &&
+        (item.productId.sellingPrice !== undefined && item.productId.sellingPrice !== null)
+    );
+    console.log('✅ Items iniciales válidos:', validItems.length);
+    return validItems;
+});
     const [checkoutData, setCheckoutData] = useState({
         customer_info: {
             name: '',
@@ -48,16 +59,20 @@ const useCheckout = () => {
     }, [isLoggedIn, user]);
 
     // ✅ CARGAR ITEMS DEL CARRITO
-    const loadCartItems = () => {
-        const items = localCartHelper.getCart();
-        const validItems = items.filter(item => 
-            item.productId && 
-            typeof item.productId === 'object' &&
-            item.productId.productName &&
-            item.productId.sellingPrice
-        );
-        setCartItems(validItems);
-    };
+   const loadCartItems = () => {
+    const items = localCartHelper.getCart();
+    console.log('🔍 useCheckout - Items del localStorage:', items.length, items);
+    
+    const validItems = items.filter(item => 
+        item.productId && 
+        typeof item.productId === 'object' &&
+        item.productId.productName &&
+        (item.productId.sellingPrice !== undefined && item.productId.sellingPrice !== null)
+    );
+    
+    console.log('✅ useCheckout - Items válidos después filtro:', validItems.length, validItems);
+    setCartItems(validItems);
+};
 
     // ✅ CALCULAR TOTALES
     const calculateTotals = () => {
@@ -109,46 +124,44 @@ const useCheckout = () => {
 
     // ✅ VALIDAR PASO ACTUAL
     const validateCurrentStep = () => {
-        switch (currentStep) {
-            case 1: // Datos del cliente
-                const { name, email, phone } = checkoutData.customer_info;
-                if (!name.trim()) {
-                    toast.error('El nombre es requerido');
-                    return false;
-                }
-                if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
-                    toast.error('Email válido es requerido');
-                    return false;
-                }
-                if (!phone.trim()) {
-                    toast.error('El teléfono es requerido');
-                    return false;
-                }
-                return true;
+    switch (currentStep) {
+        case 1: // Datos del cliente
+            const { name, email, phone } = checkoutData.customer_info;
+            if (!name.trim()) {
+                return false;
+            }
+            if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+                return false;
+            }
+            if (!phone.trim()) {
+                return false;
+            }
+            return true;
+            
+        // Resto igual pero SIN toast.error
 
-            case 2: // Ubicación de entrega
-                const { lat, lng, address } = checkoutData.delivery_location;
-                if (!lat || !lng) {
-                    toast.error('Selecciona una ubicación en el mapa');
-                    return false;
-                }
-                if (!address.trim()) {
-                    toast.error('La dirección es requerida');
-                    return false;
-                }
-                return true;
+        case 2: // Ubicación de entrega
+            const deliveryLocation = checkoutData?.delivery_location || {};
+            const { lat, lng, address = '' } = deliveryLocation;
+            
+            if (!lat || !lng) {
+                return false;
+            }
+            if (!address.trim()) {
+                return false;
+            }
+            return true;
 
-            case 3: // Método de pago
-                if (!checkoutData.payment_method) {
-                    toast.error('Selecciona un método de pago');
-                    return false;
-                }
-                return true;
+        case 3: // Método de pago
+            if (!checkoutData?.payment_method) {
+                return false;
+            }
+            return true;
 
-            default:
-                return true;
-        }
-    };
+        default:
+            return true;
+    }
+};
 
     // ✅ AVANZAR AL SIGUIENTE PASO
     const nextStep = () => {

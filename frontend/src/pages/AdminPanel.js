@@ -1,4 +1,4 @@
-// frontend/src/pages/AdminPanel.js - ACTUALIZADO CON TRANSACCIONES BANCARD
+// frontend/src/pages/AdminPanel.js - ACTUALIZADO CON GESTIÓN DE PEDIDOS Y TRANSFERENCIAS
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { CiUser } from 'react-icons/ci';
@@ -22,8 +22,12 @@ import {
   FaShoppingCart,
   FaTachometerAlt,
   FaHome,
-  FaCreditCard, // ✅ NUEVO ICONO PARA BANCARD
-  FaUndo // ✅ ICONO PARA ROLLBACKS
+  FaCreditCard,
+  FaUndo,
+  FaUniversity,
+  FaShoppingBag,
+  FaExchangeAlt,
+  FaCogs
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import SummaryApi from '../common';
@@ -71,7 +75,7 @@ const AdminPanel = () => {
     return location.pathname.includes(path);
   };
 
-  // ✅ MENÚ ACTUALIZADO CON TRANSACCIONES BANCARD
+  // ✅ MENÚ ACTUALIZADO CON GESTIÓN DE PEDIDOS Y TRANSFERENCIAS
   const navItems = [
     {
       path: "dashboard",
@@ -87,6 +91,29 @@ const AdminPanel = () => {
           label: "Productos",
           icon: <FaBoxOpen className="mr-2" />,
           description: "Gestionar productos"
+        }
+      ]
+    },
+    {
+      category: "Gestión de Pedidos", // ✅ NUEVA CATEGORÍA
+      items: [
+        {
+          path: "gestion-pedidos",
+          label: "Todos los Pedidos",
+          icon: <FaShoppingBag className="mr-2" />,
+          description: "Gestión unificada de pedidos"
+        },
+        {
+          path: "transferencias-bancarias",
+          label: "Transferencias Bancarias",
+          icon: <FaUniversity className="mr-2" />,
+          description: "Verificar transferencias"
+        },
+        {
+          path: "pedidos-legacy",
+          label: "Pedidos Legacy",
+          icon: <FaCogs className="mr-2" />,
+          description: "Sistema anterior de pedidos"
         }
       ]
     },
@@ -126,7 +153,7 @@ const AdminPanel = () => {
       ]
     },
     {
-      category: "Pagos Online", // ✅ NUEVA CATEGORÍA
+      category: "Pagos Online",
       items: [
         {
           path: "transacciones-bancard",
