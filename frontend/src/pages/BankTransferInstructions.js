@@ -1,8 +1,8 @@
-// frontend/src/pages/BankTransferInstructions.js
+// frontend/src/pages/BankTransferInstructions.js - CORREGIDO
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FaUniversity, FaCopy, FaUpload, FaCheckCircle, FaWhatsapp, FaArrowLeft, FaExclamationCircle } from 'react-icons/fa';
+import { FaUniversity, FaCopy, FaUpload, FaCheckCircle, FaWhatsapp, FaArrowLeft, FaExclamationCircle, FaPaperPlane } from 'react-icons/fa';
 import displayINRCurrency from '../helpers/displayCurrency';
 import SummaryApi from '../common';
 
@@ -15,6 +15,7 @@ const BankTransferInstructions = () => {
     const [loading, setLoading] = useState(true);
     const [uploadingProof, setUploadingProof] = useState(false);
     const [proofUploaded, setProofUploaded] = useState(false);
+    const [submittingWithoutProof, setSubmittingWithoutProof] = useState(false);
     const [transferData, setTransferData] = useState({
         reference_number: '',
         transfer_date: new Date().toISOString().split('T')[0],
@@ -40,82 +41,111 @@ const BankTransferInstructions = () => {
     const fetchOrderAndTransfer = async () => {
         setLoading(true);
         try {
-            // Obtener información del pedido
-            const orderResponse = await fetch(`${SummaryApi.orders.getById.url}/${orderId}`, {
-                method: SummaryApi.orders.getById.method,
-                credentials: 'include'
+            console.log('🔍 === OBTENIENDO PEDIDO Y TRANSFERENCIA ===');
+            console.log('📋 Order ID:', orderId);
+
+            // ✅ USAR ENDPOINT CORRECTO PARA OBTENER PEDIDO
+            const orderResponse = await fetch(`${SummaryApi.baseURL}/api/orders/${orderId}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
+            console.log('📥 Order Response Status:', orderResponse.status);
+
+            if (!orderResponse.ok) {
+                throw new Error(`Error HTTP ${orderResponse.status}`);
+            }
+
             const orderResult = await orderResponse.json();
+            console.log('📋 Order Result:', orderResult);
 
             if (orderResult.success) {
                 setOrder(orderResult.data);
                 
                 // Si el pedido ya tiene una transferencia, obtener sus datos
                 if (orderResult.data.bank_transfer_id) {
-                    fetchTransferDetails(orderResult.data.bank_transfer_id);
+                    await fetchTransferDetails(orderResult.data.bank_transfer_id);
                 } else {
-                    // Crear transferencia si no existe
-                    createBankTransfer(orderResult.data._id);
+                    // Crear transferencia automáticamente
+                    await createBankTransfer();
                 }
             } else {
-                toast.error('Error al cargar el pedido');
+                toast.error(orderResult.message || 'Error al cargar el pedido');
                 navigate('/');
             }
         } catch (error) {
-            console.error('Error:', error);
-            toast.error('Error de conexión');
+            console.error('❌ Error:', error);
+            toast.error('Error de conexión. Verifica que el backend esté funcionando.');
             navigate('/');
         } finally {
             setLoading(false);
         }
     };
 
-    const createBankTransfer = async (orderIdDB) => {
+    const createBankTransfer = async () => {
         try {
-            const response = await fetch(`${SummaryApi.bankTransfers.create.url}/${orderId}/bank-transfer`, {
-                method: SummaryApi.bankTransfers.create.method,
+            console.log('🆕 === CREANDO TRANSFERENCIA BANCARIA ===');
+            
+            const response = await fetch(`${SummaryApi.baseURL}/api/orders/${orderId}/bank-transfer`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 credentials: 'include',
                 body: JSON.stringify({
-                    customer_transfer_info: transferData
+                    customer_transfer_info: {
+                        ...transferData,
+                        transfer_amount: order?.total_amount || 0
+                    }
                 })
             });
+
+            console.log('📥 Create Transfer Response:', response.status);
+
+            if (!response.ok) {
+                console.warn('⚠️ Error creando transferencia, continuando sin ella');
+                return;
+            }
 
             const result = await response.json();
 
             if (result.success) {
+                console.log('✅ Transferencia creada:', result.data.transfer);
                 setTransfer(result.data.transfer);
-                console.log('Transferencia creada:', result.data.transfer);
             }
         } catch (error) {
-            console.error('Error creando transferencia:', error);
+            console.error('❌ Error creando transferencia:', error);
+            console.log('ℹ️ Continuando sin transferencia previa');
         }
     };
 
     const fetchTransferDetails = async (transferId) => {
         try {
-            const response = await fetch(`${SummaryApi.bankTransfers.getById.url}/${transferId}`, {
-                method: SummaryApi.bankTransfers.getById.method,
+            console.log('🔍 === OBTENIENDO DETALLES DE TRANSFERENCIA ===');
+            
+            const response = await fetch(`${SummaryApi.baseURL}/api/bank-transfers/${transferId}`, {
+                method: 'GET',
                 credentials: 'include'
             });
 
-            const result = await response.json();
-
-            if (result.success) {
-                setTransfer(result.data);
-                setProofUploaded(!!result.data.transfer_proof?.file_url);
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    setTransfer(result.data);
+                    setProofUploaded(!!result.data.transfer_proof?.file_url);
+                }
             }
         } catch (error) {
-            console.error('Error obteniendo transferencia:', error);
+            console.error('❌ Error obteniendo transferencia:', error);
         }
     };
 
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text).then(() => {
-            toast.success('Copiado al portapapeles');
+            toast.success('📋 Copiado al portapapeles');
         }).catch(() => {
             toast.error('Error al copiar');
         });
@@ -129,26 +159,121 @@ const BankTransferInstructions = () => {
         }));
     };
 
+    // ✅ VALIDAR DATOS MÍNIMOS PARA ENVÍO
+    const canSubmitTransfer = () => {
+        return transferData.reference_number.trim() && 
+               transferData.customer_bank.trim() && 
+               order;
+    };
+
+    // ✅ ENVIAR TRANSFERENCIA SIN COMPROBANTE
+    const submitTransferWithoutProof = async () => {
+        if (!canSubmitTransfer()) {
+            toast.error('Complete al menos el número de referencia y banco');
+            return;
+        }
+
+        setSubmittingWithoutProof(true);
+
+        try {
+            console.log('📤 === ENVIANDO TRANSFERENCIA SIN COMPROBANTE ===');
+            
+            const transferId = transfer?.transfer_id || `TRF-${Date.now()}`;
+            
+            const submitData = {
+                order_id: orderId,
+                reference_number: transferData.reference_number,
+                transfer_date: transferData.transfer_date,
+                customer_bank: transferData.customer_bank,
+                customer_account: transferData.customer_account,
+                transfer_notes: transferData.transfer_notes,
+                transfer_amount: order.total_amount,
+                // ✅ INDICAR QUE SE ENVIARÁ COMPROBANTE DESPUÉS
+                proof_status: 'pending_upload',
+                submission_method: 'without_proof'
+            };
+
+            console.log('📤 Datos a enviar:', submitData);
+
+            // ✅ ENDPOINT PARA CREAR/ACTUALIZAR TRANSFERENCIA
+            const response = await fetch(`${SummaryApi.baseURL}/api/bank-transfers/${transferId}/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(submitData)
+            });
+
+            console.log('📥 Submit Response Status:', response.status);
+
+            const result = await response.json();
+            console.log('📥 Submit Result:', result);
+
+            if (result.success) {
+                toast.success('✅ Información de transferencia enviada exitosamente');
+                
+                // ✅ ACTUALIZAR ESTADO LOCAL
+                setTransfer(result.data || {
+                    transfer_id: transferId,
+                    ...submitData,
+                    admin_verification: { status: 'pending' }
+                });
+                
+                // ✅ NOTIFICAR ÉXITO
+                toast.info('ℹ️ Puedes subir el comprobante después por WhatsApp');
+                
+            } else {
+                toast.error(result.message || 'Error al enviar transferencia');
+            }
+
+        } catch (error) {
+            console.error('❌ Error enviando transferencia:', error);
+            toast.error('Error de conexión. La información se guardó localmente.');
+            
+            // ✅ GUARDAR EN LOCALSTORAGE COMO BACKUP
+            localStorage.setItem(`transfer_${orderId}`, JSON.stringify({
+                ...transferData,
+                order_id: orderId,
+                timestamp: Date.now(),
+                status: 'pending_submission'
+            }));
+            
+            toast.info('📱 Contacta por WhatsApp para confirmar tu transferencia');
+        } finally {
+            setSubmittingWithoutProof(false);
+        }
+    };
+
+    // ✅ MANEJAR SUBIDA DE ARCHIVO (MEJORADO)
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
-        if (!file || !transfer) return;
+        if (!file) return;
 
         // Validar archivo
         const maxSize = 5 * 1024 * 1024; // 5MB
         const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
 
         if (file.size > maxSize) {
-            toast.error('El archivo no puede ser mayor a 5MB');
+            toast.error('📁 El archivo no puede ser mayor a 5MB');
             return;
         }
 
         if (!allowedTypes.includes(file.type)) {
-            toast.error('Solo se permiten archivos JPG, PNG o PDF');
+            toast.error('📁 Solo se permiten archivos JPG, PNG o PDF');
+            return;
+        }
+
+        if (!canSubmitTransfer()) {
+            toast.error('Complete los datos de transferencia antes de subir el comprobante');
             return;
         }
 
         setUploadingProof(true);
+
         try {
+            console.log('📤 === SUBIENDO COMPROBANTE ===');
+            
             const formData = new FormData();
             formData.append('transfer_proof', file);
             formData.append('reference_number', transferData.reference_number);
@@ -156,25 +281,41 @@ const BankTransferInstructions = () => {
             formData.append('customer_bank', transferData.customer_bank);
             formData.append('customer_account', transferData.customer_account);
             formData.append('transfer_notes', transferData.transfer_notes);
+            formData.append('order_id', orderId);
 
-            const response = await fetch(`${SummaryApi.bankTransfers.uploadProof.url}/${transfer.transfer_id}/proof`, {
-                method: SummaryApi.bankTransfers.uploadProof.method,
+            // ✅ USAR TRANSFERENCIA EXISTENTE O CREAR NUEVA
+            const transferId = transfer?.transfer_id || `TRF-${Date.now()}`;
+            
+            const response = await fetch(`${SummaryApi.baseURL}/api/bank-transfers/${transferId}/proof`, {
+                method: 'POST',
                 credentials: 'include',
                 body: formData
             });
 
+            console.log('📥 Upload Response Status:', response.status);
+
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+
             const result = await response.json();
+            console.log('📥 Upload Result:', result);
 
             if (result.success) {
-                toast.success('Comprobante subido exitosamente');
+                toast.success('✅ Comprobante subido exitosamente');
                 setProofUploaded(true);
-                setTransfer(result.data.transfer);
+                setTransfer(result.data.transfer || result.data);
             } else {
-                toast.error(result.message || 'Error al subir comprobante');
+                throw new Error(result.message || 'Error al subir comprobante');
             }
+
         } catch (error) {
-            console.error('Error subiendo comprobante:', error);
-            toast.error('Error de conexión al subir comprobante');
+            console.error('❌ Error subiendo comprobante:', error);
+            toast.error(`❌ Error al subir comprobante: ${error.message}`);
+            
+            // ✅ OFRECER ALTERNATIVA POR WHATSAPP
+            toast.info('💡 Puedes enviar el comprobante por WhatsApp como alternativa');
+            
         } finally {
             setUploadingProof(false);
         }
@@ -183,13 +324,18 @@ const BankTransferInstructions = () => {
     const sendToWhatsApp = () => {
         if (!order) return;
 
-        let message = `*COMPROBANTE DE TRANSFERENCIA - BlueTec*\n\n`;
+        let message = `*TRANSFERENCIA BANCARIA - BlueTec*\n\n`;
         message += `📋 *Pedido:* ${order.order_id}\n`;
-        message += `💰 *Monto:* ${displayINRCurrency(order.total_amount)}\n`;
-        message += `🏦 *Banco:* ${transferData.customer_bank}\n`;
-        message += `📄 *Referencia:* ${transferData.reference_number}\n`;
-        message += `📅 *Fecha:* ${transferData.transfer_date}\n\n`;
-        message += `Hola, adjunto el comprobante de transferencia de mi pedido. Gracias.`;
+        message += `💰 *Monto:* ${displayINRCurrency(order.total_amount)}\n\n`;
+        
+        if (transferData.reference_number) {
+            message += `🏦 *Datos de mi transferencia:*\n`;
+            message += `📄 *Referencia:* ${transferData.reference_number}\n`;
+            message += `🏪 *Mi Banco:* ${transferData.customer_bank}\n`;
+            message += `📅 *Fecha:* ${transferData.transfer_date}\n\n`;
+        }
+        
+        message += `Hola, ${proofUploaded ? 'ya subí' : 'necesito ayuda con'} el comprobante de transferencia de mi pedido. Gracias.`;
         
         const encodedMessage = encodeURIComponent(message);
         window.open(`https://wa.me/+595984133733?text=${encodedMessage}`, '_blank');
@@ -211,6 +357,7 @@ const BankTransferInstructions = () => {
             <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-gray-800 mb-4">Pedido no encontrado</h2>
+                    <p className="text-gray-600 mb-4">No se pudo cargar la información del pedido</p>
                     <Link to="/" className="bg-[#2A3190] text-white px-6 py-3 rounded-lg hover:bg-[#1e236b] transition-colors">
                         Volver al inicio
                     </Link>
@@ -258,91 +405,38 @@ const BankTransferInstructions = () => {
                             
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                                 <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="text-gray-600 text-sm">Banco:</p>
-                                            <p className="font-bold text-lg">{bankDetails.bank}</p>
+                                    {Object.entries({
+                                        'Banco': bankDetails.bank,
+                                        'Tipo de Cuenta': bankDetails.accountType,
+                                        'Número de Cuenta': bankDetails.accountNumber,
+                                        'Titular': bankDetails.holder,
+                                        'Monto a Transferir': displayINRCurrency(order.total_amount),
+                                        'Referencia': order.order_id
+                                    }).map(([label, value]) => (
+                                        <div key={label} className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-gray-600 text-sm">{label}:</p>
+                                                <p className={`font-bold ${label === 'Monto a Transferir' ? 'text-xl text-green-600' : 'text-lg'}`}>
+                                                    {value}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => copyToClipboard(value.toString())}
+                                                className="text-blue-600 hover:text-blue-800"
+                                                title="Copiar"
+                                            >
+                                                <FaCopy />
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => copyToClipboard(bankDetails.bank)}
-                                            className="text-blue-600 hover:text-blue-800"
-                                        >
-                                            <FaCopy />
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="text-gray-600 text-sm">Tipo de Cuenta:</p>
-                                            <p className="font-bold text-lg">{bankDetails.accountType}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => copyToClipboard(bankDetails.accountType)}
-                                            className="text-blue-600 hover:text-blue-800"
-                                        >
-                                            <FaCopy />
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="text-gray-600 text-sm">Número de Cuenta:</p>
-                                            <p className="font-bold text-xl text-[#2A3190]">{bankDetails.accountNumber}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => copyToClipboard(bankDetails.accountNumber)}
-                                            className="text-blue-600 hover:text-blue-800"
-                                        >
-                                            <FaCopy />
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="text-gray-600 text-sm">Titular:</p>
-                                            <p className="font-bold text-lg">{bankDetails.holder}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => copyToClipboard(bankDetails.holder)}
-                                            className="text-blue-600 hover:text-blue-800"
-                                        >
-                                            <FaCopy />
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center border-t pt-4">
-                                        <div>
-                                            <p className="text-gray-600 text-sm">Monto a Transferir:</p>
-                                            <p className="font-bold text-xl text-green-600">{displayINRCurrency(order.total_amount)}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => copyToClipboard(order.total_amount.toString())}
-                                            className="text-blue-600 hover:text-blue-800"
-                                        >
-                                            <FaCopy />
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="text-gray-600 text-sm">Referencia:</p>
-                                            <p className="font-bold text-lg">{order.order_id}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => copyToClipboard(order.order_id)}
-                                            className="text-blue-600 hover:text-blue-800"
-                                        >
-                                            <FaCopy />
-                                        </button>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Formulario para subir comprobante */}
+                        {/* ✅ FORMULARIO MEJORADO */}
                         {!proofUploaded ? (
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-                                <h3 className="text-xl font-bold text-[#2A3190] mb-4">Subir Comprobante de Transferencia</h3>
+                                <h3 className="text-xl font-bold text-[#2A3190] mb-4">Información de tu Transferencia</h3>
                                 
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -377,7 +471,7 @@ const BankTransferInstructions = () => {
                                         
                                         <div>
                                             <label className="block text-gray-700 font-medium mb-2">
-                                                Tu Banco
+                                                Tu Banco *
                                             </label>
                                             <input
                                                 type="text"
@@ -386,6 +480,7 @@ const BankTransferInstructions = () => {
                                                 onChange={handleInputChange}
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190]"
                                                 placeholder="Ej: Banco Itaú"
+                                                required
                                             />
                                         </div>
                                         
@@ -417,10 +512,43 @@ const BankTransferInstructions = () => {
                                             placeholder="Información adicional sobre la transferencia..."
                                         />
                                     </div>
+
+                                    {/* ✅ BOTÓN PARA ENVIAR SIN COMPROBANTE */}
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <FaExclamationCircle className="text-yellow-600" />
+                                            <h4 className="font-semibold text-yellow-800">Opciones de Envío</h4>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            <button
+                                                onClick={submitTransferWithoutProof}
+                                                disabled={!canSubmitTransfer() || submittingWithoutProof}
+                                                className="w-full bg-yellow-600 text-white py-3 rounded-lg hover:bg-yellow-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {submittingWithoutProof ? (
+                                                    <>
+                                                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                                        Enviando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <FaPaperPlane />
+                                                        Enviar Información (Sin Comprobante)
+                                                    </>
+                                                )}
+                                            </button>
+                                            
+                                            <p className="text-yellow-700 text-sm text-center">
+                                                Podrás subir el comprobante después o enviarlo por WhatsApp
+                                            </p>
+                                        </div>
+                                    </div>
                                     
+                                    {/* Subir comprobante */}
                                     <div>
                                         <label className="block text-gray-700 font-medium mb-2">
-                                            Comprobante de Transferencia *
+                                            Comprobante de Transferencia (Opcional)
                                         </label>
                                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                                             <FaUpload className="text-4xl text-gray-400 mx-auto mb-4" />
@@ -454,9 +582,9 @@ const BankTransferInstructions = () => {
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
                                 <div className="text-center">
                                     <FaCheckCircle className="text-5xl text-green-600 mx-auto mb-4" />
-                                    <h3 className="text-xl font-bold text-green-600 mb-2">¡Comprobante Subido!</h3>
+                                    <h3 className="text-xl font-bold text-green-600 mb-2">¡Información Recibida!</h3>
                                     <p className="text-gray-600">
-                                        Tu comprobante ha sido recibido y está siendo verificado por nuestro equipo.
+                                        Tu información de transferencia ha sido recibida y está siendo verificada por nuestro equipo.
                                         Recibirás una confirmación en las próximas 24 horas.
                                     </p>
                                 </div>
@@ -486,8 +614,8 @@ const BankTransferInstructions = () => {
                                         2
                                     </div>
                                     <div>
-                                        <p className="font-medium text-gray-900">Sube el comprobante</p>
-                                        <p className="text-gray-600 text-sm">Foto o PDF del comprobante de transferencia</p>
+                                        <p className="font-medium text-gray-900">Envía la información</p>
+                                        <p className="text-gray-600 text-sm">Completa los datos y envía (con o sin comprobante)</p>
                                     </div>
                                 </div>
                                 
@@ -545,8 +673,8 @@ const BankTransferInstructions = () => {
                                     <div>
                                         <p className="text-yellow-800 font-medium text-sm">Importante</p>
                                         <p className="text-yellow-700 text-sm">
-                                            Asegúrate de que el monto transferido coincida exactamente con el total del pedido. 
-                                            Incluye la referencia del pedido en la transferencia.
+                                            Puedes enviar la información primero y subir el comprobante después. 
+                                            Asegúrate de que el monto transferido coincida exactamente con el total del pedido.
                                         </p>
                                     </div>
                                 </div>

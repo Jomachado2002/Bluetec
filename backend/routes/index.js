@@ -66,7 +66,8 @@ const {
     getPendingTransfersController,
     approveTransferController,
     rejectTransferController,
-    getTransferStatsController
+    getTransferStatsController,
+    submitTransferWithoutProofController
 } = require('../controller/bankTransfer/bankTransferController');
 
 // ✅ MIDDLEWARES DE VALIDACIÓN (AGREGAR DESPUÉS DE LAS IMPORTACIONES ANTERIORES)
@@ -953,6 +954,9 @@ router.post("/bank-transfers/:transferId/proof", authToken, validateTransferId, 
 // Obtener transferencia específica
 router.get("/bank-transfers/:transferId", authToken, validateTransferId, getTransferByIdController);
 
+
+// ✅ ENVIAR TRANSFERENCIA SIN COMPROBANTE (NUEVA RUTA)
+router.post("/bank-transfers/:transferId/submit", submitTransferWithoutProofController);
 // ===========================================
 // ✅ RUTAS DE ADMINISTRACIÓN - GESTIÓN DE PEDIDOS Y TRANSFERENCIAS
 // ===========================================

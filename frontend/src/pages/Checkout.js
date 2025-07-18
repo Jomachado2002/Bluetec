@@ -147,7 +147,13 @@ const Checkout = () => {
                                 <p><strong>Email:</strong> {checkoutData.customer_info.email}</p>
                                 <p><strong>Teléfono:</strong> {checkoutData.customer_info.phone}</p>
                                 {checkoutData.customer_info.address && (
-                                    <p><strong>Dirección:</strong> {checkoutData.customer_info.address}</p>
+                                    <p><strong>Dirección:</strong> {
+                                        typeof checkoutData.customer_info.address === 'string' 
+                                            ? checkoutData.customer_info.address 
+                                            : typeof checkoutData.customer_info.address === 'object' 
+                                                ? Object.values(checkoutData.customer_info.address).filter(Boolean).join(', ')
+                                                : String(checkoutData.customer_info.address)
+                                    }</p>
                                 )}
                             </div>
                         </div>

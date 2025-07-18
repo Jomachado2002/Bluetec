@@ -552,6 +552,89 @@ const getTransferStatsController = async (req, res) => {
         });
     }
 };
+const submitTransferWithoutProofController = async (req, res) => {
+    try {
+        const { transferId } = req.params;
+        const { 
+            order_id, 
+            reference_number, 
+            transfer_date, 
+            customer_bank, 
+            customer_account, 
+            transfer_notes,
+            transfer_amount 
+        } = req.body;
+
+        console.log('📤 === ENVIANDO TRANSFERENCIA SIN COMPROBANTE ===');
+        console.log('💳 Transfer ID:', transferId);
+        console.log('📋 Datos recibidos:', req.body);
+
+        // ✅ BUSCAR O CREAR TRANSFERENCIA
+        let transfer = await BankTransferModel.findOne({ transfer_id: transferId });
+        
+        if (!transfer) {
+            // Buscar pedido para crear transferencia
+            const order = await OrderModel.findOne({ order_id: order_id });
+            if (!order) {
+                return res.status(404).json({
+                    message: 'Pedido no encontrado',
+                    success: false,
+                    error: true
+                });
+            }
+
+            // Crear nueva transferencia
+            transfer = new BankTransferModel({
+                transfer_id: transferId,
+                order_id: order._id,
+                customer_transfer_info: {
+                    reference_number,
+                    transfer_date: transfer_date ? new Date(transfer_date) : new Date(),
+                    customer_bank,
+                    customer_account,
+                    transfer_notes,
+                    transfer_amount: transfer_amount || order.total_amount
+                },
+                admin_verification: {
+                    status: 'pending'
+                }
+            });
+
+            await transfer.save();
+            console.log('✅ Nueva transferencia creada');
+        } else {
+            // Actualizar transferencia existente
+            transfer.customer_transfer_info = {
+                ...transfer.customer_transfer_info,
+                reference_number,
+                transfer_date: transfer_date ? new Date(transfer_date) : new Date(),
+                customer_bank,
+                customer_account,
+                transfer_notes,
+                transfer_amount: transfer_amount || transfer.customer_transfer_info.transfer_amount
+            };
+
+            await transfer.save();
+            console.log('✅ Transferencia actualizada');
+        }
+
+        res.json({
+            message: 'Información de transferencia guardada exitosamente',
+            success: true,
+            error: false,
+            data: transfer
+        });
+
+    } catch (error) {
+        console.error('❌ Error guardando transferencia:', error);
+        res.status(500).json({
+            message: 'Error al guardar transferencia',
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
+};
 
 module.exports = {
     createBankTransferController,
@@ -560,5 +643,6 @@ module.exports = {
     getPendingTransfersController,
     approveTransferController,
     rejectTransferController,
-    getTransferStatsController
+    getTransferStatsController,
+    submitTransferWithoutProofController
 };

@@ -172,26 +172,29 @@ console.log('📊 Estado del carrito:', {
     // ✅ FUNCIÓN PARA CAPTURAR DATOS DE TRACKING
     const captureTrackingData = useCallback(() => {
         // ✅ CONVERTIR ADDRESS A STRING SI ES OBJETO
-        const getAddressString = (address) => {
-            if (!address) return '';
-            
-            if (typeof address === 'string') {
-                return address;
-            }
-            
-            if (typeof address === 'object') {
-                // Si es un objeto, convertirlo a string legible
-                const parts = [];
-                if (address.street) parts.push(address.street);
-                if (address.city) parts.push(address.city);
-                if (address.state && address.state !== address.city) parts.push(address.state);
-                if (address.zipCode) parts.push(address.zipCode);
-                if (address.country) parts.push(address.country);
-                return parts.join(', ');
-            }
-            
-            return String(address);
-        };
+       const getAddressString = (address) => {
+    if (!address) return '';
+    
+    if (typeof address === 'string') {
+        return address;
+    }
+    
+    if (typeof address === 'object') {
+        try {
+            const parts = [];
+            if (address.street) parts.push(String(address.street));
+            if (address.city) parts.push(String(address.city));
+            if (address.state && address.state !== address.city) parts.push(String(address.state));
+            if (address.zipCode) parts.push(String(address.zipCode));
+            if (address.country) parts.push(String(address.country));
+            return parts.length > 0 ? parts.join(', ') : '';
+        } catch (error) {
+            return JSON.stringify(address);
+        }
+    }
+    
+    return String(address || '');
+};
 
         return {
             user_agent: navigator.userAgent,
@@ -201,7 +204,7 @@ console.log('📊 Estado del carrito:', {
             payment_session_id: sessionStorage.getItem('payment_session') || 
                                 `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             cart_total_items: totalQty,
-            order_notes: String(getAddressString(customerData.address) || ''),// ✅ CONVERTIR A STRING
+            order_notes: getAddressString(customerData.address) || '',// ✅ CONVERTIR A STRING
             delivery_method: 'pickup',
             invoice_number: `INV-${Date.now()}`,
             tax_amount: (totalPrice * 0.1).toFixed(2),
