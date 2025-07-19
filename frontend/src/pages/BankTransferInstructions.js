@@ -3,7 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FaUniversity, FaCopy, FaUpload, FaCheckCircle, FaWhatsapp, FaArrowLeft, FaExclamationCircle, FaPaperPlane } from 'react-icons/fa';
+import { IoMdTrash } from 'react-icons/io';
 import displayINRCurrency from '../helpers/displayCurrency';
+import { uploadProof } from '../helpers/uploadImage';
 import SummaryApi from '../common';
 
 const BankTransferInstructions = () => {
@@ -16,6 +18,9 @@ const BankTransferInstructions = () => {
     const [uploadingProof, setUploadingProof] = useState(false);
     const [proofUploaded, setProofUploaded] = useState(false);
     const [submittingWithoutProof, setSubmittingWithoutProof] = useState(false);
+    const [dragActive, setDragActive] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadedFile, setUploadedFile] = useState(null);
     const [transferData, setTransferData] = useState({
         reference_number: '',
         transfer_date: new Date().toISOString().split('T')[0],
@@ -246,8 +251,7 @@ const BankTransferInstructions = () => {
     };
 
     // ✅ MANEJAR SUBIDA DE ARCHIVO (MEJORADO)
-    const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
+   const handleFileUpload = async (file) => {
         if (!file) return;
 
         // Validar archivo
@@ -270,54 +274,98 @@ const BankTransferInstructions = () => {
         }
 
         setUploadingProof(true);
+        setUploadProgress(0);
 
         try {
-            console.log('📤 === SUBIENDO COMPROBANTE ===');
+            console.log('📤 === SUBIENDO COMPROBANTE A FIREBASE ===');
             
-            const formData = new FormData();
-            formData.append('transfer_proof', file);
-            formData.append('reference_number', transferData.reference_number);
-            formData.append('transfer_date', transferData.transfer_date);
-            formData.append('customer_bank', transferData.customer_bank);
-            formData.append('customer_account', transferData.customer_account);
-            formData.append('transfer_notes', transferData.transfer_notes);
-            formData.append('order_id', orderId);
+            // Simular progreso
+            const progressInterval = setInterval(() => {
+                setUploadProgress(prev => Math.min(prev + 10, 90));
+            }, 100);
 
-            // ✅ USAR TRANSFERENCIA EXISTENTE O CREAR NUEVA
+            // Subir a Firebase
+            const uploadResult = await uploadProof(file);
+            
+            clearInterval(progressInterval);
+            setUploadProgress(100);
+
+            console.log('📤 Archivo subido a Firebase:', uploadResult.url);
+
+            // Enviar URL al backend
             const transferId = transfer?.transfer_id || `TRF-${Date.now()}`;
             
             const response = await fetch(`${SummaryApi.baseURL}/api/bank-transfers/${transferId}/proof`, {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 credentials: 'include',
-                body: formData
+                body: JSON.stringify({
+                    proof_url: uploadResult.url,
+                    file_name: uploadResult.original_filename,
+                    file_size: uploadResult.bytes,
+                    file_type: file.type,
+                    reference_number: transferData.reference_number,
+                    transfer_date: transferData.transfer_date,
+                    customer_bank: transferData.customer_bank,
+                    customer_account: transferData.customer_account,
+                    transfer_notes: transferData.transfer_notes,
+                    order_id: orderId
+                })
             });
 
-            console.log('📥 Upload Response Status:', response.status);
-
-            if (!response.ok) {
-                throw new Error(`Error HTTP ${response.status}`);
-            }
-
             const result = await response.json();
-            console.log('📥 Upload Result:', result);
 
             if (result.success) {
                 toast.success('✅ Comprobante subido exitosamente');
                 setProofUploaded(true);
+                setUploadedFile({
+                    name: file.name,
+                    size: file.size,
+                    url: uploadResult.url,
+                    type: file.type
+                });
                 setTransfer(result.data.transfer || result.data);
             } else {
-                throw new Error(result.message || 'Error al subir comprobante');
+                throw new Error(result.message || 'Error al procesar comprobante');
             }
 
         } catch (error) {
             console.error('❌ Error subiendo comprobante:', error);
-            toast.error(`❌ Error al subir comprobante: ${error.message}`);
-            
-            // ✅ OFRECER ALTERNATIVA POR WHATSAPP
+            toast.error(`❌ Error: ${error.message}`);
             toast.info('💡 Puedes enviar el comprobante por WhatsApp como alternativa');
             
         } finally {
             setUploadingProof(false);
+            setUploadProgress(0);
+        }
+    };
+
+    // Handlers para drag & drop
+    const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileUpload(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleFileInputChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleFileUpload(e.target.files[0]);
         }
     };
 
@@ -546,35 +594,93 @@ const BankTransferInstructions = () => {
                                     </div>
                                     
                                     {/* Subir comprobante */}
-                                    <div>
+                                        <div>
                                         <label className="block text-gray-700 font-medium mb-2">
                                             Comprobante de Transferencia (Opcional)
                                         </label>
-                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                                            <FaUpload className="text-4xl text-gray-400 mx-auto mb-4" />
-                                            <p className="text-gray-600 mb-4">
-                                                Arrastra y suelta tu comprobante aquí, o haz clic para seleccionar
-                                            </p>
-                                            <input
-                                                type="file"
-                                                accept="image/*,.pdf"
-                                                onChange={handleFileUpload}
-                                                className="hidden"
-                                                id="file-upload"
-                                                disabled={uploadingProof}
-                                            />
-                                            <label
-                                                htmlFor="file-upload"
-                                                className={`bg-[#2A3190] text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-[#1e236b] transition-colors ${
-                                                    uploadingProof ? 'opacity-50 cursor-not-allowed' : ''
+                                        
+                                        {!uploadedFile ? (
+                                            <div
+                                                className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 ${
+                                                    dragActive 
+                                                        ? 'border-[#2A3190] bg-blue-50' 
+                                                        : uploadingProof 
+                                                            ? 'border-gray-400 bg-gray-50' 
+                                                            : 'border-gray-300 hover:border-[#2A3190] hover:bg-blue-50'
                                                 }`}
+                                                onDragEnter={handleDrag}
+                                                onDragLeave={handleDrag}
+                                                onDragOver={handleDrag}
+                                                onDrop={handleDrop}
                                             >
-                                                {uploadingProof ? 'Subiendo...' : 'Seleccionar Archivo'}
-                                            </label>
-                                            <p className="text-gray-500 text-sm mt-2">
-                                                JPG, PNG o PDF - Máximo 5MB
-                                            </p>
-                                        </div>
+                                                {uploadingProof ? (
+                                                    <div className="space-y-4">
+                                                        <div className="animate-spin w-8 h-8 border-4 border-[#2A3190] border-t-transparent rounded-full mx-auto"></div>
+                                                        <div className="space-y-2">
+                                                            <p className="text-[#2A3190] font-medium">Subiendo comprobante...</p>
+                                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                <div 
+                                                                    className="bg-[#2A3190] h-2 rounded-full transition-all duration-300"
+                                                                    style={{ width: `${uploadProgress}%` }}
+                                                                ></div>
+                                                            </div>
+                                                            <p className="text-gray-600 text-sm">{uploadProgress}%</p>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <FaUpload className={`text-4xl mx-auto mb-4 ${dragActive ? 'text-[#2A3190]' : 'text-gray-400'}`} />
+                                                        <p className={`mb-4 ${dragActive ? 'text-[#2A3190] font-medium' : 'text-gray-600'}`}>
+                                                            {dragActive 
+                                                                ? 'Suelta el archivo aquí' 
+                                                                : 'Arrastra tu comprobante aquí o haz clic para seleccionar'
+                                                            }
+                                                        </p>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*,.pdf"
+                                                            onChange={handleFileInputChange}
+                                                            className="hidden"
+                                                            id="file-upload"
+                                                            disabled={uploadingProof}
+                                                        />
+                                                        <label
+                                                            htmlFor="file-upload"
+                                                            className="bg-[#2A3190] text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-[#1e236b] transition-colors inline-block"
+                                                        >
+                                                            Seleccionar Archivo
+                                                        </label>
+                                                        <p className="text-gray-500 text-sm mt-2">
+                                                            JPG, PNG o PDF - Máximo 5MB
+                                                        </p>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <FaCheckCircle className="text-green-600 text-xl" />
+                                                        <div>
+                                                            <p className="font-medium text-green-800">{uploadedFile.name}</p>
+                                                            <p className="text-green-600 text-sm">
+                                                                {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setUploadedFile(null);
+                                                            setProofUploaded(false);
+                                                        }}
+                                                        className="text-red-600 hover:text-red-800"
+                                                        title="Eliminar archivo"
+                                                    >
+                                                        <IoMdTrash />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

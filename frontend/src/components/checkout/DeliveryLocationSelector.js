@@ -1,32 +1,25 @@
 // frontend/src/components/checkout/DeliveryLocationSelector.js
 import React, { useState, useEffect, useRef } from 'react';
-import { FaMapMarkerAlt, FaSearch, FaCurrentLocation, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaLocationArrow, FaExclamationCircle, FaCheckCircle, FaSearch } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
-const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerData }) => {
+const DeliveryLocationSelector = ({ onLocationSelect, initialLocation }) => {
     const [location, setLocation] = useState(initialLocation || { lat: null, lng: null });
     const [address, setAddress] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
-    const [mapLoaded, setMapLoaded] = useState(false);
-    const [suggestions, setSuggestions] = useState([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const markerRef = useRef(null);
-    const autocompleteRef = useRef(null);
+    const searchInputRef = useRef(null);
 
     // Paraguay center coordinates
     const paraguayCenter = { lat: -25.2637, lng: -57.5759 };
 
     // Inicializar Google Maps
     useEffect(() => {
-        if (!window.google) {
-            loadGoogleMaps();
-        } else {
-            initializeMap();
-        }
+        loadGoogleMaps();
     }, []);
 
     // Actualizar ubicación cuando cambie el prop inicial
@@ -45,52 +38,47 @@ const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerD
             return;
         }
 
+        const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+        if (!apiKey) {
+            toast.error('API Key de Google Maps no configurado');
+            return;
+        }
+
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places&language=es&region=PY`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=es&region=PY`;
         script.async = true;
         script.defer = true;
-        script.onload = () => {
-            setMapLoaded(true);
-            initializeMap();
-        };
-        script.onerror = () => {
-            toast.error('Error al cargar Google Maps');
-        };
+        script.onload = () => initializeMap();
+        script.onerror = () => toast.error('Error al cargar Google Maps');
         document.head.appendChild(script);
     };
 
     const initializeMap = () => {
         if (!mapRef.current || !window.google) return;
 
+        // Configuración del mapa estilo Uber/Bolt
         const mapOptions = {
-            zoom: location.lat ? 16 : 11,
+            zoom: location.lat ? 16 : 12,
             center: location.lat ? location : paraguayCenter,
             mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+            disableDefaultUI: true,
+            zoomControl: true,
+            gestureHandling: 'greedy',
             styles: [
                 {
                     featureType: 'poi',
                     elementType: 'labels',
-                    stylers: [{ visibility: 'on' }]
+                    stylers: [{ visibility: 'simplified' }]
                 }
             ]
         };
 
         mapInstanceRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-        // Crear marcador
-        markerRef.current = new window.google.maps.Marker({
-            position: location.lat ? location : paraguayCenter,
-            map: mapInstanceRef.current,
-            draggable: true,
-            title: 'Ubicación de entrega'
-        });
-
-        // Si ya hay ubicación inicial, mostrar marcador
+        // Crear marcador personalizado estilo Uber (pin rojo grande)
         if (location.lat) {
-            markerRef.current.setPosition(location);
+            createUberStyleMarker(location);
             reverseGeocode(location);
-        } else {
-            markerRef.current.setVisible(false);
         }
 
         // Listener para click en el mapa
@@ -99,67 +87,46 @@ const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerD
                 lat: event.latLng.lat(),
                 lng: event.latLng.lng()
             };
-            updateLocationAndMarker(newLocation);
+            handleLocationSelect(newLocation);
+        });
+
+        // Configurar autocompletado
+        setupAutocomplete();
+    };
+
+    const createUberStyleMarker = (newLocation) => {
+        // Remover marcador anterior
+        if (markerRef.current) {
+            markerRef.current.setMap(null);
+        }
+
+        // Crear marcador personalizado más grande y visible
+        markerRef.current = new window.google.maps.Marker({
+            position: newLocation,
+            map: mapInstanceRef.current,
+            draggable: true,
+            title: 'Ubicación de entrega',
+            icon: {
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                    <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 0C8.95 0 0 8.95 0 20c0 15 20 30 20 30s20-15 20-30C40 8.95 31.05 0 20 0z" fill="#FF0000"/>
+                        <circle cx="20" cy="20" r="8" fill="#FFFFFF"/>
+                        <circle cx="20" cy="20" r="4" fill="#FF0000"/>
+                    </svg>
+                `),
+                scaledSize: new window.google.maps.Size(40, 50),
+                anchor: new window.google.maps.Point(20, 50)
+            }
         });
 
         // Listener para arrastrar marcador
         markerRef.current.addListener('dragend', (event) => {
-            const newLocation = {
+            const draggedLocation = {
                 lat: event.latLng.lat(),
                 lng: event.latLng.lng()
             };
-            updateLocationAndMarker(newLocation);
+            handleLocationSelect(draggedLocation);
         });
-
-        // Inicializar autocompletado
-        initializeAutocomplete();
-    };
-
-    const initializeAutocomplete = () => {
-        if (!window.google || !window.google.maps.places) return;
-
-        const input = document.getElementById('location-search');
-        if (!input) return;
-
-        autocompleteRef.current = new window.google.maps.places.Autocomplete(input, {
-            componentRestrictions: { country: 'PY' },
-            fields: ['place_id', 'geometry', 'name', 'formatted_address'],
-            types: ['establishment', 'geocode']
-        });
-
-        autocompleteRef.current.addListener('place_changed', () => {
-            const place = autocompleteRef.current.getPlace();
-            
-            if (!place.geometry || !place.geometry.location) {
-                toast.error('No se pudo encontrar la ubicación');
-                return;
-            }
-
-            const newLocation = {
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng()
-            };
-
-            updateLocationAndMarker(newLocation);
-            setAddress(place.formatted_address || place.name || '');
-            setSearchQuery(place.formatted_address || place.name || '');
-        });
-    };
-
-    const updateLocationAndMarker = (newLocation) => {
-        setLocation(newLocation);
-        
-        if (markerRef.current) {
-            markerRef.current.setPosition(newLocation);
-            markerRef.current.setVisible(true);
-        }
-
-        if (mapInstanceRef.current) {
-            mapInstanceRef.current.setCenter(newLocation);
-            mapInstanceRef.current.setZoom(16);
-        }
-
-        reverseGeocode(newLocation);
     };
 
     const updateMapLocation = (newLocation) => {
@@ -170,8 +137,21 @@ const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerD
 
         if (markerRef.current) {
             markerRef.current.setPosition(newLocation);
-            markerRef.current.setVisible(true);
+        } else {
+            createUberStyleMarker(newLocation);
         }
+    };
+
+    const handleLocationSelect = (newLocation) => {
+        setLocation(newLocation);
+        createUberStyleMarker(newLocation);
+        
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.setCenter(newLocation);
+        }
+
+        reverseGeocode(newLocation);
+        toast.success('📍 Ubicación seleccionada');
     };
 
     const reverseGeocode = async (coords) => {
@@ -187,9 +167,8 @@ const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerD
                     if (status === 'OK' && results[0]) {
                         const foundAddress = results[0].formatted_address;
                         setAddress(foundAddress);
-                        setSearchQuery(foundAddress);
                         
-                        // Llamar callback con ubicación completa
+                        // Notificar al componente padre
                         onLocationSelect({
                             lat: coords.lat,
                             lng: coords.lng,
@@ -216,6 +195,36 @@ const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerD
         }
     };
 
+    const setupAutocomplete = () => {
+        if (!searchInputRef.current || !window.google?.maps?.places) return;
+
+        const autocomplete = new window.google.maps.places.Autocomplete(
+            searchInputRef.current,
+            {
+                componentRestrictions: { country: 'PY' },
+                fields: ['geometry', 'formatted_address', 'name'],
+                types: ['establishment', 'geocode']
+            }
+        );
+
+        autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+            
+            if (!place.geometry) {
+                toast.error('No se encontró la ubicación');
+                return;
+            }
+
+            const newLocation = {
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng()
+            };
+
+            handleLocationSelect(newLocation);
+            setSearchQuery(place.formatted_address || place.name || '');
+        });
+    };
+
     const getCurrentLocation = () => {
         if (!navigator.geolocation) {
             toast.error('Tu navegador no soporta geolocalización');
@@ -229,9 +238,15 @@ const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerD
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
-                updateLocationAndMarker(newLocation);
+                
+                handleLocationSelect(newLocation);
+                
+                if (mapInstanceRef.current) {
+                    mapInstanceRef.current.setZoom(17);
+                }
+                
                 setLoading(false);
-                toast.success('Ubicación actual obtenida');
+                toast.success('🎯 Ubicación actual obtenida');
             },
             (error) => {
                 console.error('Error obteniendo ubicación:', error);
@@ -246,153 +261,108 @@ const DeliveryLocationSelector = ({ onLocationSelect, initialLocation, customerD
         );
     };
 
-    const searchLocation = async (query) => {
-        if (!query.trim() || !window.google) return;
-
-        setLoading(true);
-        try {
-            const geocoder = new window.google.maps.Geocoder();
-            
-            geocoder.geocode(
-                { 
-                    address: query,
-                    componentRestrictions: { country: 'PY' }
-                },
-                (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        const result = results[0];
-                        const newLocation = {
-                            lat: result.geometry.location.lat(),
-                            lng: result.geometry.location.lng()
-                        };
-                        updateLocationAndMarker(newLocation);
-                        setAddress(result.formatted_address);
-                        toast.success('Ubicación encontrada');
-                    } else {
-                        toast.error('No se encontró la ubicación');
-                    }
-                    setLoading(false);
-                }
-            );
-        } catch (error) {
-            console.error('Error buscando ubicación:', error);
-            toast.error('Error al buscar ubicación');
-            setLoading(false);
-        }
-    };
-
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        searchLocation(searchQuery);
-    };
-
     const isLocationSelected = location.lat && location.lng;
+
+    // Determinar altura del mapa según el dispositivo
+    const getMapHeight = () => {
+        if (window.innerWidth < 768) return '70vh';  // 70% de la altura de pantalla en móvil
+        if (window.innerWidth < 1024) return '400px'; // Tablet
+        return '500px'; // Desktop
+    };
 
     return (
         <div className="space-y-4">
-            {/* Buscador de ubicación */}
-            <div>
-                <label className="block text-gray-700 font-medium mb-2">
-                    Buscar ubicación de entrega
-                </label>
-                <form onSubmit={handleSearchSubmit} className="flex gap-2">
-                    <div className="relative flex-1">
-                        <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                        <input
-                            id="location-search"
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent"
-                            placeholder="Buscar dirección, lugar o punto de referencia..."
-                        />
-                    </div>
-                    <button
-                        type="button"
-                        onClick={getCurrentLocation}
-                        disabled={loading}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                        title="Usar mi ubicación actual"
-                    >
-                        <FaCurrentLocation />
-                        <span className="hidden sm:inline">Mi ubicación</span>
-                    </button>
-                </form>
+            {/* Buscador y botón de ubicación actual */}
+             <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <FaSearch className="absolute left-3 top-3 text-gray-400 z-10" />
+                    <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm md:text-base"
+                        placeholder="Buscar dirección, lugar o punto de referencia..."
+                    />
+                </div>
+                
+                <button
+                    onClick={getCurrentLocation}
+                    disabled={loading}
+                    className="bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap min-w-[120px] text-sm md:text-base"
+                >
+                    <FaLocationArrow className={loading ? 'animate-spin' : ''} />
+                    <span>Mi ubicación</span>
+                </button>
             </div>
-
-            {/* Mapa */}
-            <div className="relative">
+            
+            {/* Mapa responsive */}
+            <div className="relative rounded-lg overflow-hidden border border-gray-300">
                 <div
                     ref={mapRef}
-                    className="w-full h-80 rounded-lg border border-gray-300 bg-gray-100"
-                    style={{ minHeight: '320px' }}
+                    className="w-full bg-gray-100"
+                    style={{ height: getMapHeight() }}
                 />
                 
+                {/* Indicador de carga */}
                 {loading && (
-                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg">
-                        <div className="flex items-center gap-3">
+                    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
+                        <div className="flex items-center gap-3 bg-white px-4 py-3 rounded-lg shadow-lg">
                             <div className="animate-spin w-6 h-6 border-2 border-[#2A3190] border-t-transparent rounded-full"></div>
-                            <span className="text-gray-600">Buscando ubicación...</span>
+                            <span className="text-gray-700 font-medium">Cargando...</span>
                         </div>
                     </div>
                 )}
 
-                {!mapLoaded && (
-                    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center rounded-lg">
-                        <div className="text-center">
-                            <div className="animate-spin w-8 h-8 border-2 border-[#2A3190] border-t-transparent rounded-full mx-auto mb-3"></div>
-                            <p className="text-gray-600">Cargando mapa...</p>
+                {/* Instrucciones flotantes */}
+                 {!isLocationSelected && (
+                    <div className="absolute top-2 left-2 right-2 md:top-4 md:left-4 md:right-auto md:max-w-sm z-10">
+                        <div className="bg-white rounded-lg shadow-lg p-3 md:p-4 border border-gray-200">
+                            <div className="flex items-start gap-2 md:gap-3">
+                                <div className="bg-red-100 p-1.5 md:p-2 rounded-full flex-shrink-0">
+                                    <FaMapMarkerAlt className="text-red-600 text-xs md:text-sm" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-gray-900 mb-1 md:mb-2 text-xs md:text-sm">¿Cómo marcar tu ubicación?</p>
+                                    <div className="text-xs md:text-xs text-gray-700 space-y-1">
+                                        <p>🔍 <strong>Busca</strong> un lugar arriba</p>
+                                        <p>📍 <strong>Toca el mapa</strong> para marcar</p>
+                                        <p>🔴 <strong>Arrastra</strong> el pin rojo</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Información de la ubicación seleccionada */}
+            {/* Estado de la ubicación */}
             {isLocationSelected ? (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-start gap-3">
-                        <FaCheckCircle className="text-green-600 text-lg mt-1" />
-                        <div className="flex-1">
-                            <p className="text-green-800 font-medium text-sm">✓ Ubicación seleccionada</p>
-                            <p className="text-green-700 text-sm mt-1">{address}</p>
+                        <FaCheckCircle className="text-green-600 text-lg mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-green-800 font-semibold text-sm mb-1">✓ Ubicación confirmada</p>
+                            <p className="text-green-700 text-sm break-words">{address}</p>
                             <div className="mt-2 text-xs text-green-600">
-                                <p>Coordenadas: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}</p>
+                                Coordenadas: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
                             </div>
                         </div>
-                        <a
-                            href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-green-600 hover:text-green-800 text-sm hover:underline"
-                        >
-                            Ver en Google Maps →
-                        </a>
                     </div>
                 </div>
             ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                     <div className="flex items-start gap-3">
-                        <FaExclamationCircle className="text-yellow-600 text-lg mt-1" />
+                        <FaExclamationCircle className="text-amber-600 text-lg mt-0.5 flex-shrink-0" />
                         <div>
-                            <p className="text-yellow-800 font-medium text-sm">Selecciona una ubicación</p>
-                            <p className="text-yellow-700 text-sm mt-1">
-                                Haz clic en el mapa, busca una dirección o usa tu ubicación actual
+                            <p className="text-amber-800 font-semibold text-sm mb-1">Selecciona tu ubicación</p>
+                            <p className="text-amber-700 text-sm">
+                                Busca una dirección, usa tu GPS o haz clic directamente en el mapa
                             </p>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* Instrucciones */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="text-blue-900 font-medium text-sm mb-2">💡 Instrucciones:</h4>
-                <ul className="text-blue-800 text-sm space-y-1">
-                    <li>• Busca tu dirección en el campo de búsqueda</li>
-                    <li>• Haz clic en el mapa para seleccionar una ubicación exacta</li>
-                    <li>• Arrastra el marcador rojo para ajustar la posición</li>
-                    <li>• Usa "Mi ubicación" para obtener tu posición actual</li>
-                </ul>
-            </div>
         </div>
     );
 };

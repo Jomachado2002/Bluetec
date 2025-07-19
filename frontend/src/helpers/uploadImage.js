@@ -57,4 +57,44 @@ const uploadImage = async(image) => {
   }
 };
 
+/**
+ * Sube un comprobante de transferencia a Firebase Storage
+ * @param {File} file - Archivo de comprobante a subir
+ * @returns {Promise<Object>} - URL del comprobante subido
+ */
+const uploadProof = async(file) => {
+  try {
+    // Crear un nombre único para el comprobante
+    const uniqueId = uuidv4();
+    const fileName = `${uniqueId}_${file.name.replace(/\s+/g, '_')}`;
+    
+    // Ruta en Firebase Storage para comprobantes
+    const storagePath = 'bank_transfers';
+    const fullPath = `${storagePath}/${fileName}`;
+    
+    // Crear referencia para subir el comprobante
+    const storageRef = ref(storage, fullPath);
+    
+    // Subir el archivo
+    const snapshot = await uploadBytes(storageRef, file);
+    
+    // Obtener la URL pública
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    // Devolver objeto con la URL
+    return {
+      url: downloadURL,
+      public_id: fullPath,
+      secure_url: downloadURL,
+      original_filename: file.name,
+      format: file.name.split('.').pop().toLowerCase(),
+      bytes: file.size
+    };
+  } catch (error) {
+    console.error("Error al subir comprobante a Firebase Storage:", error);
+    throw error;
+  }
+};
+
+export { uploadProof };
 export default uploadImage;

@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { FaCreditCard, FaUniversity, FaFileInvoice, FaShieldAlt, FaExclamationCircle } from 'react-icons/fa';
 
-const PaymentMethodSelector = ({ selectedMethod, onMethodSelect, isLoggedIn }) => {
+const PaymentMethodSelector = ({ selectedMethod, onMethodSelect, isLoggedIn, isCompact = false }) => {
+
     const [showDetails, setShowDetails] = useState(null);
 
     const paymentMethods = [
@@ -74,6 +75,51 @@ const PaymentMethodSelector = ({ selectedMethod, onMethodSelect, isLoggedIn }) =
     const toggleDetails = (methodId) => {
         setShowDetails(showDetails === methodId ? null : methodId);
     };
+
+
+
+    if (isCompact) {
+        return (
+            <div className="space-y-3">
+                {paymentMethods.map((method) => {
+                    const Icon = method.icon;
+                    const isSelected = selectedMethod === method.id;
+
+                    return (
+                        <div key={method.id} className="relative">
+                            <div
+                                className={`relative border-2 rounded-lg p-3 cursor-pointer transition-all duration-300 ${
+                                    isSelected 
+                                        ? `${method.borderColor} ${method.bgColor}` 
+                                        : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => onMethodSelect(method.id)}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full ${method.color} flex items-center justify-center`}>
+                                            <Icon className="text-white text-sm" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-gray-900 text-sm">{method.name}</h3>
+                                            <p className="text-gray-600 text-xs">{method.description}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                        isSelected ? `${method.borderColor} ${method.color}` : 'border-gray-300'
+                                    }`}>
+                                        {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
+
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">

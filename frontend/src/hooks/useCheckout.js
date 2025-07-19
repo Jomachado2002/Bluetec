@@ -131,96 +131,36 @@ const useCheckout = () => {
     });
 };
 
-    // ✅ VALIDAR PASO ACTUAL
     const validateCurrentStep = () => {
-    switch (currentStep) {
-       case 1: // Datos del cliente
-    const customerInfo = checkoutData?.customer_info || {};
-    const { name = '', email = '', phone = '' } = customerInfo;
-    
-    console.log('👤 VALIDANDO PASO 1:', {
-        customerInfo,
-        name: `"${name}"`,
-        email: `"${email}"`,
-        phone: `"${phone}"`,
-        nameValid: !!name.trim(),
-        emailValid: !!(email.trim() && /\S+@\S+\.\S+/.test(email)),
-        phoneValid: !!phone.trim()
-    });
-    
-    if (!name.trim()) {
-        console.log('❌ Falta nombre');
-        return false;
-    }
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
-        console.log('❌ Falta email válido');
-        return false;
-    }
-    if (!phone.trim()) {
-        console.log('❌ Falta teléfono');
-        return false;
-    }
-    console.log('✅ Paso 1 válido');
-    return true;
+        if (currentStep === 1) {
+            // Validar datos del cliente
+            const customerInfo = checkoutData?.customer_info || {};
+            const { name = '', email = '', phone = '' } = customerInfo;
             
-        // Resto igual pero SIN toast.error
-
-        case 2: // Ubicación de entrega
-    const deliveryLocation = checkoutData?.delivery_location || {};
-    const { lat, lng, address = '' } = deliveryLocation;
-    
-    console.log('🗺️ VALIDANDO UBICACIÓN:', {
-        deliveryLocation,
-        lat,
-        lng,
-        address,
-        hasLatLng: !!(lat && lng),
-        hasAddress: !!address.trim(),
-        passesValidation: !!(lat && lng && address.trim())
-    });
-    
-    if (!lat || !lng) {
-        console.log('❌ Falta lat/lng');
-        return false;
-    }
-    if (!address.trim()) {
-        console.log('❌ Falta address');
-        return false;
-    }
-    console.log('✅ Validación ubicación OK');
-    return true;
-    
-
-        case 3: // Método de pago
+            if (!name.trim() || !email.trim() || !/\S+@\S+\.\S+/.test(email) || !phone.trim()) {
+                return false;
+            }
+            
+            // Validar ubicación
+            const deliveryLocation = checkoutData?.delivery_location || {};
+            const { lat, lng, address = '' } = deliveryLocation;
+            
+            if (!lat || !lng || !address.trim()) {
+                return false;
+            }
+            
+            // Validar método de pago
             if (!checkoutData?.payment_method) {
                 return false;
             }
+            
             return true;
-
-        default:
-            return true;
-    }
-};
-
-    // ✅ AVANZAR AL SIGUIENTE PASO
-    const nextStep = () => {
-        if (validateCurrentStep()) {
-            setCurrentStep(prev => Math.min(prev + 1, 4));
         }
+        
+        return currentStep === 2;
     };
 
-    // ✅ RETROCEDER AL PASO ANTERIOR
-    const prevStep = () => {
-        setCurrentStep(prev => Math.max(prev - 1, 1));
-    };
-
-    // ✅ IR A PASO ESPECÍFICO
-    const goToStep = (step) => {
-        if (step < currentStep || validateCurrentStep()) {
-            setCurrentStep(step);
-        }
-    };
-
+   
     // ✅ PREPARAR ITEMS PARA EL PEDIDO
     const prepareOrderItems = () => {
         return cartItems.map(item => ({
@@ -356,23 +296,15 @@ const useCheckout = () => {
 
     // ✅ VERIFICAR SI EL CHECKOUT ESTÁ COMPLETO
     const isCheckoutComplete = () => {
-        return currentStep === 4 && validateCurrentStep();
+        return currentStep === 2 && validateCurrentStep();
     };
 
     // ✅ OBTENER PROGRESO DEL CHECKOUT
     const getProgress = () => {
-        return (currentStep / 4) * 100;
+        return (currentStep / 2) * 100;
     };
 
-    // ✅ OBTENER PASOS DISPONIBLES
-    const getSteps = () => {
-        return [
-            { step: 1, title: 'Datos del Cliente', completed: currentStep > 1 },
-            { step: 2, title: 'Ubicación de Entrega', completed: currentStep > 2 },
-            { step: 3, title: 'Método de Pago', completed: currentStep > 3 },
-            { step: 4, title: 'Confirmación', completed: currentStep > 4 }
-        ];
-    };
+   
 
     return {
         // Estado
@@ -383,10 +315,7 @@ const useCheckout = () => {
         isLoggedIn,
         user,
         
-        // Funciones de navegación
-        nextStep,
-        prevStep,
-        goToStep,
+        goToNextStep: () => setCurrentStep(2),
         
         // Funciones de actualización
         updateCheckoutData,
@@ -407,7 +336,6 @@ const useCheckout = () => {
         // Funciones de utilidad
         resetCheckout,
         getProgress,
-        getSteps,
         prepareOrderItems,
         loadCartItems
     };
