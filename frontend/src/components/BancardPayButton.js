@@ -9,13 +9,17 @@ const BancardPayButton = ({
   onPaymentStart = () => {},
   onPaymentSuccess = () => {},
   onPaymentError = () => {},
-  disabled = false 
+  disabled = false,
+  // Nueva prop para controlar si debe mostrar formulario o ir directo al iframe
+  skipForm = false,
+  // Nueva prop para cargar automáticamente
+  autoLoad = false 
 }) => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showInlineIframe, setShowInlineIframe] = useState(false);
   const [processId, setProcessId] = useState('');
-    const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
@@ -34,6 +38,7 @@ const BancardPayButton = ({
       }));
     }
   }, [customerData.name, customerData.email, customerData.phone, customerData.address]);
+
   const [errors, setErrors] = useState({});
 
   // ✅ FUNCIÓN CORREGIDA PARA CAPTURAR DATOS DE TRACKING
@@ -48,7 +53,7 @@ const BancardPayButton = ({
       cart_total_items: cartItems.length,
       order_notes: formData.address || '',
       delivery_method: 'pickup',
-            invoice_number: `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      invoice_number: `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       tax_amount: (totalAmount * 0.1).toFixed(2),
       utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
       utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
@@ -119,9 +124,11 @@ const BancardPayButton = ({
       totalAmount,
       cartItemsCount: cartItems.length,
       customerDataName: customerData?.name,
-      disabled
+      disabled,
+      skipForm,
+      autoLoad
     });
-  }, [totalAmount, cartItems.length, customerData?.name, disabled]);
+  }, [totalAmount, cartItems.length, customerData?.name, disabled, skipForm, autoLoad]);
 
  useEffect(() => {
     if (showInlineIframe && processId) {
@@ -347,7 +354,10 @@ const BancardPayButton = ({
   };
 
   const processPayment = async () => {
-    if (!validateForm()) {
+    // Si skipForm es true y tenemos customerData, usar esos datos
+    const dataToUse = skipForm && customerData.name ? customerData : formData;
+    
+    if (!skipForm && !validateForm()) {
       return;
     }
 
@@ -365,7 +375,7 @@ const BancardPayButton = ({
       console.log('🔗 Configuración de pago:', {
         backendUrl,
         totalAmount,
-        customerData: formData
+        customerData: dataToUse
       });
       
       if (!backendUrl) {
@@ -381,17 +391,17 @@ const BancardPayButton = ({
         currency: 'PYG',
         description: `Compra BlueTec - ${cartItems.length} productos`,
         customer_info: {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address
+          name: dataToUse.name,
+          email: dataToUse.email,
+          phone: dataToUse.phone,
+          address: dataToUse.address
         },
         items: cartItems.map(item => ({
           product_id: item.productId?._id || item._id,
           name: item.productId?.productName || item.name || 'Producto',
           quantity: item.quantity,
           unitPrice: item.productId?.sellingPrice || item.unitPrice || 0,
-          unit_price: item.productId?.sellingPrice || item.unitPrice || 0, // ✅ AGREGAR AMBOS CAMPOS
+          unit_price: item.productId?.sellingPrice || item.unitPrice || 0,
           total: (item.productId?.sellingPrice || item.unitPrice || 0) * item.quantity,
           category: item.productId?.category || '',
           brand: item.productId?.brandName || ''
@@ -453,7 +463,7 @@ const BancardPayButton = ({
         setProcessId(result.data.process_id);
         setShowForm(false);
         setShowInlineIframe(true);
-        // Asegurarse de que el iframe se inicialice después de que el DOM se actualice
+        
         setTimeout(() => {
           if (document.getElementById('bancard-iframe-container')) {
             loadBancardScript();
@@ -464,11 +474,10 @@ const BancardPayButton = ({
           shop_process_id: result.data.shop_process_id,
           process_id: result.data.process_id,
           amount: totalAmount,
-          customer: formData,
+          customer: dataToUse,
           timestamp: Date.now()
         }));
         
-        onPaymentSuccess(result.data);
       } else {
         console.error('❌ Respuesta inválida:', result);
         throw new Error(result.message || 'La respuesta del servidor no contiene los datos necesarios');
@@ -520,10 +529,43 @@ const BancardPayButton = ({
     }
   };
 
-  
+  // ✅ CARGAR AUTOMÁTICAMENTE SI autoLoad ES TRUE
+  useEffect(() => {
+    if (autoLoad && customerData.name && cartItems.length > 0 && totalAmount > 0 && !showInlineIframe && !processId && !loading) {
+      console.log('🚀 AutoLoad activado - iniciando pago automáticamente');
+      console.log('📊 Datos disponibles:', {
+        customerName: customerData.name,
+        itemsCount: cartItems.length,
+        total: totalAmount,
+        hasIframe: showInlineIframe,
+        hasProcessId: !!processId,
+        isLoading: loading
+      });
+      setTimeout(() => {
+        processPayment();
+      }, 500);
+    } else if (autoLoad) {
+      console.log('⚠️ AutoLoad NO se ejecuta porque:', {
+        hasCustomerName: !!customerData.name,
+        hasItems: cartItems.length > 0,
+        hasAmount: totalAmount > 0,
+        noIframe: !showInlineIframe,
+        noProcessId: !processId,
+        notLoading: !loading
+      });
+    }
+  }, [autoLoad, customerData.name, cartItems.length, totalAmount, showInlineIframe, processId, loading]);
+
+  // ✅ SI SKIPFORM ES TRUE, IR DIRECTO AL PAGO (mantener para compatibilidad)
+  useEffect(() => {
+    if (skipForm && !autoLoad && customerData.name && !showInlineIframe && !processId) {
+      console.log('🚀 Modo skipForm activado, procesando pago automáticamente');
+      processPayment();
+    }
+  }, [skipForm, autoLoad, customerData.name]);
 
   // ✅ SI EL FORMULARIO ESTÁ VISIBLE
- if (showForm && !customerData.name) { // Solo mostrar formulario si no hay datos del cliente
+ if (showForm && !skipForm && !customerData.name) {
     return (
       <div className="space-y-4">
         {/* Resumen */}
@@ -657,19 +699,9 @@ const BancardPayButton = ({
       </div>
     );
   }
-  // Si tenemos datos del cliente del checkout, ir directo al iframe
-  if (showForm && customerData.name && !showInlineIframe) {
-    processPayment();
-    return (
-      <div className="text-center py-8">
-        <FaSpinner className="animate-spin text-3xl text-[#2A3190] mx-auto mb-4" />
-        <p className="text-gray-600">Preparando formulario de pago...</p>
-      </div>
-    );
-  }
 
-  // Mostrar iframe directamente si viene del checkout
-  if (showInlineIframe || (customerData.name && showForm)) {
+  // Mostrar iframe directamente
+  if (showInlineIframe || (skipForm && processId)) {
     return (
       <div className="w-full">
         {/* Header del pago */}
@@ -764,67 +796,131 @@ const BancardPayButton = ({
     );
   }
 
+  // ✅ VISTA INICIAL DEL BOTÓN (solo si no es skipForm)
+  if (!skipForm) {
+    return (
+      <div className="space-y-3">
+        {/* Botón principal de Bancard */}
+        <button
+          onClick={() => setShowForm(true)}
+          disabled={disabled || cartItems.length === 0 || totalAmount <= 0}
+          className="w-full bg-[#2A3190] text-white py-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-3 font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FaCreditCard className="text-xl" />
+          <span>Pagar con Bancard</span>
+          <span className="text-sm font-normal">
+            ({displayPYGCurrency(totalAmount)})
+          </span>
+        </button>
 
-  // ✅ VISTA INICIAL DEL BOTÓN
-  return (
-    <div className="space-y-3">
-      {/* Botón principal de Bancard */}
-      <button
-        onClick={() => setShowForm(true)}
-        disabled={disabled || cartItems.length === 0 || totalAmount <= 0}
-        className="w-full bg-[#2A3190] text-white py-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-3 font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <FaCreditCard className="text-xl" />
-        <span>Pagar con Bancard</span>
-        <span className="text-sm font-normal">
-          ({displayPYGCurrency(totalAmount)})
-        </span>
-      </button>
-
-      {/* Información de Bancard */}
-      <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-        <div className="flex items-center justify-center gap-2 text-blue-800 mb-2">
-          <MdSecurity className="text-lg" />
-          <span className="font-semibold text-sm">Pago seguro con Bancard</span>
-        </div>
-        <div className="text-xs text-blue-700 space-y-1">
-          <div className="flex items-center justify-center gap-4">
-            <span>✓ Tarjetas de crédito</span>
-            <span>✓ Tarjetas de débito</span>
+        {/* Información de Bancard */}
+        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+          <div className="flex items-center justify-center gap-2 text-blue-800 mb-2">
+            <MdSecurity className="text-lg" />
+            <span className="font-semibold text-sm">Pago seguro con Bancard</span>
           </div>
-          <div className="flex items-center justify-center gap-4">
-            <span>✓ Billeteras digitales</span>
-            <span>✓ Transferencias</span>
+          <div className="text-xs text-blue-700 space-y-1">
+            <div className="flex items-center justify-center gap-4">
+              <span>✓ Tarjetas de crédito</span>
+              <span>✓ Tarjetas de débito</span>
+            </div>
+            <div className="flex items-center justify-center gap-4">
+              <span>✓ Billeteras digitales</span>
+              <span>✓ Transferencias</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Certificaciones de seguridad */}
+        <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
+          <div className="flex items-center gap-1">
+            <FaLock className="text-green-500" />
+            <span>Cifrado SSL</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <MdSecurity className="text-green-500" />
+            <span>PCI DSS</span>
+          </div>
+        </div>
+
+        {/* Errores de validación generales */}
+        {errors.cart && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-700 text-sm">{errors.cart}</p>
+          </div>
+        )}
+        
+        {errors.amount && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-700 text-sm">{errors.amount}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Si es autoLoad o skipForm, mostrar el loading inicial y luego el iframe
+  if ((autoLoad || skipForm) && (!processId || loading)) {
+    return (
+      <div className="w-full">
+        {/* Header del pago en estado de carga */}
+        <div className="bg-[#2A3190] text-white p-4 rounded-t-lg flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <FaLock className="text-lg" />
+            <div>
+              <h3 className="font-semibold">Preparando Pago - Bancard</h3>
+              <p className="text-sm text-blue-100">Total: {displayPYGCurrency(totalAmount)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Contenedor de carga */}
+        <div className="border border-gray-200 rounded-b-lg bg-white">
+          <div className="text-center py-16">
+            <div className="relative">
+              {/* Logo de Bancard simulado */}
+              <div className="w-16 h-16 bg-[#2A3190] rounded-full flex items-center justify-center mx-auto mb-6">
+                <FaCreditCard className="text-white text-2xl" />
+              </div>
+              
+              {/* Spinner de carga */}
+              <FaSpinner className="animate-spin text-2xl text-[#2A3190] mx-auto mb-4" />
+              
+              <h4 className="text-lg font-semibold text-gray-900 mb-2">Conectando con Bancard</h4>
+              <p className="text-gray-600 mb-4">Preparando formulario de pago seguro...</p>
+              
+              {/* Pasos de carga */}
+              <div className="max-w-sm mx-auto space-y-2 text-sm text-gray-500">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Verificando datos del pedido</span>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                  <span>Conectando con Bancard</span>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                  <span>Cargando formulario de pago</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer con información de seguridad */}
+          <div className="bg-green-50 border-t p-4 rounded-b-lg">
+            <div className="flex items-center justify-center gap-3 text-green-700">
+              <FaLock className="text-lg" />
+              <div className="text-center">
+                <p className="font-medium text-sm">Transacción 100% segura</p>
+                <p className="text-xs">Protegido por Bancard y certificado SSL</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Certificaciones de seguridad */}
-      <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
-        <div className="flex items-center gap-1">
-          <FaLock className="text-green-500" />
-          <span>Cifrado SSL</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <MdSecurity className="text-green-500" />
-          <span>PCI DSS</span>
-        </div>
-      </div>
-
-      {/* Errores de validación generales */}
-      {errors.cart && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-red-700 text-sm">{errors.cart}</p>
-        </div>
-      )}
-      
-      {errors.amount && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-red-700 text-sm">{errors.amount}</p>
-        </div>
-      )}
-    </div>
-  );
+    );
+  }
 };
 
 export default BancardPayButton;
