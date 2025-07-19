@@ -13,14 +13,27 @@ const BancardPayButton = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [showIframe, setShowIframe] = useState(false);
+  const [showInlineIframe, setShowInlineIframe] = useState(false);
   const [processId, setProcessId] = useState('');
-  const [formData, setFormData] = useState({
-    name: customerData.name || '',
-    email: customerData.email || '',
-    phone: customerData.phone || '',
-    address: customerData.address || ''
+    const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: ''
   });
+
+  // Actualizar formData cuando cambie customerData
+  useEffect(() => {
+    if (customerData && Object.keys(customerData).length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        name: customerData.name || prev.name,
+        email: customerData.email || prev.email,
+        phone: customerData.phone || prev.phone,
+        address: customerData.address || prev.address
+      }));
+    }
+  }, [customerData.name, customerData.email, customerData.phone, customerData.address]);
   const [errors, setErrors] = useState({});
 
   // ✅ FUNCIÓN CORREGIDA PARA CAPTURAR DATOS DE TRACKING
@@ -35,7 +48,7 @@ const BancardPayButton = ({
       cart_total_items: cartItems.length,
       order_notes: formData.address || '',
       delivery_method: 'pickup',
-      invoice_number: `INV-${Date.now()}`,
+            invoice_number: `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       tax_amount: (totalAmount * 0.1).toFixed(2),
       utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
       utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
@@ -76,14 +89,14 @@ const BancardPayButton = ({
         console.log('📋 Datos parseados del iframe:', data);
         
         if (data && typeof data === 'object') {
-          if (data.type === 'payment_success' || data.status === 'success') {
+         if (data.type === 'payment_success' || data.status === 'success') {
             console.log('✅ Pago exitoso desde iframe:', data);
-            setShowIframe(false);
+            setShowInlineIframe(false);
             setLoading(false);
             onPaymentSuccess(data);
           } else if (data.type === 'payment_error' || data.status === 'error') {
             console.error('❌ Error en el pago desde iframe:', data);
-            setShowIframe(false);
+            setShowInlineIframe(false);
             setLoading(false);
             onPaymentError(new Error(data.message || 'Error en el proceso de pago'));
           } else if (data.type === 'iframe_loaded' || data.message === 'loaded') {
@@ -99,27 +112,27 @@ const BancardPayButton = ({
   };
 
   // ✅ DEBUG: Verificar configuración al montar
-  useEffect(() => {
+ useEffect(() => {
     console.log('🔧 DEBUG - Configuración BancardPayButton:', {
       backendUrl: process.env.REACT_APP_BACKEND_URL,
       environment: process.env.REACT_APP_BANCARD_ENVIRONMENT,
       totalAmount,
       cartItemsCount: cartItems.length,
-      customerData,
+      customerDataName: customerData?.name,
       disabled
     });
-  }, [totalAmount, cartItems.length, customerData, disabled]);
+  }, [totalAmount, cartItems.length, customerData?.name, disabled]);
 
-  useEffect(() => {
-    if (showIframe && processId) {
-      console.log('🎯 Efecto para cargar script:', { showIframe, processId });
+ useEffect(() => {
+    if (showInlineIframe && processId) {
+      console.log('🎯 Efecto para cargar script:', { showInlineIframe, processId });
       const timer = setTimeout(() => {
         loadBancardScript();
       }, 100);
       
       return () => clearTimeout(timer);
     }
-  }, [showIframe, processId]);
+  }, [showInlineIframe, processId]);
 
   // ✅ LIMPIAR SCRIPT AL DESMONTAR
   useEffect(() => {
@@ -136,7 +149,7 @@ const BancardPayButton = ({
     
     if (retryCount >= 3) {
       console.error('❌ Máximo de intentos alcanzado para cargar script');
-      setShowIframe(false);
+      setShowInlineIframe(false);
       setLoading(false);
       onPaymentError(new Error('No se pudo cargar el sistema de pagos después de 3 intentos'));
       return;
@@ -242,7 +255,8 @@ const BancardPayButton = ({
       
       container.innerHTML = '';
       container.style.display = 'block';
-      container.style.minHeight = '500px';
+      container.style.minHeight = '600px';
+      container.style.height = 'auto';
       container.style.width = '100%';
       container.style.border = '1px solid #e5e5e5';
       container.style.borderRadius = '8px';
@@ -332,9 +346,14 @@ const BancardPayButton = ({
     }
   };
 
-  // ✅ PROCESAR PAGO CON BANCARD - CORREGIDO
   const processPayment = async () => {
     if (!validateForm()) {
+      return;
+    }
+
+    // Evitar llamadas múltiples
+    if (loading) {
+      console.log('⚠️ Ya se está procesando un pago');
       return;
     }
 
@@ -433,7 +452,13 @@ const BancardPayButton = ({
         
         setProcessId(result.data.process_id);
         setShowForm(false);
-        setShowIframe(true);
+        setShowInlineIframe(true);
+        // Asegurarse de que el iframe se inicialice después de que el DOM se actualice
+        setTimeout(() => {
+          if (document.getElementById('bancard-iframe-container')) {
+            loadBancardScript();
+          }
+        }, 100);
         
         sessionStorage.setItem('bancard_payment', JSON.stringify({
           shop_process_id: result.data.shop_process_id,
@@ -455,14 +480,23 @@ const BancardPayButton = ({
       let userMessage = 'Error desconocido';
       
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        userMessage = 'No se puede conectar con el servidor. Verifica que el backend esté funcionando.';
+        userMessage = `No se puede conectar con el servidor (${process.env.REACT_APP_BACKEND_URL}). Verifica que el backend esté funcionando en el puerto correcto.`;
       } else if (error.message.includes('REACT_APP_BACKEND_URL')) {
-        userMessage = 'Error de configuración. Contacta al soporte técnico.';
+        userMessage = 'Error de configuración. REACT_APP_BACKEND_URL no está configurado correctamente.';
       } else if (error.message.includes('Backend no disponible')) {
         userMessage = 'El servidor de pagos no está disponible. Intenta nuevamente en unos minutos.';
+      } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+        userMessage = 'Error de conexión. Verifica tu conexión a internet y que el backend esté ejecutándose.';
       } else {
         userMessage = error.message;
       }
+      
+      console.error('🔍 DEBUG Error details:', {
+        name: error.name,
+        message: error.message,
+        backendUrl: process.env.REACT_APP_BACKEND_URL,
+        stack: error.stack
+      });
       
       alert(`Error al procesar el pago: ${userMessage}`);
       onPaymentError(error);
@@ -470,8 +504,8 @@ const BancardPayButton = ({
   };
 
   // ✅ CERRAR IFRAME
-  const closeIframe = () => {
-    setShowIframe(false);
+   const closeInlineIframe = () => {
+    setShowInlineIframe(false);
     setProcessId('');
     setLoading(false);
     
@@ -479,101 +513,17 @@ const BancardPayButton = ({
     if (script) {
       script.remove();
     }
+    
+    const container = document.getElementById('bancard-iframe-container');
+    if (container) {
+      container.innerHTML = '';
+    }
   };
 
-  // ✅ SI MOSTRAMOS EL IFRAME - CORREGIDO COMPLETAMENTE
-  if (showIframe) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-          {/* Header del modal */}
-          <div className="flex justify-between items-center p-4 border-b bg-[#2A3190] text-white">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <FaLock />
-              Pago Seguro - Bancard
-            </h2>
-            <button
-              onClick={closeIframe}
-              className="text-white hover:text-gray-200 text-xl"
-            >
-              <FaTimes />
-            </button>
-          </div>
-
-          {/* Información del pago */}
-          <div className="p-4 bg-blue-50 border-b">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-700">Total a pagar:</span>
-              <span className="font-bold text-xl text-[#2A3190]">
-                {displayPYGCurrency(totalAmount)}
-              </span>
-            </div>
-          </div>
-
-          {/* Contenedor del iframe de Bancard */}
-          <div className="p-4">
-            {loading && (
-              <div className="text-center py-8">
-                <FaSpinner className="animate-spin text-3xl text-[#2A3190] mx-auto mb-4" />
-                <p className="text-gray-600">Cargando formulario de pago...</p>
-              </div>
-            )}
-            
-            <div 
-              id="bancard-iframe-container"
-              className="w-full"
-              style={{ 
-                display: loading ? 'none' : 'block',
-                minHeight: '500px',
-                width: '100%',
-                border: '1px solid #e5e5e5',
-                borderRadius: '8px',
-                backgroundColor: '#ffffff'
-              }}
-            >
-              {!loading && (
-                <div className="p-4 text-center text-gray-500">
-                  <p>Cargando formulario de pago seguro...</p>
-                  <p className="text-sm mt-2">Si no aparece el formulario, verifica tu conexión.</p>
-                </div>
-              )}
-            </div>
-            
-            {!loading && (
-              <div className="mt-4 text-center">
-                <button
-                  onClick={() => {
-                    console.log('🔄 Reintentando cargar iframe...');
-                    setLoading(true);
-                    setTimeout(() => {
-                      initializeBancardIframe();
-                    }, 500);
-                  }}
-                  className="text-blue-600 hover:text-blue-800 text-sm underline"
-                >
-                  ¿No aparece el formulario? Haz clic para recargar
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Footer con información de seguridad */}
-          <div className="p-4 bg-gray-50 border-t text-center">
-            <div className="flex items-center justify-center gap-2 text-green-600 mb-2">
-              <FaLock />
-              <span className="text-sm font-medium">Conexión segura SSL</span>
-            </div>
-            <p className="text-xs text-gray-500">
-              Tus datos están protegidos por Bancard
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  
 
   // ✅ SI EL FORMULARIO ESTÁ VISIBLE
-  if (showForm) {
+ if (showForm && !customerData.name) { // Solo mostrar formulario si no hay datos del cliente
     return (
       <div className="space-y-4">
         {/* Resumen */}
@@ -703,9 +653,117 @@ const BancardPayButton = ({
             )}
           </button>
         </div>
+        
       </div>
     );
   }
+  // Si tenemos datos del cliente del checkout, ir directo al iframe
+  if (showForm && customerData.name && !showInlineIframe) {
+    processPayment();
+    return (
+      <div className="text-center py-8">
+        <FaSpinner className="animate-spin text-3xl text-[#2A3190] mx-auto mb-4" />
+        <p className="text-gray-600">Preparando formulario de pago...</p>
+      </div>
+    );
+  }
+
+  // Mostrar iframe directamente si viene del checkout
+  if (showInlineIframe || (customerData.name && showForm)) {
+    return (
+      <div className="w-full">
+        {/* Header del pago */}
+        <div className="bg-[#2A3190] text-white p-4 rounded-t-lg flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <FaLock className="text-lg" />
+            <div>
+              <h3 className="font-semibold">Finalizar Pago - Bancard</h3>
+              <p className="text-sm text-blue-100">Total: {displayPYGCurrency(totalAmount)}</p>
+            </div>
+          </div>
+          <button
+            onClick={closeInlineIframe}
+            className="text-white hover:text-gray-200 p-2 hover:bg-white hover:bg-opacity-20 rounded"
+            title="Cancelar pago"
+          >
+            <FaTimes className="text-lg" />
+          </button>
+        </div>
+
+        {/* Resumen del pedido */}
+        <div className="bg-blue-50 border-x border-blue-200 p-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-blue-700">Cliente:</p>
+              <p className="font-semibold text-blue-900">{customerData.name || formData.name}</p>
+            </div>
+            <div>
+              <p className="text-blue-700">Productos:</p>
+              <p className="font-semibold text-blue-900">{cartItems.length} items</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Contenedor del iframe - TAMAÑO COMPLETO */}
+        <div className="border border-gray-200 rounded-b-lg bg-white">
+          {loading && (
+            <div className="text-center py-12">
+              <FaSpinner className="animate-spin text-4xl text-[#2A3190] mx-auto mb-4" />
+              <p className="text-gray-600 font-medium">Cargando formulario de pago seguro...</p>
+              <p className="text-gray-500 text-sm mt-2">Conectando con Bancard...</p>
+            </div>
+          )}
+          
+          <div 
+            id="bancard-iframe-container"
+            className="w-full min-h-[600px]"
+            style={{ 
+              display: loading ? 'none' : 'block',
+              width: '100%',
+              minHeight: '600px',
+              height: 'auto'
+            }}
+          >
+            {!loading && !processId && (
+              <div className="p-8 text-center text-gray-500">
+                <FaCreditCard className="text-4xl text-gray-300 mx-auto mb-4" />
+                <p className="font-medium">Preparando formulario de pago...</p>
+              </div>
+            )}
+          </div>
+          
+          {!loading && processId && (
+            <div className="p-4 text-center border-t">
+              <button
+                onClick={() => {
+                  console.log('🔄 Reintentando cargar iframe...');
+                  setLoading(true);
+                  setTimeout(() => {
+                    initializeBancardIframe();
+                  }, 500);
+                }}
+                className="text-blue-600 hover:text-blue-800 text-sm underline font-medium"
+              >
+                ¿No aparece el formulario? Haz clic para recargar
+              </button>
+            </div>
+          )}
+
+          {/* Footer con información de seguridad */}
+          <div className="bg-green-50 border-t p-4 rounded-b-lg">
+            <div className="flex items-center justify-center gap-3 text-green-700">
+              <FaLock className="text-lg" />
+              <div className="text-center">
+                <p className="font-medium text-sm">Transacción 100% segura</p>
+                <p className="text-xs">Protegido por Bancard y certificado SSL</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   // ✅ VISTA INICIAL DEL BOTÓN
   return (
