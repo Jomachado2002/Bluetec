@@ -14,6 +14,7 @@ import Cart from '../pages/Cart'
 import SearchProduct from "../pages/SearchProduct"
 import MobileCategoriesPage from "../pages/MobileCategoriesPage"
 import ResetPassword from "../pages/ResetPassword"
+import Checkout from "../pages/Checkout"
 import Nosotros from "../pages/Nosotros"
 
 // ✅ NUEVA PÁGINA DE PERFIL DE USUARIO
@@ -97,6 +98,10 @@ const router = createBrowserRouter([
             {
                 path: "carrito",
                 element: <Cart />
+            },
+            {
+                path: "finalizar-compra",
+                element: <Checkout />
             },
             {
                 path: "buscar",

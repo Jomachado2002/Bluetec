@@ -902,90 +902,29 @@ const Cart = () => {
 
                                 {/* ✅ SECCIÓN DE OPCIONES DE PAGO MEJORADA */}
                                 <div className="mt-8">
-                                    {!paymentMode && (
-                                        <div className="space-y-4">
-                                            <h3 className="text-lg font-semibold text-gray-800 mb-4">¿Cómo deseas pagar?</h3>
-                                            
-                                            {/* ✅ OPCIÓN: USUARIO REGISTRADO CON TARJETAS GUARDADAS */}
-                                            {isLoggedIn && (
-                                                <div className="space-y-3">
-                                                    <button
-                                                        onClick={() => handlePaymentModeSelection('saved_cards')}
-                                                        className="w-full bg-green-600 text-white py-4 px-4 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-between group shadow-md"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="bg-green-500 p-2 rounded-full">
-                                                                <FaShieldAlt className="text-white" />
-                                                            </div>
-                                                            <div className="text-left">
-                                                                <p className="font-semibold">Pago con tarjetas guardadas</p>
-                                                                <p className="text-sm text-green-100">Rápido y seguro</p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="bg-green-500 px-3 py-1 rounded-full text-xs font-medium">
-                                                            RECOMENDADO
-                                                        </div>
-                                                    </button>
-                                                    
-                                                    <button
-                                                        onClick={() => handlePaymentModeSelection('guest')}
-                                                        className="w-full bg-[#2A3190] text-white py-4 px-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center gap-3 shadow-md"
-                                                    >
-                                                        <FaCreditCard className="text-xl" />
-                                                        <div className="text-left">
-                                                            <p className="font-semibold">Pagar con nueva tarjeta</p>
-                                                            <p className="text-sm text-blue-100">Ingresa datos manualmente</p>
-                                                        </div>
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {/* ✅ OPCIÓN: USUARIO NO REGISTRADO */}
-                                            {!isLoggedIn && (
-                                                <div className="space-y-3">
-                                                    <button
-                                                        onClick={() => handlePaymentModeSelection('register')}
-                                                        className="w-full bg-green-600 text-white py-4 px-4 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-between group shadow-md"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="bg-green-500 p-2 rounded-full">
-                                                                <FaUser className="text-white" />
-                                                            </div>
-                                                            <div className="text-left">
-                                                                <p className="font-semibold">Registrarme y pagar</p>
-                                                                <p className="text-sm text-green-100">Guarda tarjetas para futuras compras</p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="bg-green-500 px-3 py-1 rounded-full text-xs font-medium">
-                                                            RECOMENDADO
-                                                        </div>
-                                                    </button>
-                                                    
-                                                    <button
-                                                        onClick={() => handlePaymentModeSelection('guest')}
-                                                        className="w-full bg-gray-600 text-white py-4 px-4 rounded-lg hover:bg-gray-700 transition-all duration-300 flex items-center gap-3 shadow-md"
-                                                    >
-                                                        <FaCreditCard className="text-xl" />
-                                                        <div className="text-left">
-                                                            <p className="font-semibold">Pagar como invitado</p>
-                                                            <p className="text-sm text-gray-200">Sin registro, datos no se guardan</p>
-                                                        </div>
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {/* ✅ INFORMACIÓN SOBRE BENEFICIOS */}
-                                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200 mt-4">
-                                                <h4 className="font-semibold text-blue-800 mb-2">💡 Ventajas de registrarte</h4>
-                                                <ul className="text-blue-700 text-sm space-y-1">
-                                                    <li>• Guarda tus tarjetas para compras más rápidas</li>
-                                                    <li>• Historial de pedidos y transacciones</li>
-                                                    <li>• Ofertas exclusivas y promociones</li>
-                                                    <li>• Soporte personalizado</li>
-                                                </ul>
+                                    <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">¿Qué deseas hacer?</h3>
+                                    
+                                    {/* Botón Finalizar Compra */}
+                                    <button
+                                        onClick={() => navigate('/finalizar-compra')}
+                                        disabled={validProducts.length === 0}
+                                        className="w-full bg-[#2A3190] text-white py-4 px-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-between group shadow-md disabled:opacity-50"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-[#1e236b] p-2 rounded-full">
+                                                <FaCreditCard className="text-white" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="font-semibold">Finalizar Compra</p>
+                                                <p className="text-sm text-blue-100">Pago con tarjeta o QR</p>
                                             </div>
                                         </div>
-                                    )}
+                                        <div className="bg-[#1e236b] px-3 py-1 rounded-full text-xs font-medium">
+                                            SEGURO
+                                        </div>
+                                    </button>
+                                </div>
 
                                     {/* ✅ FORMULARIO DE DATOS DEL CLIENTE */}
                                     {showCustomerForm && (
