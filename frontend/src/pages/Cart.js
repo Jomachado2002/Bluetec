@@ -900,12 +900,10 @@ const Cart = () => {
                                     </div>
                                 </div>
 
-                                {/* ✅ SECCIÓN DE OPCIONES DE PAGO MEJORADA */}
-                                <div className="mt-8">
-                                    <div className="space-y-4">
+                              <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">¿Qué deseas hacer?</h3>
                                     
-                                    {/* Botón Finalizar Compra */}
+                                    {/* Botón Finalizar Compra - Principal */}
                                     <button
                                         onClick={() => navigate('/finalizar-compra')}
                                         disabled={validProducts.length === 0}
@@ -917,259 +915,91 @@ const Cart = () => {
                                             </div>
                                             <div className="text-left">
                                                 <p className="font-semibold">Finalizar Compra</p>
-                                                <p className="text-sm text-blue-100">Pago con tarjeta o QR</p>
+                                                <p className="text-sm text-blue-100">Pago seguro con Bancard</p>
                                             </div>
                                         </div>
                                         <div className="bg-[#1e236b] px-3 py-1 rounded-full text-xs font-medium">
                                             SEGURO
                                         </div>
                                     </button>
-                                </div>
 
-                                    {/* ✅ FORMULARIO DE DATOS DEL CLIENTE */}
+                                    {/* Formulario de datos mínimos para presupuestos */}
+                                    {!showCustomerForm && (
+                                        <button
+                                            onClick={() => setShowCustomerForm(true)}
+                                            className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                                        >
+                                            Solicitar presupuesto (PDF/WhatsApp)
+                                        </button>
+                                    )}
+
+                                    {/* Formulario para presupuestos */}
                                     {showCustomerForm && (
-                                        <div className="space-y-4 bg-blue-50 p-5 rounded-lg border border-blue-100">
-                                            <div className="flex justify-between items-center">
-                                                <h3 className="font-semibold text-[#2A3190]">
-                                                    {paymentMode === 'saved_cards' ? 'Confirma tus datos' : 'Datos del cliente'}
-                                                </h3>
+                                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <h4 className="font-medium text-[#2A3190]">Datos para presupuesto</h4>
                                                 <button
-                                                    onClick={() => {
-                                                        setShowCustomerForm(false);
-                                                        setPaymentMode('');
-                                                    }}
+                                                    onClick={() => setShowCustomerForm(false)}
                                                     className="text-gray-500 hover:text-gray-700"
                                                 >
                                                     ✕
                                                 </button>
                                             </div>
                                             
-                                            <div>
-                                                <label className="block text-gray-700 text-sm font-medium mb-1">
-                                                    Nombre completo *
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="name"
-                                                    value={customerData.name}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
-                                                    placeholder="Nombre completo"
-                                                    readOnly={isLoggedIn && paymentMode === 'saved_cards'}
-                                                    required
-                                                />
-                                            </div>
-                                            
-                                            <div>
-                                                <label className="block text-gray-700 text-sm font-medium mb-1">
-                                                    Email *
-                                                </label>
-                                                <input
-                                                    type="email"
-                                                    name="email"
-                                                    value={customerData.email}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
-                                                    placeholder="tu@email.com"
-                                                    readOnly={isLoggedIn && paymentMode === 'saved_cards'}
-                                                />
-                                            </div>
-                                            
-                                            <div>
-                                                <label className="block text-gray-700 text-sm font-medium mb-1">
-                                                    Teléfono *
-                                                </label>
-                                                <input
-                                                    type="tel"
-                                                    name="phone"
-                                                    value={customerData.phone}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
-                                                    placeholder="+595 XXX XXXXXX"
-                                                    readOnly={isLoggedIn && paymentMode === 'saved_cards'}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-gray-700 text-sm font-medium mb-1">
-                                                    Dirección (opcional)
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="address"
-                                                    value={customerData.address}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
-                                                    placeholder="Dirección de entrega"
-                                                />
-                                            </div>
-
-                                            {/* ✅ SELECCIÓN DE TARJETAS GUARDADAS */}
-                                            {paymentMode === 'saved_cards' && isLoggedIn && (
-                                                <div className="border-t border-blue-200 pt-4">
-                                                    <h4 className="font-medium text-[#2A3190] mb-3">💳 Selecciona tu tarjeta</h4>
-                                                    
-                                                    {loadingCards ? (
-                                                        <div className="text-center py-4">
-                                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2A3190] mx-auto"></div>
-                                                            <p className="text-sm text-gray-600 mt-2">Cargando tarjetas...</p>
-                                                        </div>
-                                                    ) : registeredCards.length > 0 ? (
-                                                        <div className="space-y-3">
-                                                            {registeredCards.map((card, index) => (
-                                                                <button
-                                                                    key={index}
-                                                                    onClick={() => setSelectedCard(card)}
-                                                                    className={`w-full p-3 rounded-lg border-2 transition-all ${
-                                                                        selectedCard === card 
-                                                                            ? 'border-[#2A3190] bg-blue-50' 
-                                                                            : 'border-gray-200 hover:border-gray-300'
-                                                                    }`}
-                                                                >
-                                                                    <div className="flex justify-between items-center">
-                                                                        <div className="text-left">
-                                                                            <p className="font-medium text-gray-800">
-                                                                                {card.card_brand || 'Tarjeta'}
-                                                                            </p>
-                                                                            <p className="text-sm text-gray-600">
-                                                                                {card.card_masked_number || '**** **** **** ****'}
-                                                                            </p>
-                                                                        </div>
-                                                                        {selectedCard === card && (
-                                                                            <div className="text-[#2A3190]">
-                                                                                <FaShieldAlt />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </button>
-                                                            ))}
-                                                            
-                                                            <button
-                                                                onClick={() => navigate('/mi-perfil?tab=cards')}
-                                                                className="w-full p-3 rounded-lg border-2 border-dashed border-gray-300 hover:border-[#2A3190] transition-all flex items-center justify-center gap-2 text-gray-600 hover:text-[#2A3190]"
-                                                            >
-                                                                <FaPlus className="text-sm" />
-                                                                <span>Agregar nueva tarjeta</span>
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-center py-6 bg-gray-50 rounded-lg">
-                                                            <FaCreditCard className="text-3xl text-gray-400 mx-auto mb-2" />
-                                                            <p className="text-gray-600 mb-3">No tienes tarjetas guardadas</p>
-                                                            <button
-                                                                onClick={() => navigate('/mi-perfil?tab=cards')}
-                                                                className="text-[#2A3190] hover:text-[#1e236b] font-medium text-sm"
-                                                            >
-                                                                Registrar primera tarjeta
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* ✅ OPCIONES DE PRESUPUESTO */}
-                                            <div className="border-t border-blue-200 pt-4">
-                                                <h4 className="font-medium text-[#2A3190] mb-3">📋 Solicitar presupuesto</h4>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button
-                                                        onClick={generatePDF}
-                                                        disabled={!hasValidCustomerDataForBudget()}
-                                                        className="bg-[#2A3190] text-white py-2.5 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        <MdDownload className="text-lg" />
-                                                        <span>PDF</span>
-                                                    </button>
-                                                    
-                                                    <button
-                                                        onClick={sendToWhatsApp}
-                                                        disabled={!hasValidCustomerDataForBudget()}
-                                                        className="bg-[#25D366] text-white py-2.5 rounded-lg hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >
-                                                        <MdWhatsapp className="text-lg" />
-                                                        <span>WhatsApp</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* ✅ BOTONES DE PAGO */}
-                                            <div className="border-t border-blue-200 pt-4">
-                                                <h4 className="font-medium text-[#2A3190] mb-3">💳 Proceder al pago</h4>
-                                                
-                                                {paymentMode === 'saved_cards' && selectedCard ? (
-                                                    <button
-                                                        onClick={handlePayWithSavedCard}
-                                                        disabled={!hasValidCustomerDataForPayment()}
-                                                        className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2 font-medium shadow-md disabled:opacity-50"
-                                                    >
-                                                        <FaLock />
-                                                        <span>Pagar con tarjeta seleccionada</span>
-                                                    </button>
-                                                ) : (
-                                                    <BancardPayButton
-                                                        cartItems={prepareBancardItems()}
-                                                        totalAmount={totalPrice}
-                                                        customerData={customerData}
-                                                        onPaymentStart={handlePaymentStart}
-                                                        onPaymentSuccess={handlePaymentSuccess}
-                                                        onPaymentError={handlePaymentError}
-                                                        disabled={validProducts.length === 0 || !hasValidCustomerDataForPayment()}
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <input
+                                                        type="text"
+                                                        name="name"
+                                                        value={customerData.name}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
+                                                        placeholder="Nombre completo *"
                                                     />
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* ✅ MODAL DE REGISTRO */}
-                                    {showRegisterPrompt && (
-                                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-                                                <div className="p-6">
-                                                    <h2 className="text-xl font-bold text-[#2A3190] mb-4">¡Únete a BlueTec!</h2>
-                                                    
-                                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                                                        <h3 className="font-medium text-green-800 mb-2">🎉 Ventajas exclusivas:</h3>
-                                                        <ul className="text-green-700 text-sm space-y-1">
-                                                            <li>• Guarda tus tarjetas de forma segura</li>
-                                                            <li>• Compras más rápidas en el futuro</li>
-                                                            <li>• Historial completo de pedidos</li>
-                                                            <li>• Ofertas y descuentos exclusivos</li>
-                                                            <li>• Soporte prioritario</li>
-                                                        </ul>
-                                                    </div>
-                                                    
-                                                    <p className="text-gray-600 mb-6">
-                                                        Crea tu cuenta en menos de 2 minutos y disfruta de una experiencia de compra superior.
-                                                    </p>
-                                                    
-                                                    <div className="flex gap-3">
-                                                        <button
-                                                            onClick={() => setShowRegisterPrompt(false)}
-                                                            className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                                                        >
-                                                            Ahora no
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                navigate('/registro');
-                                                            }}
-                                                            className="flex-1 bg-[#2A3190] text-white py-2 rounded-lg hover:bg-[#1e236b] transition-colors"
-                                                        >
-                                                            Registrarme
-                                                        </button>
-                                                    </div>
-                                                    
-                                                    <div className="mt-4 text-center">
-                                                        <button
-                                                            onClick={() => {
-                                                                setShowRegisterPrompt(false);
-                                                                handlePaymentModeSelection('guest');
-                                                            }}
-                                                            className="text-gray-500 hover:text-gray-700 text-sm underline"
-                                                        >
-                                                            Continuar como invitado
-                                                        </button>
-                                                    </div>
                                                 </div>
+                                                
+                                                <div>
+                                                    <input
+                                                        type="email"
+                                                        name="email"
+                                                        value={customerData.email}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
+                                                        placeholder="Email (opcional)"
+                                                    />
+                                                </div>
+                                                
+                                                <div>
+                                                    <input
+                                                        type="tel"
+                                                        name="phone"
+                                                        value={customerData.phone}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A3190] focus:border-transparent text-sm"
+                                                        placeholder="Teléfono (opcional)"
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Botones de presupuesto */}
+                                            <div className="grid grid-cols-2 gap-3 mt-4">
+                                                <button
+                                                    onClick={generatePDF}
+                                                    disabled={!hasValidCustomerDataForBudget()}
+                                                    className="bg-[#2A3190] text-white py-2.5 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <MdDownload className="text-lg" />
+                                                    <span>PDF</span>
+                                                </button>
+                                                
+                                                <button
+                                                    onClick={sendToWhatsApp}
+                                                    disabled={!hasValidCustomerDataForBudget()}
+                                                    className="bg-[#25D366] text-white py-2.5 rounded-lg hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center gap-1.5 text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <MdWhatsapp className="text-lg" />
+                                                    <span>WhatsApp</span>
+                                                </button>
                                             </div>
                                         </div>
                                     )}

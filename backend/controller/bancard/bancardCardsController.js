@@ -205,7 +205,7 @@ const chargeWithTokenController = async (req, res) => {
                 referrer_url: referrer_url || req.headers.referer || '',
                 order_notes: order_notes,
                 delivery_method: delivery_method,
-                invoice_number: invoice_number,
+                invoice_number: invoice_number || null,
                 tax_amount: parseFloat(tax_amount) || 0,
                 utm_source: utm_source,
                 utm_medium: utm_medium,

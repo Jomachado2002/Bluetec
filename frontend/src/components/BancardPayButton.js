@@ -286,35 +286,6 @@ const BancardPayButton = ({
     return formatter.format(num);
   };
 
-  // Validar formulario
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'El nombre es requerido';
-    }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = 'El email es requerido';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'El email no es válido';
-    }
-    
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'El teléfono es requerido';
-    }
-    
-    if (cartItems.length === 0) {
-      newErrors.cart = 'No hay productos en el carrito';
-    }
-    
-    if (totalAmount <= 0) {
-      newErrors.amount = 'El monto debe ser mayor a 0';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
   // Manejar cambios en el formulario
   const handleInputChange = (e) => {
@@ -332,142 +303,153 @@ const BancardPayButton = ({
     }
   };
 
-  // ✅ PROCESAR PAGO CON BANCARD - CORREGIDO
-  const processPayment = async () => {
-    if (!validateForm()) {
-      return;
+  // ✅ PROCESAR PAGO CON BANCARD - VERSIÓN CORREGIDA SIN VALIDACIONES DE FORMULARIO
+const processPayment = async () => {
+    // ✅ VALIDACIONES BÁSICAS SOLAMENTE
+    if (cartItems.length === 0) {
+        alert('No hay productos en el carrito');
+        return;
+    }
+
+    if (totalAmount <= 0) {
+        alert('El monto debe ser mayor a 0');
+        return;
+    }
+
+    if (!customerData || !customerData.name) {
+        alert('Faltan datos del cliente');
+        return;
     }
 
     setLoading(true);
     onPaymentStart();
 
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL;
-      console.log('🔗 Configuración de pago:', {
-        backendUrl,
-        totalAmount,
-        customerData: formData
-      });
-      
-      if (!backendUrl) {
-        throw new Error('REACT_APP_BACKEND_URL no está configurada. Verifica tu archivo .env.local');
-      }
-
-      // ✅ CAPTURAR DATOS DE TRACKING CORREGIDO
-      const trackingData = captureTrackingData();
-
-      // ✅ PREPARAR DATOS NORMALIZADOS PARA BACKEND
-      const paymentRequest = {
-        amount: totalAmount.toFixed(2),
-        currency: 'PYG',
-        description: `Compra BlueTec - ${cartItems.length} productos`,
-        customer_info: {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address
-        },
-        items: cartItems.map(item => ({
-          product_id: item.productId?._id || item._id,
-          name: item.productId?.productName || item.name || 'Producto',
-          quantity: item.quantity,
-          unitPrice: item.productId?.sellingPrice || item.unitPrice || 0,
-          unit_price: item.productId?.sellingPrice || item.unitPrice || 0, // ✅ AGREGAR AMBOS CAMPOS
-          total: (item.productId?.sellingPrice || item.unitPrice || 0) * item.quantity,
-          category: item.productId?.category || '',
-          brand: item.productId?.brandName || ''
-        })),
+        const backendUrl = process.env.REACT_APP_BACKEND_URL;
+        console.log('🔗 Configuración de pago:', {
+            backendUrl,
+            totalAmount,
+            customerData
+        });
         
-        // ✅ DATOS DE TRACKING CORREGIDOS
-        user_type: 'GUEST',
-        payment_method: 'new_card',
-        user_bancard_id: null,
-        ip_address: '',
-        user_agent: trackingData.user_agent,
-        payment_session_id: trackingData.payment_session_id,
-        device_type: trackingData.device_type,
-        cart_total_items: trackingData.cart_total_items,
-        referrer_url: trackingData.referrer_url,
-        order_notes: trackingData.order_notes,
-        delivery_method: trackingData.delivery_method,
-        invoice_number: trackingData.invoice_number,
-        tax_amount: trackingData.tax_amount,
-        utm_source: trackingData.utm_source,
-        utm_medium: trackingData.utm_medium,
-        utm_campaign: trackingData.utm_campaign
-      };
+        if (!backendUrl) {
+            throw new Error('REACT_APP_BACKEND_URL no está configurada. Verifica tu archivo .env.local');
+        }
 
-      console.log('📤 Enviando solicitud de pago:', paymentRequest);
+        // ✅ CAPTURAR DATOS DE TRACKING CORREGIDO
+        const trackingData = captureTrackingData();
 
-      const response = await fetch(`${backendUrl}/api/bancard/create-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(paymentRequest)
-      });
+        // ✅ PREPARAR DATOS NORMALIZADOS PARA BACKEND
+        const paymentRequest = {
+            amount: totalAmount.toFixed(2),
+            currency: 'PYG',
+            description: `Compra BlueTec - ${cartItems.length} productos`,
+            customer_info: {
+                name: customerData.name || '',
+                email: customerData.email || '',
+                phone: customerData.phone || '',
+                address: customerData.address || ''
+            },
+            items: cartItems.map(item => ({
+                product_id: item.productId?._id || item._id,
+                name: item.productId?.productName || item.name || 'Producto',
+                quantity: item.quantity,
+                unitPrice: item.productId?.sellingPrice || item.unitPrice || 0,
+                unit_price: item.productId?.sellingPrice || item.unitPrice || 0,
+                total: (item.productId?.sellingPrice || item.unitPrice || 0) * item.quantity,
+                category: item.productId?.category || '',
+                brand: item.productId?.brandName || ''
+            })),
+            
+            // ✅ DATOS DE TRACKING CORREGIDOS
+            user_type: 'GUEST',
+            payment_method: 'new_card',
+            user_bancard_id: null,
+            ip_address: '',
+            user_agent: trackingData.user_agent,
+            payment_session_id: trackingData.payment_session_id,
+            device_type: trackingData.device_type,
+            cart_total_items: trackingData.cart_total_items,
+            referrer_url: trackingData.referrer_url,
+            order_notes: String(trackingData.order_notes || ''),
+            delivery_method: trackingData.delivery_method,
+            invoice_number: trackingData.invoice_number,
+            tax_amount: trackingData.tax_amount,
+            utm_source: trackingData.utm_source,
+            utm_medium: trackingData.utm_medium,
+            utm_campaign: trackingData.utm_campaign
+        };
 
-      console.log('📥 Response status:', response.status);
+        console.log('📤 Enviando solicitud de pago:', paymentRequest);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
+        const response = await fetch(`${backendUrl}/api/bancard/create-payment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify(paymentRequest)
+        });
+
+        console.log('📥 Response status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response:', errorText);
+            
+            let errorMessage = `Error HTTP ${response.status}`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.message || errorMessage;
+            } catch (e) {
+                errorMessage = errorText;
+            }
+            
+            throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        console.log('📥 Respuesta del backend:', result);
+
+        if (result.success && result.data && result.data.process_id) {
+            console.log('✅ Pago creado exitosamente:', result.data);
+            
+            setProcessId(result.data.process_id);
+            setShowIframe(true);
+            
+            sessionStorage.setItem('bancard_payment', JSON.stringify({
+                shop_process_id: result.data.shop_process_id,
+                process_id: result.data.process_id,
+                amount: totalAmount,
+                customer: customerData,
+                timestamp: Date.now()
+            }));
+            
+            onPaymentSuccess(result.data);
+        } else {
+            console.error('❌ Respuesta inválida:', result);
+            throw new Error(result.message || 'La respuesta del servidor no contiene los datos necesarios');
+        }
+    } catch (error) {
+        console.error('❌ Error completo en processPayment:', error);
+        setLoading(false);
         
-        let errorMessage = `Error HTTP ${response.status}`;
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorMessage;
-        } catch (e) {
-          errorMessage = errorText;
+        let userMessage = 'Error desconocido';
+        
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            userMessage = 'No se puede conectar con el servidor. Verifica que el backend esté funcionando.';
+        } else if (error.message.includes('REACT_APP_BACKEND_URL')) {
+            userMessage = 'Error de configuración. Contacta al soporte técnico.';
+        } else if (error.message.includes('Backend no disponible')) {
+            userMessage = 'El servidor de pagos no está disponible. Intenta nuevamente en unos minutos.';
+        } else {
+            userMessage = error.message;
         }
         
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      console.log('📥 Respuesta del backend:', result);
-
-      if (result.success && result.data && result.data.process_id) {
-        console.log('✅ Pago creado exitosamente:', result.data);
-        
-        setProcessId(result.data.process_id);
-        setShowForm(false);
-        setShowIframe(true);
-        
-        sessionStorage.setItem('bancard_payment', JSON.stringify({
-          shop_process_id: result.data.shop_process_id,
-          process_id: result.data.process_id,
-          amount: totalAmount,
-          customer: formData,
-          timestamp: Date.now()
-        }));
-        
-        onPaymentSuccess(result.data);
-      } else {
-        console.error('❌ Respuesta inválida:', result);
-        throw new Error(result.message || 'La respuesta del servidor no contiene los datos necesarios');
-      }
-    } catch (error) {
-      console.error('❌ Error completo en processPayment:', error);
-      setLoading(false);
-      
-      let userMessage = 'Error desconocido';
-      
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        userMessage = 'No se puede conectar con el servidor. Verifica que el backend esté funcionando.';
-      } else if (error.message.includes('REACT_APP_BACKEND_URL')) {
-        userMessage = 'Error de configuración. Contacta al soporte técnico.';
-      } else if (error.message.includes('Backend no disponible')) {
-        userMessage = 'El servidor de pagos no está disponible. Intenta nuevamente en unos minutos.';
-      } else {
-        userMessage = error.message;
-      }
-      
-      alert(`Error al procesar el pago: ${userMessage}`);
-      onPaymentError(error);
+        alert(`Error al procesar el pago: ${userMessage}`);
+        onPaymentError(error);
     }
-  };
+};
 
   // ✅ CERRAR IFRAME
   const closeIframe = () => {
@@ -482,245 +464,160 @@ const BancardPayButton = ({
   };
 
   // ✅ SI MOSTRAMOS EL IFRAME - CORREGIDO COMPLETAMENTE
+ // ✅ SI MOSTRAMOS EL IFRAME - VERSIÓN INLINE COMPLETA (NO MODAL)
   if (showIframe) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-          {/* Header del modal */}
-          <div className="flex justify-between items-center p-4 border-b bg-[#2A3190] text-white">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <FaLock />
-              Pago Seguro - Bancard
-            </h2>
-            <button
-              onClick={closeIframe}
-              className="text-white hover:text-gray-200 text-xl"
-            >
-              <FaTimes />
-            </button>
-          </div>
+      <div className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden shadow-lg">
+        {/* Header del iframe */}
+        <div className="bg-[#2A3190] text-white p-4 flex justify-between items-center">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <FaLock />
+            Pago Seguro - Bancard
+          </h3>
+          <button
+            onClick={closeIframe}
+            className="text-white hover:text-gray-200 text-xl transition-colors"
+          >
+            <FaTimes />
+          </button>
+        </div>
 
-          {/* Información del pago */}
-          <div className="p-4 bg-blue-50 border-b">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-700">Total a pagar:</span>
-              <span className="font-bold text-xl text-[#2A3190]">
-                {displayPYGCurrency(totalAmount)}
-              </span>
-            </div>
+        {/* Información del pago */}
+        <div className="p-4 bg-blue-50 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-700 font-medium">Total a pagar:</span>
+            <span className="font-bold text-xl text-[#2A3190]">
+              {displayPYGCurrency(totalAmount)}
+            </span>
           </div>
+          <div className="flex justify-between items-center mt-2 text-sm">
+            <span className="text-gray-600">Métodos disponibles:</span>
+            <span className="text-gray-600">Tarjetas • QR • Billeteras</span>
+          </div>
+        </div>
 
-          {/* Contenedor del iframe de Bancard */}
-          <div className="p-4">
-            {loading && (
-              <div className="text-center py-8">
-                <FaSpinner className="animate-spin text-3xl text-[#2A3190] mx-auto mb-4" />
-                <p className="text-gray-600">Cargando formulario de pago...</p>
-              </div>
-            )}
-            
-            <div 
-              id="bancard-iframe-container"
-              className="w-full"
-              style={{ 
-                display: loading ? 'none' : 'block',
-                minHeight: '500px',
-                width: '100%',
-                border: '1px solid #e5e5e5',
-                borderRadius: '8px',
-                backgroundColor: '#ffffff'
-              }}
-            >
-              {!loading && (
-                <div className="p-4 text-center text-gray-500">
-                  <p>Cargando formulario de pago seguro...</p>
-                  <p className="text-sm mt-2">Si no aparece el formulario, verifica tu conexión.</p>
-                </div>
-              )}
+        {/* Contenedor del iframe de Bancard */}
+        <div className="p-4">
+          {loading && (
+            <div className="text-center py-12">
+              <FaSpinner className="animate-spin text-4xl text-[#2A3190] mx-auto mb-4" />
+              <p className="text-gray-600 font-medium">Cargando formulario de pago...</p>
+              <p className="text-gray-500 text-sm mt-2">Conectando con Bancard de forma segura</p>
             </div>
-            
+          )}
+          
+          <div 
+            id="bancard-iframe-container"
+            className="w-full"
+            style={{ 
+              display: loading ? 'none' : 'block',
+              minHeight: '500px',
+              width: '100%',
+              border: '1px solid #e5e5e5',
+              borderRadius: '8px',
+              backgroundColor: '#ffffff'
+            }}
+          >
             {!loading && (
-              <div className="mt-4 text-center">
-                <button
-                  onClick={() => {
-                    console.log('🔄 Reintentando cargar iframe...');
-                    setLoading(true);
-                    setTimeout(() => {
-                      initializeBancardIframe();
-                    }, 500);
-                  }}
-                  className="text-blue-600 hover:text-blue-800 text-sm underline"
-                >
-                  ¿No aparece el formulario? Haz clic para recargar
-                </button>
+              <div className="p-8 text-center text-gray-500">
+                <FaCreditCard className="text-4xl text-gray-400 mx-auto mb-4" />
+                <p className="font-medium">Cargando formulario de pago seguro...</p>
+                <p className="text-sm mt-2">Si no aparece el formulario en unos segundos, verifica tu conexión a internet.</p>
               </div>
             )}
           </div>
+          
+          {!loading && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => {
+                  console.log('🔄 Reintentando cargar iframe...');
+                  setLoading(true);
+                  setTimeout(() => {
+                    initializeBancardIframe();
+                  }, 500);
+                }}
+                className="text-blue-600 hover:text-blue-800 text-sm underline transition-colors"
+              >
+                ¿No aparece el formulario? Haz clic para recargar
+              </button>
+            </div>
+          )}
 
-          {/* Footer con información de seguridad */}
-          <div className="p-4 bg-gray-50 border-t text-center">
-            <div className="flex items-center justify-center gap-2 text-green-600 mb-2">
+          {/* Información adicional sobre métodos de pago */}
+          {!loading && (
+            <div className="mt-6 bg-gray-50 rounded-lg p-4">
+              <h4 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
+                <FaCreditCard className="text-[#2A3190]" />
+                Métodos de pago disponibles:
+              </h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-700">Tarjetas de crédito</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-700">Tarjetas de débito</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-700">Código QR</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-700">Billeteras digitales</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer con información de seguridad */}
+        <div className="p-4 bg-gray-50 border-t">
+          <div className="flex items-center justify-center gap-6 mb-3">
+            <div className="flex items-center gap-2 text-green-600">
               <FaLock />
               <span className="text-sm font-medium">Conexión segura SSL</span>
             </div>
-            <p className="text-xs text-gray-500">
-              Tus datos están protegidos por Bancard
-            </p>
+            <div className="flex items-center gap-2 text-green-600">
+              <MdSecurity />
+              <span className="text-sm font-medium">Certificado PCI DSS</span>
+            </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ SI EL FORMULARIO ESTÁ VISIBLE
-  if (showForm) {
-    return (
-      <div className="space-y-4">
-        {/* Resumen */}
-        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-          <h3 className="font-semibold text-blue-800 mb-2">Resumen del pago</h3>
-          <div className="flex justify-between text-sm">
-            <span className="text-blue-700">Total a pagar:</span>
-            <span className="font-bold text-blue-800">{displayPYGCurrency(totalAmount)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-blue-700">Productos:</span>
-            <span className="text-blue-800">{cartItems.length} items</span>
-          </div>
-        </div>
-
-        {/* Formulario de datos */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-gray-800">Datos del comprador</h3>
-          
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">
-              Nombre completo *
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Tu nombre completo"
-            />
-            {errors.name && (
-              <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">
-              Email *
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="tu@email.com"
-            />
-            {errors.email && (
-              <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">
-              Teléfono *
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
-                errors.phone ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="+595 XXX XXXXXX"
-            />
-            {errors.phone && (
-              <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">
-              Dirección (opcional)
-            </label>
-            <input
-              type="text"
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              placeholder="Tu dirección de entrega"
-            />
-          </div>
-        </div>
-
-        {/* Información de seguridad */}
-        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-          <div className="flex items-center gap-2 text-green-800 mb-1">
-            <FaLock className="text-sm" />
-            <span className="font-semibold text-sm">Pago 100% seguro</span>
-          </div>
-          <p className="text-green-700 text-xs">
-            Procesado por Bancard, la plataforma de pagos más confiable de Paraguay.
+          <p className="text-xs text-gray-500 text-center">
+            Tus datos están protegidos por Bancard con los más altos estándares de seguridad
           </p>
         </div>
-
-        {/* Botones */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowForm(false)}
-            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
-          >
-            Cancelar
-          </button>
-          
-          <button
-            onClick={processPayment}
-            disabled={loading || disabled}
-            className="flex-2 bg-[#2A3190] text-white py-3 px-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-2 font-semibold text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <FaSpinner className="animate-spin" />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <FaCreditCard />
-                Pagar con Bancard
-              </>
-            )}
-          </button>
-        </div>
       </div>
     );
   }
 
+ 
+
   // ✅ VISTA INICIAL DEL BOTÓN
-  return (
+ return (
     <div className="space-y-3">
-      {/* Botón principal de Bancard */}
+      {/* Botón principal de Bancard - Directo */}
       <button
-        onClick={() => setShowForm(true)}
+        onClick={processPayment}
         disabled={disabled || cartItems.length === 0 || totalAmount <= 0}
         className="w-full bg-[#2A3190] text-white py-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-center gap-3 font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <FaCreditCard className="text-xl" />
-        <span>Pagar con Bancard</span>
-        <span className="text-sm font-normal">
-          ({displayPYGCurrency(totalAmount)})
-        </span>
+        {loading ? (
+          <>
+            <FaSpinner className="animate-spin" />
+            Procesando...
+          </>
+        ) : (
+          <>
+            <FaCreditCard className="text-xl" />
+            <span>Pagar con Bancard</span>
+            <span className="text-sm font-normal">
+              ({displayPYGCurrency(totalAmount)})
+            </span>
+          </>
+        )}
       </button>
 
       {/* Información de Bancard */}
@@ -736,7 +633,7 @@ const BancardPayButton = ({
           </div>
           <div className="flex items-center justify-center gap-4">
             <span>✓ Billeteras digitales</span>
-            <span>✓ Transferencias</span>
+            <span>✓ Código QR</span>
           </div>
         </div>
       </div>
@@ -766,7 +663,7 @@ const BancardPayButton = ({
         </div>
       )}
     </div>
-  );
+);
 };
 
 export default BancardPayButton;
