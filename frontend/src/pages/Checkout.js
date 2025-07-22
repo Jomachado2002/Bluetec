@@ -1,9 +1,8 @@
-// frontend/src/pages/Checkout.js - DISEÑO NUEVO ESTILO MERCADOLIBRE
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
-import { FaArrowLeft, FaMapMarkerAlt, FaCreditCard, FaQrcode, FaLock, FaCheckCircle } from 'react-icons/fa';
+import { FaArrowLeft, FaMapMarkerAlt, FaCreditCard, FaQrcode, FaLock, FaCheckCircle, FaPlus, FaMinus } from 'react-icons/fa';
 import { localCartHelper } from '../helpers/addToCart';
 import { formatIVABreakdown } from '../helpers/taxCalculator';
 import displayINRCurrency from '../helpers/displayCurrency';
@@ -11,15 +10,26 @@ import SimpleLocationSelector from '../components/location/SimpleLocationSelecto
 import BancardPayButton from '../components/BancardPayButton';
 import SummaryApi from '../common';
 
+// Paleta de colores principal
+const COLORS = {
+  primary: '#1a237e',       // Azul oscuro principal
+  primaryLight: '#303f9f',  // Azul más claro para hover
+  secondary: '#ffab00',     // Amarillo/accent
+  light: '#f5f5f7',         // Fondo claro
+  dark: '#121212',          // Texto oscuro
+  gray: '#757575',          // Texto gris
+  success: '#4caf50',       // Éxito/verde
+  error: '#f44336',         // Error/rojo
+  white: '#ffffff'          // Blanco
+};
 
-// ✅ COMPONENTE PARA TARJETAS GUARDADAS
+// Componente de tarjetas guardadas con nuevo diseño
 const SavedCardsSection = ({ user, totalAmount, customerData, cartItems, onPaymentSuccess, onPaymentError }) => {
     const [registeredCards, setRegisteredCards] = useState([]);
     const [selectedCard, setSelectedCard] = useState(null);
     const [loadingCards, setLoadingCards] = useState(true);
     const [processingPayment, setProcessingPayment] = useState(false);
 
-    // Cargar tarjetas guardadas
     useEffect(() => {
         const fetchUserCards = async () => {
             if (!user?.bancardUserId) {
@@ -51,7 +61,6 @@ const SavedCardsSection = ({ user, totalAmount, customerData, cartItems, onPayme
         fetchUserCards();
     }, [user?.bancardUserId]);
 
-    // Pagar con tarjeta guardada
     const handlePayWithSavedCard = async () => {
         if (!selectedCard) {
             toast.error('Selecciona una tarjeta');
@@ -129,33 +138,32 @@ const SavedCardsSection = ({ user, totalAmount, customerData, cartItems, onPayme
     if (loadingCards) {
         return (
             <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#2A3190] mx-auto mb-2"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1a237e] mx-auto mb-2"></div>
                 <p className="text-sm text-gray-600">Cargando tarjetas guardadas...</p>
             </div>
         );
     }
 
     if (registeredCards.length === 0) {
-        return null; // No mostrar nada si no hay tarjetas
+        return null;
     }
 
     return (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-            <h3 className="font-medium text-green-800 mb-3 flex items-center gap-2">
-                <FaCreditCard className="text-green-600" />
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 mb-6 shadow-sm">
+            <h3 className="font-medium text-blue-800 mb-4 flex items-center gap-2 text-lg">
+                <FaCreditCard className="text-blue-600" />
                 Tus tarjetas guardadas
             </h3>
             
-            <div className="space-y-2">
+            <div className="space-y-3">
                 {registeredCards.map((card, index) => (
                     <button
                         key={index}
                         onClick={() => setSelectedCard(card)}
-                        className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                            selectedCard === card 
-                                ? 'border-green-500 bg-green-100' 
-                                : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                        className={`w-full p-4 rounded-lg border transition-all text-left 
+                            ${selectedCard === card 
+                                ? 'border-blue-500 bg-blue-100 shadow-sm' 
+                                : 'border-gray-200 hover:border-blue-300 bg-white'}`}
                     >
                         <div className="flex justify-between items-center">
                             <div>
@@ -167,7 +175,7 @@ const SavedCardsSection = ({ user, totalAmount, customerData, cartItems, onPayme
                                 </p>
                             </div>
                             {selectedCard === card && (
-                                <FaCheckCircle className="text-green-500" />
+                                <FaCheckCircle className="text-blue-600 text-lg" />
                             )}
                         </div>
                     </button>
@@ -178,7 +186,8 @@ const SavedCardsSection = ({ user, totalAmount, customerData, cartItems, onPayme
                 <button
                     onClick={handlePayWithSavedCard}
                     disabled={processingPayment}
-                    className="w-full mt-3 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                    className={`w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-medium disabled:opacity-50 
+                        flex items-center justify-center gap-2 transition-colors hover:bg-blue-700`}
                 >
                     {processingPayment ? (
                         <>
@@ -204,10 +213,12 @@ const Checkout = () => {
     
     const [cartItems, setCartItems] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [currentStep, setCurrentStep] = useState(1); // 1: Envío, 2: Pago
+    const [currentStep, setCurrentStep] = useState(1);
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [showLocationSelector, setShowLocationSelector] = useState(false);
     const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+    const [couponCode, setCouponCode] = useState('');
+    const [couponApplied, setCouponApplied] = useState(false);
     
     const [formData, setFormData] = useState({
         name: '',
@@ -216,7 +227,6 @@ const Checkout = () => {
         address: ''
     });
 
-    // Cargar datos del carrito
     useEffect(() => {
         const loadCartData = () => {
             try {
@@ -248,7 +258,6 @@ const Checkout = () => {
         loadCartData();
     }, [navigate]);
 
-    // Auto-completar datos del usuario si está logueado
     useEffect(() => {
         if (isLoggedIn && user) {
             setFormData({
@@ -257,13 +266,10 @@ const Checkout = () => {
                 phone: user.phone || '',
                 address: ''
             });
-            
-            // Cargar ubicación guardada si existe
             loadUserLocation();
         }
     }, [isLoggedIn, user]);
 
-    // Cargar ubicación del usuario
     const loadUserLocation = async () => {
         if (!isLoggedIn) return;
         
@@ -290,20 +296,17 @@ const Checkout = () => {
         }
     };
 
-    // Calcular totales
     const totalPrice = cartItems.reduce((total, item) => 
         total + (item.quantity * item.productId.sellingPrice), 0
     );
     
     const ivaBreakdown = formatIVABreakdown(totalPrice);
 
-    // Manejar cambios en el formulario
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Manejar selección de ubicación
     const handleLocationSave = (locationData) => {
         setSelectedLocation(locationData);
         setFormData(prev => ({
@@ -311,19 +314,17 @@ const Checkout = () => {
             address: locationData.address || ''
         }));
         setShowLocationSelector(false);
-        setCurrentStep(2); // Ir al paso de pago
+        setCurrentStep(2);
         toast.success('Ubicación guardada correctamente');
     };
 
-    // Validar datos mínimos
     const canProceedToPayment = () => {
         return selectedLocation && (
-            isLoggedIn || // Si está logueado, con ubicación es suficiente
-            (formData.name.trim() && formData.phone.trim()) // Si es invitado, necesita datos básicos
+            isLoggedIn || 
+            (formData.name.trim() && formData.phone.trim())
         );
     };
 
-    // Preparar datos para Bancard
     const prepareBancardData = () => ({
         name: formData.name,
         email: formData.email,
@@ -331,7 +332,6 @@ const Checkout = () => {
         address: selectedLocation?.address || formData.address
     });
 
-    // Manejar éxito del pago
     const handlePaymentSuccess = (paymentData) => {
         console.log('Pago exitoso desde checkout:', paymentData);
         toast.success('Redirigiendo al procesamiento de pago...');
@@ -342,11 +342,27 @@ const Checkout = () => {
         toast.error('Error al procesar el pago. Intenta nuevamente.');
     };
 
+    const applyCoupon = () => {
+        if (!couponCode.trim()) {
+            toast.error('Ingresa un código promocional');
+            return;
+        }
+        // Aquí iría la lógica para validar el cupón con el backend
+        setCouponApplied(true);
+        toast.success('Cupón aplicado correctamente');
+    };
+
+    const removeCoupon = () => {
+        setCouponApplied(false);
+        setCouponCode('');
+        toast.info('Cupón removido');
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#2A3190] mx-auto mb-4"></div>
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#1a237e] mx-auto mb-4"></div>
                     <p className="text-gray-600">Cargando checkout...</p>
                 </div>
             </div>
@@ -355,175 +371,218 @@ const Checkout = () => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <div className="container mx-auto px-4 py-6">
-                
-                {/* Header con breadcrumb */}
-                <div className="flex items-center gap-4 mb-6">
+            <div className="container mx-auto px-4 py-8 max-w-7xl">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <Link 
                         to="/carrito" 
-                        className="flex items-center gap-2 text-gray-600 hover:text-[#2A3190] transition-colors"
+                        className="flex items-center gap-2 text-gray-600 hover:text-blue-800 transition-colors"
                     >
                         <FaArrowLeft />
-                        <span>Volver</span>
+                        <span className="font-medium">Volver al carrito</span>
                     </Link>
-                </div>
-
-                {/* Steps indicator */}
-                <div className="flex items-center justify-center mb-8">
-                    <div className="flex items-center gap-4">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 1 ? 'bg-orange-500 text-white' : 'bg-gray-300 text-gray-600'}`}>
-                            {currentStep > 1 ? <FaCheckCircle /> : '1'}
-                        </div>
-                        <span className={`font-medium ${currentStep >= 1 ? 'text-orange-500' : 'text-gray-500'}`}>Envío</span>
-                        
-                        <div className="w-16 h-px bg-gray-300"></div>
-                        
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 2 ? 'bg-orange-500 text-white' : 'bg-gray-300 text-gray-600'}`}>
-                            2
-                        </div>
-                        <span className={`font-medium ${currentStep >= 2 ? 'text-orange-500' : 'text-gray-500'}`}>Pago</span>
+                    
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">¿Necesitas ayuda?</span>
+                        <a href="/contacto" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            Contacta con soporte
+                        </a>
                     </div>
                 </div>
 
+                {/* Contenido principal */}
                 <div className="flex flex-col lg:flex-row gap-8">
-                    
-                    {/* Columna Principal */}
+                    {/* Columna izquierda - Pasos del checkout */}
                     <div className="flex-1">
-                        
-                        {/* STEP 1: Dirección */}
-                        {/* STEP 1: Dirección - SIEMPRE VISIBLE */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                        <h2 className="text-xl font-bold text-gray-800 mb-6">Dirección</h2>
-                        
-                        {!isLoggedIn && (
-                            <div className="space-y-4 mb-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={handleInputChange}
-                                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                        placeholder="Nombre completo *"
-                                    />
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleInputChange}
-                                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                        placeholder="Teléfono *"
-                                    />
-                                </div>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    placeholder="Email (opcional)"
-                                />
-                            </div>
-                        )}
-
-                        {/* Mostrar datos del usuario logueado */}
-                        {isLoggedIn && (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <FaCheckCircle className="text-green-600" />
-                                    <span className="font-medium text-green-800">Datos de usuario</span>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                    <div>
-                                        <span className="text-gray-600">Nombre: </span>
-                                        <span className="font-medium">{formData.name}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-gray-600">Email: </span>
-                                        <span className="font-medium">{formData.email}</span>
-                                    </div>
-                                    {formData.phone && (
-                                        <div>
-                                            <span className="text-gray-600">Teléfono: </span>
-                                            <span className="font-medium">{formData.phone}</span>
+                        {/* Indicador de pasos */}
+                        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h1 className="text-2xl font-bold text-gray-900">Finalizar compra</h1>
+                                <div className="hidden md:flex items-center gap-4">
+                                    <div className={`flex items-center gap-2 ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-400'}`}>
+                                        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 1 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                            {currentStep > 1 ? <FaCheckCircle /> : '1'}
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        
-                        {selectedLocation ? (
-                            <div className="border border-orange-200 rounded-lg p-4 bg-orange-50 mb-4">
-                                <div className="flex items-start gap-3">
-                                    <FaCheckCircle className="text-orange-500 mt-1 flex-shrink-0" />
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-800">Mi Dirección</p>
-                                        <p className="text-gray-600 text-sm mt-1">{selectedLocation.address}</p>
-                                        <button
-                                            onClick={() => setShowLocationSelector(true)}
-                                            className="text-orange-500 text-sm hover:text-orange-600 mt-2"
-                                        >
-                                            Cambiar dirección
-                                        </button>
+                                        <span className="font-medium">Envío</span>
+                                    </div>
+                                    
+                                    <div className="w-16 h-px bg-gray-300"></div>
+                                    
+                                    <div className={`flex items-center gap-2 ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-400'}`}>
+                                        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${currentStep >= 2 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                            2
+                                        </div>
+                                        <span className="font-medium">Pago</span>
                                     </div>
                                 </div>
                             </div>
-                        ) : (
-                            <button
-                                onClick={() => setShowLocationSelector(true)}
-                                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-orange-400 hover:bg-orange-50 transition-all"
-                            >
-                                <div className="text-center">
-                                    <FaMapMarkerAlt className="text-2xl text-gray-400 mx-auto mb-2" />
-                                    <p className="text-gray-600 font-medium">Seleccionar ubicación en el mapa</p>
-                                    <p className="text-sm text-gray-500">Haz clic para abrir el mapa</p>
-                                </div>
-                            </button>
-                        )}
-                        
-                        {showLocationSelector && (
-                            <div className="mt-6">
-                                <SimpleLocationSelector
-                                    initialLocation={selectedLocation}
-                                    onLocationSave={handleLocationSave}
-                                    isUserLoggedIn={isLoggedIn}
-                                    title="Seleccionar Dirección de Entrega"
-                                    onClose={() => setShowLocationSelector(false)}
-                                />
-                            </div>
-                        )}
 
-                        {/* Botón para continuar al pago */}
-                        {selectedLocation && canProceedToPayment() && currentStep === 1 && (
-                            <div className="mt-6">
+                            {/* Mobile steps indicator */}
+                            <div className="md:hidden bg-blue-50 rounded-lg p-3 mb-6">
+                                <div className="flex justify-between items-center">
+                                    <span className={`text-sm font-medium ${currentStep === 1 ? 'text-blue-800' : 'text-gray-600'}`}>
+                                        Paso 1: Envío
+                                    </span>
+                                    <span className={`text-sm font-medium ${currentStep === 2 ? 'text-blue-800' : 'text-gray-600'}`}>
+                                        Paso 2: Pago
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                    <div 
+                                        className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                        style={{ width: currentStep === 1 ? '50%' : '100%' }}
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Paso 1: Dirección */}
+                        <div className={`bg-white rounded-xl shadow-sm p-6 mb-6 transition-all ${currentStep === 1 ? 'block' : 'hidden'}`}>
+                            <h2 className="text-xl font-bold text-gray-800 mb-6">Información de envío</h2>
+                            
+                            {!isLoggedIn && (
+                                <div className="space-y-4 mb-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nombre completo *</label>
+                                            <input
+                                                type="text"
+                                                id="name"
+                                                name="name"
+                                                value={formData.name}
+                                                onChange={handleInputChange}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                placeholder="Ej: Juan Pérez"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono *</label>
+                                            <input
+                                                type="tel"
+                                                id="phone"
+                                                name="phone"
+                                                value={formData.phone}
+                                                onChange={handleInputChange}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                placeholder="Ej: 0981123456"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
+                                        <input
+                                            type="email"
+                                            id="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            placeholder="Ej: juan@email.com"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {isLoggedIn && (
+                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <FaCheckCircle className="text-blue-600 text-lg" />
+                                        <span className="font-medium text-blue-800">Datos de tu cuenta</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        <div>
+                                            <span className="text-gray-600">Nombre: </span>
+                                            <span className="font-medium">{formData.name}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-600">Email: </span>
+                                            <span className="font-medium">{formData.email}</span>
+                                        </div>
+                                        {formData.phone && (
+                                            <div>
+                                                <span className="text-gray-600">Teléfono: </span>
+                                                <span className="font-medium">{formData.phone}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Selección de ubicación */}
+                            <div className="mb-6">
+                                <h3 className="text-lg font-medium text-gray-800 mb-3">Dirección de entrega</h3>
+                                
+                                {selectedLocation ? (
+                                    <div className="border border-blue-200 rounded-xl p-4 bg-blue-50">
+                                        <div className="flex items-start gap-3">
+                                            <FaMapMarkerAlt className="text-blue-600 mt-1 flex-shrink-0" />
+                                            <div className="flex-1">
+                                                <p className="font-medium text-gray-800">Dirección seleccionada</p>
+                                                <p className="text-gray-600 mt-1">{selectedLocation.address}</p>
+                                                <button
+                                                    onClick={() => setShowLocationSelector(true)}
+                                                    className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-2"
+                                                >
+                                                    Cambiar dirección
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setShowLocationSelector(true)}
+                                        className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                                    >
+                                        <div className="text-center">
+                                            <FaMapMarkerAlt className="text-3xl text-gray-400 mx-auto mb-3" />
+                                            <p className="text-gray-700 font-medium">Seleccionar ubicación en el mapa</p>
+                                            <p className="text-sm text-gray-500 mt-1">Haz clic para abrir el mapa</p>
+                                        </div>
+                                    </button>
+                                )}
+                            </div>
+
+                            {showLocationSelector && (
+                                <div className="mt-6">
+                                    <SimpleLocationSelector
+                                        initialLocation={selectedLocation}
+                                        onLocationSave={handleLocationSave}
+                                        isUserLoggedIn={isLoggedIn}
+                                        title="Seleccionar Dirección de Entrega"
+                                        onClose={() => setShowLocationSelector(false)}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Botón para continuar */}
+                            {selectedLocation && canProceedToPayment() && (
                                 <button
                                     onClick={() => setCurrentStep(2)}
-                                    className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                                    className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium mt-4"
                                 >
                                     Continuar al pago
                                 </button>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
 
-                        {/* STEP 2: Método de pago */}
+                        {/* Paso 2: Pago */}
                         {currentStep === 2 && (
-                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                            <div className="bg-white rounded-xl shadow-sm p-6">
                                 <h2 className="text-xl font-bold text-gray-800 mb-6">Método de pago</h2>
                                 
                                 {!showPaymentOptions ? (
                                     <button
                                         onClick={() => setShowPaymentOptions(true)}
-                                        className="w-full bg-[#2A3190] text-white py-4 rounded-lg hover:bg-[#1e236b] transition-colors font-medium flex items-center justify-center gap-2"
+                                        className="w-full bg-blue-800 text-white py-4 rounded-lg hover:bg-blue-900 transition-colors font-medium flex items-center justify-center gap-3"
                                     >
-                                        <FaLock />
-                                        Pagar con Bancard
+                                        <FaLock className="text-lg" />
+                                        Seleccionar método de pago
                                     </button>
                                 ) : (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-4 mb-4">
-                                            <FaLock className="text-green-600" />
-                                            <span className="font-medium text-green-800">Pago 100% seguro con Bancard</span>
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3 bg-blue-50 p-4 rounded-lg">
+                                            <FaLock className="text-blue-600 text-lg" />
+                                            <span className="font-medium text-blue-800">Pago 100% seguro con Bancard</span>
                                         </div>
 
                                         {/* Tarjetas guardadas para usuarios logueados */}
@@ -540,35 +599,37 @@ const Checkout = () => {
                                         
                                         {/* Separador si hay tarjetas guardadas */}
                                         {isLoggedIn && (
-                                            <div className="flex items-center gap-4 my-6">
+                                            <div className="flex items-center gap-4 my-4">
                                                 <hr className="flex-1 border-gray-300" />
                                                 <span className="text-gray-500 text-sm">o pagar con nueva tarjeta</span>
                                                 <hr className="flex-1 border-gray-300" />
                                             </div>
                                         )}
                                         
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                                            <h3 className="font-medium text-blue-800 mb-2">💳 Métodos de pago disponibles:</h3>
-                                            <div className="grid grid-cols-2 gap-2 text-sm text-blue-700">
-                                                <div className="flex items-center gap-2">
-                                                    <FaCreditCard className="text-blue-600" />
-                                                    <span>Tarjeta de crédito</span>
+                                        {/* Métodos de pago disponibles */}
+                                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
+                                            <h3 className="font-medium text-blue-800 mb-3">💳 Métodos de pago disponibles</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200">
+                                                    <FaCreditCard className="text-blue-600 text-xl mb-2" />
+                                                    <span className="text-xs text-center">Tarjeta de crédito</span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <FaCreditCard className="text-blue-600" />
-                                                    <span>Tarjeta de débito</span>
+                                                <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200">
+                                                    <FaCreditCard className="text-blue-600 text-xl mb-2" />
+                                                    <span className="text-xs text-center">Tarjeta de débito</span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <FaQrcode className="text-blue-600" />
-                                                    <span>Billeteras digitales</span>
+                                                <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200">
+                                                    <FaQrcode className="text-blue-600 text-xl mb-2" />
+                                                    <span className="text-xs text-center">Billeteras digitales</span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <FaQrcode className="text-blue-600" />
-                                                    <span>Código QR</span>
+                                                <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-gray-200">
+                                                    <FaQrcode className="text-blue-600 text-xl mb-2" />
+                                                    <span className="text-xs text-center">Código QR</span>
                                                 </div>
                                             </div>
                                         </div>
 
+                                        {/* Botón de pago Bancard */}
                                         <BancardPayButton
                                             cartItems={cartItems}
                                             totalAmount={totalPrice}
@@ -577,6 +638,7 @@ const Checkout = () => {
                                             onPaymentSuccess={handlePaymentSuccess}
                                             onPaymentError={handlePaymentError}
                                             disabled={!canProceedToPayment()}
+                                            className="w-full bg-blue-800 hover:bg-blue-900"
                                         />
                                     </div>
                                 )}
@@ -584,16 +646,19 @@ const Checkout = () => {
                         )}
                     </div>
 
-                    {/* Sidebar - Resumen */}
+                    {/* Columna derecha - Resumen del pedido */}
                     <div className="w-full lg:w-96">
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
-                            <h3 className="text-lg font-bold text-orange-500 mb-4">Resumen</h3>
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 sticky top-6">
+                            {/* Encabezado */}
+                            <div className="bg-blue-800 text-white p-4 rounded-t-xl">
+                                <h3 className="text-lg font-bold">Resumen del pedido</h3>
+                            </div>
                             
-                            {/* Lista de productos compacta */}
-                            <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                            {/* Lista de productos */}
+                            <div className="p-4 border-b border-gray-200 max-h-72 overflow-y-auto">
                                 {cartItems.map((item) => (
-                                    <div key={item._id} className="flex gap-3">
-                                        <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                    <div key={item._id} className="flex gap-3 py-3 border-b border-gray-100 last:border-0">
+                                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                                             <img 
                                                 src={item.productId.productImage[0]} 
                                                 alt={item.productId.productName}
@@ -605,7 +670,37 @@ const Checkout = () => {
                                                 {item.productId.productName}
                                             </p>
                                             <div className="flex justify-between items-center mt-1">
-                                                <span className="text-xs text-gray-500">Cant: {item.quantity}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <button 
+                                                        className="text-gray-500 hover:text-blue-600 p-1"
+                                                        onClick={() => {
+                                                            const newItems = [...cartItems];
+                                                            const index = newItems.findIndex(i => i._id === item._id);
+                                                            if (index !== -1 && newItems[index].quantity > 1) {
+                                                                newItems[index].quantity -= 1;
+                                                                localCartHelper.updateCart(newItems);
+                                                                setCartItems(newItems);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <FaMinus className="text-xs" />
+                                                    </button>
+                                                    <span className="text-sm text-gray-700">{item.quantity}</span>
+                                                    <button 
+                                                        className="text-gray-500 hover:text-blue-600 p-1"
+                                                        onClick={() => {
+                                                            const newItems = [...cartItems];
+                                                            const index = newItems.findIndex(i => i._id === item._id);
+                                                            if (index !== -1) {
+                                                                newItems[index].quantity += 1;
+                                                                localCartHelper.updateCart(newItems);
+                                                                setCartItems(newItems);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <FaPlus className="text-xs" />
+                                                    </button>
+                                                </div>
                                                 <span className="text-sm font-medium text-gray-900">
                                                     {displayINRCurrency(item.productId.sellingPrice * item.quantity)}
                                                 </span>
@@ -615,37 +710,87 @@ const Checkout = () => {
                                 ))}
                             </div>
                             
-                            <div className="border-t border-gray-200 pt-4 space-y-3">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Subtotal</span>
-                                    <span className="font-medium">{ivaBreakdown.subtotalFormatted}</span>
+                            {/* Cupón promocional */}
+                            <div className="p-4 border-b border-gray-200">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">¿Tienes un código promocional?</h4>
+                                {couponApplied ? (
+                                    <div className="flex justify-between items-center bg-green-50 border border-green-200 rounded-lg p-3">
+                                        <span className="text-green-700 text-sm font-medium">{couponCode}</span>
+                                        <button 
+                                            onClick={removeCoupon}
+                                            className="text-red-500 hover:text-red-700 text-sm"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={couponCode}
+                                            onChange={(e) => setCouponCode(e.target.value)}
+                                            placeholder="Ingresa el código"
+                                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <button 
+                                            onClick={applyCoupon}
+                                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            Aplicar
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Resumen de precios */}
+                            <div className="p-4">
+                                <div className="space-y-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Subtotal</span>
+                                        <span className="font-medium">{ivaBreakdown.subtotalFormatted}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">IVA (10%)</span>
+                                        <span className="font-medium">{ivaBreakdown.ivaFormatted}</span>
+                                    </div>
+                                    {couponApplied && (
+                                        <div className="flex justify-between text-green-600">
+                                            <span>Descuento</span>
+                                            <span>- {displayINRCurrency(totalPrice * 0.1)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Envío</span>
+                                        <span className="text-green-600 font-medium">A calcular</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-600">Envío</span>
-                                    <span className="text-green-600 font-medium">A calcular</span>
-                                </div>
-                                <div className="border-t border-gray-200 pt-3">
+                                
+                                <div className="border-t border-gray-200 mt-4 pt-4">
                                     <div className="flex justify-between text-lg font-bold">
-                                        <span className="text-gray-900">Total</span>
-                                        <span className="text-gray-900">{ivaBreakdown.totalFormatted}</span>
+                                        <span>Total</span>
+                                        <span>{ivaBreakdown.totalFormatted}</span>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Código promocional */}
-                            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                                <p className="text-sm text-gray-700 mb-3">¿Tenés un código promocional?</p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Ingresá el código"
-                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                    />
-                                    <button className="px-4 py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors">
-                                        Añadir
-                                    </button>
+                            
+                            {/* Seguridad */}
+                            <div className="bg-gray-50 p-4 rounded-b-xl border-t border-gray-200">
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <FaLock className="text-blue-600" />
+                                    <span>Compra 100% segura. Tus datos están protegidos.</span>
                                 </div>
                             </div>
+                        </div>
+                        
+                        {/* Información adicional */}
+                        <div className="mt-4 bg-white rounded-xl shadow-sm p-4 border border-gray-200">
+                            <h4 className="font-medium text-gray-800 mb-2">Políticas de compra</h4>
+                            <ul className="text-xs text-gray-600 space-y-1">
+                                <li>• Envíos en 24-48 horas hábiles</li>
+                                <li>• Devoluciones dentro de los 15 días</li>
+                                <li>• Garantía en todos los productos</li>
+                                <li>• Soporte técnico 24/7</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
