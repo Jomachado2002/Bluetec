@@ -414,7 +414,7 @@ const createPaymentController = async (req, res) => {
                         referrer_url: referrer_url || req.headers.referer || '',
                         order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
                         delivery_method: delivery_method,
-                        invoice_number: invoice_number || null,
+                        invoice_number: invoice_number || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                         tax_amount: parseFloat(tax_amount) || 0,
                         utm_source: utm_source,
                         utm_medium: utm_medium,
