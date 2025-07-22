@@ -1,6 +1,5 @@
-// frontend/src/components/location/SimpleLocationSelector.js - ESTILO GOOGLE MAPS
 import React, { useState, useRef, useEffect } from 'react';
-import { FaMapMarkerAlt, FaSpinner, FaCheckCircle, FaSave, FaSearch, FaLocationArrow, FaTimes, FaHistory, FaTrash } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaSpinner, FaCheckCircle, FaSave, FaSearch, FaLocationArrow, FaTimes, FaCrosshairs, FaMapPin } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import SummaryApi from '../../common';
 
@@ -24,16 +23,9 @@ const SimpleLocationSelector = ({
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-  const [savedLocations, setSavedLocations] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // ✅ CARGAR GOOGLE MAPS SCRIPT
   useEffect(() => {
-    console.log('🔍 Iniciando carga de Google Maps...');
-    
     if (window.google && window.google.maps) {
-      console.log('✅ Google Maps ya está disponible');
       setGoogleMapsLoaded(true);
       setIsLoading(false);
       return;
@@ -41,25 +33,21 @@ const SimpleLocationSelector = ({
 
     const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      console.error('❌ REACT_APP_GOOGLE_MAPS_API_KEY no está configurado');
       setIsLoading(false);
       toast.error('API Key de Google Maps no configurado');
       return;
     }
 
-    console.log('📍 Cargando script de Google Maps...');
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     
     script.onload = () => {
-      console.log('✅ Script de Google Maps cargado exitosamente');
       setGoogleMapsLoaded(true);
       setIsLoading(false);
     };
     
-    script.onerror = (error) => {
-      console.error('❌ Error cargando Google Maps:', error);
+    script.onerror = () => {
       setIsLoading(false);
       toast.error('Error cargando Google Maps');
     };
@@ -68,114 +56,47 @@ const SimpleLocationSelector = ({
 
     return () => {
       if (marker) marker.setMap(null);
-      if (autocompleteRef.current) {
-        window.google?.maps?.event?.clearInstanceListeners?.(autocompleteRef.current);
-      }
     };
   }, []);
 
-  // ✅ CARGAR HISTORIAL DE UBICACIONES
-  useEffect(() => {
-    if (isUserLoggedIn && googleMapsLoaded) {
-      loadLocationHistory();
-    }
-  }, [isUserLoggedIn, googleMapsLoaded]);
-
-  // ✅ INICIALIZAR MAPA DESPUÉS DE QUE SE RENDERICE
   useEffect(() => {
     if (googleMapsLoaded && mapRef.current && !map) {
-      console.log('🗺️ Inicializando mapa después del renderizado...');
       initializeMap();
     }
   }, [googleMapsLoaded, map]);
 
-  // ✅ CARGAR HISTORIAL DE UBICACIONES
-  const loadLocationHistory = async () => {
-    if (!isUserLoggedIn) return;
-    
-    setLoadingHistory(true);
-    try {
-      const response = await fetch(SummaryApi.location.getUserLocation.url, {
-        method: 'GET',
-        credentials: 'include'
-      });
-      
-      const result = await response.json();
-      if (result.success && result.data) {
-        // Crear array con la ubicación actual del usuario
-        const userLocation = result.data;
-        if (userLocation.lat && userLocation.lng) {
-          setSavedLocations([{
-            id: 'current',
-            lat: userLocation.lat,
-            lng: userLocation.lng,
-            address: userLocation.address || 'Ubicación guardada',
-            timestamp: userLocation.timestamp,
-            isCurrent: true
-          }]);
-        }
-      }
-    } catch (error) {
-      console.warn('Error cargando historial:', error);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  // ✅ INICIALIZAR MAPA ESTILO GOOGLE MAPS
   const initializeMap = () => {
-    console.log('🗺️ === INICIALIZANDO MAPA ===');
-    
-    if (!mapRef.current) {
-      console.log('❌ mapRef.current no disponible');
-      return;
-    }
+    if (!mapRef.current) return;
 
     try {
-      console.log('📍 Creando instancia del mapa...');
       const center = selectedLocation || { lat: -25.2637, lng: -57.5759 };
       
-      // ✅ MAPA ESTILO GOOGLE MAPS CLÁSICO
       const mapInstance = new window.google.maps.Map(mapRef.current, {
         center,
         zoom: selectedLocation ? 16 : 13,
-        mapTypeControl: true,
-        streetViewControl: true,
-        fullscreenControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
         zoomControl: true,
-        gestureHandling: 'greedy', // Más fluido como Google Maps
-        styles: [] // Sin estilos personalizados, como Google Maps original
+        gestureHandling: 'greedy'
       });
 
-      console.log('✅ Instancia del mapa creada');
-
-      // ✅ CONFIGURAR AUTOCOMPLETADO
       setupAutocomplete();
-
-      // ✅ LISTENERS DEL MAPA
       mapInstance.addListener('click', handleMapClick);
       
-      // ✅ CREAR MARCADOR INICIAL SI HAY UBICACIÓN
       if (selectedLocation) {
-        createGoogleMarker(selectedLocation, mapInstance);
+        createMarker(selectedLocation, mapInstance);
         reverseGeocode(selectedLocation);
       }
 
       setMap(mapInstance);
-      console.log('✅ Mapa inicializado exitosamente');
-      
     } catch (error) {
-      console.error('❌ Error inicializando mapa:', error);
-      toast.error('Error inicializando el mapa: ' + error.message);
+      toast.error('Error inicializando el mapa');
     }
   };
 
-  // ✅ CONFIGURAR AUTOCOMPLETADO SIMPLE (SOLO NAVEGAR, NO MARCAR)
   const setupAutocomplete = () => {
-    if (!searchInputRef.current || !window.google?.maps?.places) {
-      console.warn('⚠️ No se puede configurar autocompletado');
-      return;
-    }
+    if (!searchInputRef.current || !window.google?.maps?.places) return;
 
     try {
       const autocomplete = new window.google.maps.places.Autocomplete(
@@ -200,24 +121,13 @@ const SimpleLocationSelector = ({
           lng: place.geometry.location.lng()
         };
 
-        // ✅ SOLO NAVEGAR AL LUGAR, NO CREAR MARCADOR
         if (map) {
           map.setCenter(location);
           map.setZoom(16);
         }
         
-        // ✅ LIMPIAR CUALQUIER MARCADOR EXISTENTE
-        if (marker) {
-          marker.setMap(null);
-          setMarker(null);
-        }
-        
-        // ✅ LIMPIAR UBICACIÓN SELECCIONADA
-        setSelectedLocation(null);
-        setAddress('');
-        
         setSearchValue(place.formatted_address || place.name || '');
-        toast.info('📍 Navegar a: ' + (place.formatted_address || place.name) + ' - Haz clic en el mapa para marcar tu ubicación');
+        toast.info('📍 Ubicación encontrada. Haz clic en el mapa para marcar tu ubicación exacta');
       });
 
       autocompleteRef.current = autocomplete;
@@ -226,21 +136,17 @@ const SimpleLocationSelector = ({
     }
   };
 
-  // ✅ CREAR MARCADOR ESTILO GOOGLE MAPS (ROJO CLÁSICO)
-  const createGoogleMarker = (location, mapInstance = map) => {
+  const createMarker = (location, mapInstance = map) => {
     if (marker) marker.setMap(null);
     
-    // ✅ MARCADOR ROJO CLÁSICO DE GOOGLE MAPS
     const newMarker = new window.google.maps.Marker({
       position: location,
       map: mapInstance,
       draggable: true,
-      title: 'Ubicación seleccionada',
+      title: 'Tu ubicación - Arrastra para ajustar',
       animation: window.google.maps.Animation.DROP,
-      // Usar el marcador por defecto de Google (rojo)
     });
 
-    // ✅ LISTENER PARA ARRASTRAR
     newMarker.addListener('dragend', (event) => {
       const newLocation = {
         lat: event.latLng.lat(),
@@ -248,13 +154,12 @@ const SimpleLocationSelector = ({
       };
       setSelectedLocation(newLocation);
       reverseGeocode(newLocation);
-      toast.info('📍 Ubicación actualizada');
+      toast.success('📍 Ubicación actualizada');
     });
 
     setMarker(newMarker);
   };
 
-  // ✅ MANEJAR CLICK EN MAPA (CREAR MARCADOR DONDE SE HACE CLICK)
   const handleMapClick = (event) => {
     const location = {
       lat: event.latLng.lat(),
@@ -262,12 +167,11 @@ const SimpleLocationSelector = ({
     };
     
     setSelectedLocation(location);
-    createGoogleMarker(location);
+    createMarker(location);
     reverseGeocode(location);
-    toast.success('📍 Ubicación marcada');
+    toast.success('📍 Ubicación marcada correctamente');
   };
 
-  // ✅ GEOCODIFICACIÓN INVERSA
   const reverseGeocode = async (location) => {
     try {
       const response = await fetch(SummaryApi.location.reverseGeocode.url, {
@@ -285,7 +189,6 @@ const SimpleLocationSelector = ({
     }
   };
 
-  // ✅ OBTENER UBICACIÓN ACTUAL
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast.error('❌ Geolocalización no soportada en este navegador');
@@ -307,45 +210,18 @@ const SimpleLocationSelector = ({
         }
         
         setSelectedLocation(location);
-        createGoogleMarker(location);
+        createMarker(location);
         reverseGeocode(location);
         setGettingLocation(false);
-        toast.success('🎯 Ubicación actual obtenida');
+        toast.success('🎯 Ubicación actual obtenida y marcada');
       },
       (error) => {
         setGettingLocation(false);
-        let errorMessage = 'No se pudo obtener la ubicación';
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Permiso de ubicación denegado';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Información de ubicación no disponible';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Tiempo de espera agotado';
-            break;
-        }
-        toast.error(errorMessage);
+        toast.error('No se pudo obtener la ubicación');
       }
     );
   };
 
-  // ✅ IR A UBICACIÓN DEL HISTORIAL
-  const goToSavedLocation = (location) => {
-    if (map) {
-      map.setCenter({ lat: location.lat, lng: location.lng });
-      map.setZoom(16);
-    }
-    
-    setSelectedLocation({ lat: location.lat, lng: location.lng });
-    createGoogleMarker({ lat: location.lat, lng: location.lng });
-    setAddress(location.address);
-    setShowHistory(false);
-    toast.success('📍 Ubicación cargada desde historial');
-  };
-
-  // ✅ LIMPIAR BÚSQUEDA
   const clearSearch = () => {
     setSearchValue('');
     if (searchInputRef.current) {
@@ -353,7 +229,6 @@ const SimpleLocationSelector = ({
     }
   };
 
-  // ✅ GUARDAR UBICACIÓN
   const handleSaveLocation = async () => {
     if (!selectedLocation) {
       toast.error('❌ Marca una ubicación en el mapa primero');
@@ -365,6 +240,7 @@ const SimpleLocationSelector = ({
       const payload = {
         lat: selectedLocation.lat,
         lng: selectedLocation.lng,
+        address: address,
         ...(isUserLoggedIn ? {} : { 
           session_id: Date.now(),
           guest_id: `guest-${Date.now()}`
@@ -383,33 +259,29 @@ const SimpleLocationSelector = ({
       if (result.success) {
         toast.success('✅ Ubicación guardada exitosamente');
         
-        // Actualizar historial
-        if (isUserLoggedIn) {
-          loadLocationHistory();
-        }
-        
         if (onLocationSave) {
-          onLocationSave(result.data);
+          onLocationSave({
+            ...result.data,
+            address: address || result.data.address
+          });
         }
       } else {
-        toast.error(result.message || 'Error al guardar');
+        toast.error(result.message || 'Error al guardar ubicación');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error de conexión');
+      toast.error('Error de conexión al guardar ubicación');
     } finally {
       setSaving(false);
     }
   };
 
-  // ✅ LOADING
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl mx-auto">
-        <div className="flex items-center justify-center h-64">
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 max-w-4xl mx-auto">
+        <div className="flex items-center justify-center">
           <div className="text-center">
-            <FaSpinner className="animate-spin text-4xl text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">Cargando mapa</h3>
+            <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Cargando mapa</h3>
             <p className="text-gray-600">Preparando Google Maps...</p>
           </div>
         </div>
@@ -418,20 +290,23 @@ const SimpleLocationSelector = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-xl max-w-5xl mx-auto overflow-hidden">
-      
-      {/* ✅ HEADER ESTILO GOOGLE */}
-      <div className="bg-white border-b border-gray-200 p-4">
+    <div className="bg-white rounded-xl shadow-lg border border-gray-200 max-w-5xl mx-auto overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <FaMapMarkerAlt className="text-red-500 text-xl" />
-            <h2 className="text-xl font-medium text-gray-900">{title}</h2>
+            <div className="p-2 bg-white bg-opacity-20 rounded-lg">
+              <FaMapMarkerAlt className="text-white text-xl" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">{title}</h2>
+              <p className="text-blue-100 text-sm">Busca y marca tu ubicación exacta</p>
+            </div>
           </div>
           
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
+              className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-full transition-all"
             >
               <FaTimes />
             </button>
@@ -440,114 +315,119 @@ const SimpleLocationSelector = ({
       </div>
 
       <div className="flex">
-        
-        {/* ✅ PANEL LATERAL */}
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-          
-          {/* ✅ BUSCADOR */}
-          <div className="p-4 border-b border-gray-200">
+        <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col">
+          <div className="p-6 bg-white border-b border-gray-200">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              🔍 Buscar ubicación
+            </label>
             <div className="relative">
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Buscar en el mapa"
+                placeholder="Ej: Shopping del Sol, Asunción"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {searchValue && (
                 <button
                   onClick={clearSearch}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <FaTimes />
                 </button>
               )}
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Busca un lugar para navegar hasta ahí, luego haz clic en el mapa para marcar
+            </p>
           </div>
 
-          {/* ✅ BOTÓN UBICACIÓN ACTUAL */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-6 border-b border-gray-200">
             <button
               onClick={getCurrentLocation}
               disabled={gettingLocation}
-              className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+              className="w-full flex items-center gap-3 p-4 text-left hover:bg-white rounded-xl transition-all border-2 border-dashed border-blue-300 hover:border-blue-500 disabled:opacity-50"
             >
-              {gettingLocation ? (
-                <FaSpinner className="animate-spin text-blue-500" />
-              ) : (
-                <FaLocationArrow className="text-blue-500" />
-              )}
+              <div className="p-3 bg-blue-100 rounded-lg">
+                {gettingLocation ? (
+                  <FaSpinner className="animate-spin text-blue-600" />
+                ) : (
+                  <FaLocationArrow className="text-blue-600" />
+                )}
+              </div>
               <div>
-                <div className="font-medium text-gray-900">Tu ubicación</div>
-                <div className="text-sm text-gray-500">Usar GPS</div>
+                <div className="font-semibold text-gray-900">
+                  {gettingLocation ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+                </div>
+                <div className="text-sm text-gray-600">Detectar automáticamente con GPS</div>
               </div>
             </button>
           </div>
 
-          {/* ✅ HISTORIAL DE UBICACIONES */}
-          {isUserLoggedIn && (
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-4 border-b border-gray-200">
-                <button
-                  onClick={() => setShowHistory(!showHistory)}
-                  className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
-                >
-                  <FaHistory />
-                  <span className="font-medium">Ubicaciones guardadas</span>
-                </button>
-              </div>
-              
-              {showHistory && (
-                <div className="max-h-60 overflow-y-auto">
-                  {loadingHistory ? (
-                    <div className="p-4 text-center">
-                      <FaSpinner className="animate-spin text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">Cargando historial...</p>
+          {selectedLocation && (
+            <div className="flex-1 p-6">
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <FaCheckCircle className="text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-green-900 mb-2">Ubicación marcada</h4>
+                    {address && (
+                      <p className="text-green-800 text-sm mb-3">{address}</p>
+                    )}
+                    <div className="text-xs text-green-600 font-mono">
+                      {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
                     </div>
-                  ) : savedLocations.length > 0 ? (
-                    savedLocations.map((location) => (
-                      <button
-                        key={location.id}
-                        onClick={() => goToSavedLocation(location)}
-                        className="w-full p-3 text-left hover:bg-gray-50 border-b border-gray-100 transition-colors"
-                      >
-                        <div className="flex items-start gap-3">
-                          <FaMapMarkerAlt className="text-red-500 mt-1 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-900 truncate">
-                              {location.isCurrent ? '📍 Ubicación actual' : location.address}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {new Date(location.timestamp).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">
-                      <p className="text-sm">No hay ubicaciones guardadas</p>
-                    </div>
-                  )}
+                    
+                    <button
+                      onClick={handleSaveLocation}
+                      disabled={saving}
+                      className="w-full mt-4 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-3 rounded-lg font-semibold transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {saving ? (
+                        <>
+                          <FaSpinner className="animate-spin" />
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <FaSave />
+                          Confirmar ubicación
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* ✅ INFORMACIÓN DE UBICACIÓN SELECCIONADA */}
-          {selectedLocation && (
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-start gap-3">
-                <FaMapMarkerAlt className="text-red-500 mt-1 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 mb-1">Ubicación seleccionada</div>
-                  {address && (
-                    <div className="text-sm text-gray-700 mb-2">{address}</div>
-                  )}
-                  <div className="text-xs text-gray-500">
-                    {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
+          {!selectedLocation && (
+            <div className="flex-1 p-6">
+              <div className="text-center">
+                <div className="p-4 bg-blue-100 rounded-full w-fit mx-auto mb-4">
+                  <FaCrosshairs className="text-3xl text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">¿Cómo marcar tu ubicación?</h3>
+                <div className="text-sm text-gray-600 space-y-2 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                    <span>Busca un lugar en el buscador</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                    <span>O usa tu ubicación actual</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                    <span>Haz clic en el mapa donde quieras</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-bold">✓</span>
+                    <span>Confirma la ubicación</span>
                   </div>
                 </div>
               </div>
@@ -555,51 +435,54 @@ const SimpleLocationSelector = ({
           )}
         </div>
 
-        {/* ✅ MAPA */}
         <div className="flex-1 relative">
           <div 
             ref={mapRef}
-            className="w-full h-96"
-            style={{ height: '600px' }}
+            className="w-full"
+            style={{ height: '500px' }}
           />
           
-          {/* ✅ BOTÓN GUARDAR ESTILO GOOGLE MAPS */}
-          {selectedLocation && (
-            <div className="absolute bottom-4 right-4">
-              <button
-                onClick={handleSaveLocation}
-                disabled={saving}
-                className="bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 font-medium transition-all transform hover:scale-105 disabled:transform-none"
-              >
-                {saving ? (
-                  <FaSpinner className="animate-spin" />
-                ) : (
-                  <FaSave />
-                )}
-                {saving ? 'Guardando...' : 'Guardar ubicación'}
-              </button>
-            </div>
-          )}
-          
-          {/* ✅ INSTRUCCIONES MEJORADAS */}
           {!selectedLocation && (
-            <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-sm border">
-              <div className="flex items-start gap-3">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <FaMapMarkerAlt className="text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900 mb-2">¿Cómo marcar tu ubicación?</p>
-                  <div className="text-sm text-gray-700 space-y-1">
-                    <p>• 🔍 <strong>Busca</strong> un lugar para navegar hasta ahí</p>
-                    <p>• 🖱️ <strong>Haz clic</strong> en el mapa donde quieras marcar</p>
-                    <p>• 🔴 <strong>Aparecerá</strong> el marcador rojo</p>
-                    <p>• 💾 <strong>Guarda</strong> con el botón rojo</p>
-                  </div>
+            <div className="absolute top-4 left-4 right-4">
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mx-auto max-w-md">
+                <div className="text-center">
+                  <FaMapPin className="text-2xl text-blue-600 mx-auto mb-2" />
+                  <p className="font-semibold text-gray-900 mb-1">Haz clic en el mapa</p>
+                  <p className="text-sm text-gray-600">para marcar tu ubicación exacta</p>
                 </div>
               </div>
             </div>
           )}
+
+          <button
+            onClick={getCurrentLocation}
+            disabled={gettingLocation}
+            className="absolute bottom-4 right-4 bg-white hover:bg-gray-50 disabled:bg-gray-100 shadow-lg border border-gray-200 p-3 rounded-full transition-all disabled:cursor-not-allowed"
+            title="Centrar en mi ubicación"
+          >
+            {gettingLocation ? (
+              <FaSpinner className="animate-spin text-blue-600" />
+            ) : (
+              <FaLocationArrow className="text-blue-600" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 border-t border-gray-200 p-4">
+        <div className="flex items-center justify-center gap-6 text-sm text-gray-600">
+          <div className="flex items-center gap-1">
+            <FaMapMarkerAlt className="text-red-500" />
+            <span>Marcador rojo = Tu ubicación</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <FaCrosshairs className="text-blue-500" />
+            <span>Puedes arrastrar el marcador</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <FaCheckCircle className="text-green-500" />
+            <span>Confirma para guardar</span>
+          </div>
         </div>
       </div>
     </div>
