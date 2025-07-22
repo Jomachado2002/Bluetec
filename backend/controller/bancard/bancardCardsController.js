@@ -29,6 +29,7 @@ const chargeWithTokenController = async (req, res) => {
             promotion_code = "",
             customer_info,
             items,
+            delivery_location,
             user_type = 'REGISTERED',
             payment_method = 'saved_card',
             user_bancard_id = null,
@@ -181,6 +182,7 @@ const chargeWithTokenController = async (req, res) => {
                 sku: item.sku || ''
             }));
 
+            
             const newTransaction = new BancardTransactionModel({
                 shop_process_id: parseInt(finalShopProcessId),
                 bancard_process_id: null,
@@ -189,6 +191,17 @@ const chargeWithTokenController = async (req, res) => {
                 description: description || "Pago BlueTec con tarjeta registrada",
                 customer_info: normalizedCustomerInfo,
                 items: normalizedItems,
+                delivery_location: delivery_location ? {
+                    lat: parseFloat(delivery_location.lat) || null,
+                    lng: parseFloat(delivery_location.lng) || null,
+                    address: delivery_location.address || delivery_location.google_address || '',
+                    manual_address: delivery_location.manual_address || '',
+                    city: delivery_location.city || '',
+                    house_number: delivery_location.house_number || '',
+                    reference: delivery_location.reference || '',
+                    source: delivery_location.source || 'unknown',
+                    timestamp: new Date()
+                } : null,
                 return_url: `${backendUrl}/api/bancard/redirect/success`,
                 cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
                 status: 'pending',

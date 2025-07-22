@@ -197,33 +197,35 @@ const createPaymentController = async (req, res) => {
         console.log("✅ Configuración de Bancard válida");
 
         const {
-            amount,
-            currency = 'PYG',
-            description,
-            return_url,
-            cancel_url,
-            customer_info,
-            items,
-            sale_id,
-            // ✅ CAMPO DE PROMOCIÓN ESPECÍFICO
-            promotion_code = "",
-            // ✅ CAMPOS DE TRACKING CORREGIDOS
-            user_type = 'GUEST',
-            payment_method = 'new_card',
-            user_bancard_id = null,
-            user_agent = '',
-            payment_session_id = '',
-            device_type = 'unknown',
-            cart_total_items = 0,
-            referrer_url = '',
-            order_notes = '',
-            delivery_method = 'pickup',
-            invoice_number = '',
-            tax_amount = 0,
-            utm_source = '',
-            utm_medium = '',
-            utm_campaign = ''
-        } = req.body;
+    amount,
+    currency = 'PYG',
+    description,
+    return_url,
+    cancel_url,
+    customer_info,
+    items,
+    sale_id,
+    // ✅ AGREGAR ESTE CAMPO
+    delivery_location, // ← FALTABA ESTO
+    // Campo de promoción específico
+    promotion_code = "",
+    // Campos de tracking corregidos
+    user_type = 'GUEST',
+    payment_method = 'new_card',
+    user_bancard_id = null,
+    user_agent = '',
+    payment_session_id = '',
+    device_type = 'unknown',
+    cart_total_items = 0,
+    referrer_url = '',
+    order_notes = '',
+    delivery_method = 'pickup',
+    invoice_number = '',
+    tax_amount = 0,
+    utm_source = '',
+    utm_medium = '',
+    utm_campaign = ''
+} = req.body;
 
         // ✅ DECLARAR VARIABLES DE TRACKING AL INICIO
         const finalUserType = req.isAuthenticated === true ? 'REGISTERED' : 'GUEST';
@@ -387,53 +389,84 @@ const createPaymentController = async (req, res) => {
                     });
 
                     const newTransaction = new BancardTransactionModel({
-                        shop_process_id: shopProcessId,
-                        bancard_process_id: processId,
-                        amount: parseFloat(formattedAmount),
-                        currency: currency,
-                        description: description,
-                        customer_info: normalizedCustomerInfo,
-                        items: normalizedItems,
-                        return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-                        cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
-                        status: 'pending',
-                        environment: process.env.BANCARD_ENVIRONMENT || 'staging',
-                        sale_id: sale_id || null,
-                        created_by: req.userId || null,
-                        is_certification_test: false,
-                        
-                        // ✅ CAMPOS DE TRACKING CORREGIDOS
-                        user_type: finalUserType,
-                        payment_method: payment_method,
-                        user_bancard_id: finalUserBancardId,
-                        ip_address: clientIpAddress,
-                        user_agent: user_agent || req.headers['user-agent'] || '',
-                        payment_session_id: payment_session_id,
-                        device_type: device_type,
-                        cart_total_items: cart_total_items || normalizedItems.length,
-                        referrer_url: referrer_url || req.headers.referer || '',
-                        order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
-                        delivery_method: delivery_method,
-                        invoice_number: invoice_number || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                        tax_amount: parseFloat(tax_amount) || 0,
-                        utm_source: utm_source,
-                        utm_medium: utm_medium,
-                        utm_campaign: utm_campaign,
-                        
-                        // ✅ CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
-                        is_token_payment: false,
-                        alias_token: null,
-                        
-                        // ✅ GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
-                        promotion_code: promotion_code || null,
-                        has_promotion: !!payload.operation.additional_data
-                    });
+                    shop_process_id: parseInt(finalShopProcessId),
+                    bancard_process_id: processId,
+                    amount: parseFloat(formattedAmount),
+                    currency: currency,
+                    description: description,
+                    customer_info: normalizedCustomerInfo,
+                    items: normalizedItems,
+                    return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+                    cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
+                    status: 'pending',
+                    environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+                    sale_id: sale_id || null,
+                    created_by: req.userId || null,
+                    is_certification_test: false,
+                    
+                    // ✅ AGREGAR DELIVERY_LOCATION COMPLETO
+                    delivery_location: delivery_location ? {
+                        lat: parseFloat(delivery_location.lat) || null,
+                        lng: parseFloat(delivery_location.lng) || null,
+                        address: delivery_location.address || delivery_location.google_address || '',
+                        manual_address: delivery_location.manual_address || '',
+                        city: delivery_location.city || '',
+                        house_number: delivery_location.house_number || '',
+                        reference: delivery_location.reference || '',
+                        source: delivery_location.source || 'unknown',
+                        timestamp: new Date()
+                    } : {
+                        lat: null,
+                        lng: null,
+                        address: '',
+                        manual_address: '',
+                        city: '',
+                        house_number: '',
+                        reference: '',
+                        source: 'not_provided',
+                        timestamp: new Date()
+                    },
+                    
+                    // CAMPOS DE TRACKING CORREGIDOS
+                    user_type: finalUserType,
+                    payment_method: payment_method,
+                    user_bancard_id: finalUserBancardId,
+                    ip_address: clientIpAddress,
+                    user_agent: user_agent || req.headers['user-agent'] || '',
+                    payment_session_id: payment_session_id,
+                    device_type: device_type,
+                    cart_total_items: cart_total_items || normalizedItems.length,
+                    referrer_url: referrer_url || req.headers.referer || '',
+                    order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
+                    delivery_method: delivery_method,
+                    invoice_number: invoice_number || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    tax_amount: parseFloat(tax_amount) || 0,
+                    utm_source: utm_source,
+                    utm_medium: utm_medium,
+                    utm_campaign: utm_campaign,
+                    
+                    // CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
+                    is_token_payment: false,
+                    alias_token: null,
+                    
+                    // GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
+                    promotion_code: promotion_code || null,
+                    has_promotion: !!payload.operation.additional_data
+                });
+
 
                     const savedTransaction = await newTransaction.save();
                     console.log("✅ Transacción de pago ocasional guardada en BD:", {
                         id: savedTransaction._id,
                         shop_process_id: savedTransaction.shop_process_id,
-                        has_promotion: savedTransaction.has_promotion
+                        has_promotion: savedTransaction.has_promotion,
+                        // ✅ VERIFICAR QUE delivery_location SE GUARDÓ
+                        delivery_location_saved: !!savedTransaction.delivery_location,
+                        delivery_coordinates: savedTransaction.delivery_location ? {
+                            lat: savedTransaction.delivery_location.lat,
+                            lng: savedTransaction.delivery_location.lng,
+                            hasCoords: !!(savedTransaction.delivery_location.lat && savedTransaction.delivery_location.lng)
+                        } : null
                     });
 
                 } catch (dbError) {
