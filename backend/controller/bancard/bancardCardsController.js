@@ -160,15 +160,25 @@ const chargeWithTokenController = async (req, res) => {
         // ✅ GUARDAR TRANSACCIÓN EN BD ANTES DE ENVIAR A BANCARD
         try {
             const normalizedCustomerInfo = {
-                name: customer_info?.name || req.user?.name || '',
-                email: customer_info?.email || req.user?.email || '',
-                phone: customer_info?.phone || req.user?.phone || '',
-                address: typeof customer_info?.address === 'string' 
-                    ? customer_info.address 
-                    : (customer_info?.address?.street || ''),
-                document_type: customer_info?.document_type || 'CI',
-                document_number: customer_info?.document_number || ''
-            };
+                    name: customer_info?.name || '',
+                    email: customer_info?.email || '',
+                    phone: customer_info?.phone || '',
+                    city: customer_info?.city || '',
+                    address: customer_info?.address || customer_info?.fullAddress || '',
+                    houseNumber: customer_info?.houseNumber || '',
+                    reference: customer_info?.reference || '',
+                    fullAddress: customer_info?.fullAddress || '',
+                    document_type: customer_info?.document_type || 'CI',
+                    document_number: customer_info?.document_number || '',
+                    
+                    // ✅ INFORMACIÓN DE FACTURACIÓN
+                    invoiceData: customer_info?.invoiceData || {
+                        needsInvoice: false
+                    },
+                    
+                    // ✅ INFORMACIÓN DE UBICACIÓN
+                    location: customer_info?.location || null
+                };
 
             const normalizedItems = (items || []).map(item => ({
                 product_id: item.product_id || item._id || '',

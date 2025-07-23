@@ -22,6 +22,17 @@ const localCartHelper = {
         }
     },
     
+    // ✅ AGREGAR FUNCIÓN updateCart QUE FALTABA
+    updateCart: (updatedItems) => {
+        try {
+            localStorage.setItem('cartItems', JSON.stringify(updatedItems));
+            return true;
+        } catch (error) {
+            console.error("Error al actualizar carrito:", error);
+            return false;
+        }
+    },
+    
     // Añadir producto al carrito - VERSIÓN OFFLINE
     addItem: (product, quantity = 1) => {
         try {

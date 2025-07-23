@@ -358,15 +358,25 @@ const createPaymentController = async (req, res) => {
                 try {
                     // ✅ NORMALIZAR CUSTOMER_INFO
                     const normalizedCustomerInfo = {
-                        name: customer_info?.name || '',
-                        email: customer_info?.email || '',
-                        phone: customer_info?.phone || '',
-                        address: typeof customer_info?.address === 'string' 
-                            ? customer_info.address 
-                            : (customer_info?.address?.street || ''),
-                        document_type: customer_info?.document_type || 'CI',
-                        document_number: customer_info?.document_number || ''
-                    };
+                    name: customer_info?.name || '',
+                    email: customer_info?.email || '',
+                    phone: customer_info?.phone || '',
+                    city: customer_info?.city || '',
+                    address: customer_info?.address || customer_info?.fullAddress || '',
+                    houseNumber: customer_info?.houseNumber || '',
+                    reference: customer_info?.reference || '',
+                    fullAddress: customer_info?.fullAddress || '',
+                    document_type: customer_info?.document_type || 'CI',
+                    document_number: customer_info?.document_number || '',
+                    
+                    // ✅ INFORMACIÓN DE FACTURACIÓN
+                    invoiceData: customer_info?.invoiceData || {
+                        needsInvoice: false
+                    },
+                    
+                    // ✅ INFORMACIÓN DE UBICACIÓN
+                    location: customer_info?.location || null
+                };
 
                     // ✅ NORMALIZAR ITEMS
                     const normalizedItems = (items || []).map(item => ({
@@ -389,85 +399,122 @@ const createPaymentController = async (req, res) => {
                     });
 
                     const newTransaction = new BancardTransactionModel({
-                    shop_process_id: parseInt(finalShopProcessId),
-                    bancard_process_id: processId,
-                    amount: parseFloat(formattedAmount),
-                    currency: currency,
-                    description: description,
-                    customer_info: normalizedCustomerInfo,
-                    items: normalizedItems,
-                    return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-                    cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
-                    status: 'pending',
-                    environment: process.env.BANCARD_ENVIRONMENT || 'staging',
-                    sale_id: sale_id || null,
-                    created_by: req.userId || null,
-                    is_certification_test: false,
+    // ✅ CAMBIAR DE finalShopProcessId A shopProcessId
+    shop_process_id: parseInt(shopProcessId), // ← CORREGIR AQUÍ
+    bancard_process_id: processId,
+    amount: parseFloat(formattedAmount),
+    currency: currency,
+    description: description,
+    customer_info: normalizedCustomerInfo,
+    items: normalizedItems,
+    return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+    cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
+    status: 'pending',
+    environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+    sale_id: sale_id || null,
+    created_by: req.userId || null,
+    is_certification_test: false,
+    
+    // ✅ DELIVERY_LOCATION corregido
+    delivery_location: delivery_location ? {
+    // Coordenadas (mantener para referencia)
+    lat: parseFloat(delivery_location.lat) || null,
+    lng: parseFloat(delivery_location.lng) || null,
+    
+    // ✅ URL DIRECTA DE GOOGLE MAPS (LO MÁS IMPORTANTE)
+    google_maps_url: delivery_location.lat && delivery_location.lng ? 
+        `https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&t=m&z=18` :
+        delivery_location.google_maps_url || null,
+    
+    // ✅ URL ALTERNATIVA PARA NAVEGACIÓN
+    navigation_url: delivery_location.lat && delivery_location.lng ? 
+        `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
+        null,
+    
+    // Información de la dirección
+    address: delivery_location.address || delivery_location.google_address || '',
+    manual_address: delivery_location.manual_address || '',
+    full_address: delivery_location.full_address || 
+        `${delivery_location.manual_address || delivery_location.address || ''}, ${delivery_location.city || ''}`,
+    
+    // Detalles específicos
+    city: delivery_location.city || '',
+    house_number: delivery_location.house_number || '',
+    reference: delivery_location.reference || '',
+    
+    // Metadatos
+    source: delivery_location.source || 'user_selected',
+    timestamp: new Date(),
+    
+    // ✅ INSTRUCCIONES PARA EL DELIVERY
+    delivery_instructions: `📍 Ubicación exacta: ${delivery_location.address || 'Ver en mapa'}
+📞 Referencia: ${delivery_location.reference || 'Sin referencia adicional'}
+🏠 Casa/Edificio: ${delivery_location.house_number || 'No especificado'}
+🗺️ Ver ubicación: https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&t=m&z=18`,
+
+} : {
+    // Valores por defecto cuando no hay ubicación
+    lat: null,
+    lng: null,
+    google_maps_url: null,
+    navigation_url: null,
+    address: '',
+    manual_address: '',
+    full_address: '',
+    city: '',
+    house_number: '',
+    reference: '',
+    source: 'not_provided',
+    timestamp: new Date(),
+    delivery_instructions: '⚠️ Ubicación no proporcionada - Contactar al cliente'
+},
+    
+    // CAMPOS DE TRACKING CORREGIDOS
+    user_type: finalUserType,
+    payment_method: payment_method,
+    user_bancard_id: finalUserBancardId,
+    ip_address: clientIpAddress,
+    user_agent: user_agent || req.headers['user-agent'] || '',
+    payment_session_id: payment_session_id,
+    device_type: device_type,
+    cart_total_items: cart_total_items || normalizedItems.length,
+    referrer_url: referrer_url || req.headers.referer || '',
+    order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
+    delivery_method: delivery_method,
+    invoice_number: invoice_number || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    tax_amount: parseFloat(tax_amount) || 0,
+    utm_source: utm_source,
+    utm_medium: utm_medium,
+    utm_campaign: utm_campaign,
+    
+    // CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
+    is_token_payment: false,
+    alias_token: null,
+    
+    // GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
+    promotion_code: promotion_code || null,
+    has_promotion: !!payload.operation.additional_data
+});
+
+
+                const savedTransaction = await newTransaction.save();
+                console.log("✅ Transacción de pago ocasional guardada en BD:", {
+                    id: savedTransaction._id,
+                    shop_process_id: savedTransaction.shop_process_id,
+                    has_promotion: savedTransaction.has_promotion,
+                    delivery_location_saved: !!savedTransaction.delivery_location,
                     
-                    // ✅ AGREGAR DELIVERY_LOCATION COMPLETO
-                    delivery_location: delivery_location ? {
-                        lat: parseFloat(delivery_location.lat) || null,
-                        lng: parseFloat(delivery_location.lng) || null,
-                        address: delivery_location.address || delivery_location.google_address || '',
-                        manual_address: delivery_location.manual_address || '',
-                        city: delivery_location.city || '',
-                        house_number: delivery_location.house_number || '',
-                        reference: delivery_location.reference || '',
-                        source: delivery_location.source || 'unknown',
-                        timestamp: new Date()
-                    } : {
-                        lat: null,
-                        lng: null,
-                        address: '',
-                        manual_address: '',
-                        city: '',
-                        house_number: '',
-                        reference: '',
-                        source: 'not_provided',
-                        timestamp: new Date()
-                    },
+                    // ✅ MOSTRAR URL DE GOOGLE MAPS EN EL LOG
+                    google_maps_url: savedTransaction.delivery_location?.google_maps_url || 'No disponible',
+                    navigation_url: savedTransaction.delivery_location?.navigation_url || 'No disponible',
+                    delivery_address: savedTransaction.delivery_location?.full_address || 'Sin dirección',
                     
-                    // CAMPOS DE TRACKING CORREGIDOS
-                    user_type: finalUserType,
-                    payment_method: payment_method,
-                    user_bancard_id: finalUserBancardId,
-                    ip_address: clientIpAddress,
-                    user_agent: user_agent || req.headers['user-agent'] || '',
-                    payment_session_id: payment_session_id,
-                    device_type: device_type,
-                    cart_total_items: cart_total_items || normalizedItems.length,
-                    referrer_url: referrer_url || req.headers.referer || '',
-                    order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
-                    delivery_method: delivery_method,
-                    invoice_number: invoice_number || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                    tax_amount: parseFloat(tax_amount) || 0,
-                    utm_source: utm_source,
-                    utm_medium: utm_medium,
-                    utm_campaign: utm_campaign,
-                    
-                    // CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
-                    is_token_payment: false,
-                    alias_token: null,
-                    
-                    // GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
-                    promotion_code: promotion_code || null,
-                    has_promotion: !!payload.operation.additional_data
+                    delivery_coordinates: savedTransaction.delivery_location ? {
+                        lat: savedTransaction.delivery_location.lat,
+                        lng: savedTransaction.delivery_location.lng,
+                        hasCoords: !!(savedTransaction.delivery_location.lat && savedTransaction.delivery_location.lng)
+                    } : null
                 });
-
-
-                    const savedTransaction = await newTransaction.save();
-                    console.log("✅ Transacción de pago ocasional guardada en BD:", {
-                        id: savedTransaction._id,
-                        shop_process_id: savedTransaction.shop_process_id,
-                        has_promotion: savedTransaction.has_promotion,
-                        // ✅ VERIFICAR QUE delivery_location SE GUARDÓ
-                        delivery_location_saved: !!savedTransaction.delivery_location,
-                        delivery_coordinates: savedTransaction.delivery_location ? {
-                            lat: savedTransaction.delivery_location.lat,
-                            lng: savedTransaction.delivery_location.lng,
-                            hasCoords: !!(savedTransaction.delivery_location.lat && savedTransaction.delivery_location.lng)
-                        } : null
-                    });
 
                 } catch (dbError) {
                     console.error("⚠️ Error guardando transacción en BD:", dbError);

@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { 
     FaArrowLeft, 
-    FaMapMarkerAlt, 
     FaCreditCard, 
-    FaQrcode, 
     FaLock, 
     FaCheckCircle, 
     FaPlus, 
@@ -25,7 +23,8 @@ import {
     FaGift,
     FaPercentage,
     FaInfoCircle,
-    FaSpinner
+    FaSpinner,
+    FaMapMarkerAlt
 } from 'react-icons/fa';
 import { localCartHelper } from '../helpers/addToCart';
 import { formatIVABreakdown } from '../helpers/taxCalculator';
@@ -80,6 +79,25 @@ const SavedCardsSection = ({ user, totalAmount, customerData, cartItems, onPayme
 
         setProcessingPayment(true);
         try {
+            // ✅ DEFINIR trackingData PRIMERO
+            const trackingData = {
+                user_agent: navigator.userAgent,
+                device_type: window.innerWidth < 768 ? 'mobile' : 
+                             window.innerWidth < 1024 ? 'tablet' : 'desktop',
+                referrer_url: document.referrer || 'direct',
+                payment_session_id: sessionStorage.getItem('payment_session') || 
+                                    `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                cart_total_items: cartItems.length,
+                order_notes: JSON.stringify(customerData),
+                delivery_method: 'delivery',
+                invoice_number: `INV-${Date.now()}`,
+                tax_amount: (totalAmount * 0.1).toFixed(2),
+                utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
+                utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
+                utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || ''
+            };
+
+            // ✅ AHORA SÍ USAR trackingData
             const paymentData = {
                 amount: totalAmount.toFixed(2),
                 currency: 'PYG',
@@ -99,7 +117,25 @@ const SavedCardsSection = ({ user, totalAmount, customerData, cartItems, onPayme
                 })),
                 user_type: 'REGISTERED',
                 payment_method: 'saved_card',
-                user_bancard_id: user.bancardUserId
+                user_bancard_id: user.bancardUserId,
+                
+                // ✅ AGREGAR TODOS LOS DATOS DE TRACKING
+                ...trackingData,
+                
+                // ✅ AGREGAR delivery_location SI EXISTE
+                delivery_location: customerData.location ? {
+                    lat: customerData.location.lat,
+                    lng: customerData.location.lng,
+                    address: customerData.location.address,
+                    manual_address: customerData.address,
+                    city: customerData.city,
+                    house_number: customerData.houseNumber,
+                    reference: customerData.reference,
+                    source: 'user_selected',
+                    google_address: customerData.location.address,
+                    googleMapsUrl: customerData.location.googleMapsUrl,
+                    timestamp: new Date()
+                } : null
             };
 
             const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/pago-con-token`, {
@@ -303,7 +339,8 @@ const Checkout = () => {
         }
     }, [isLoggedIn, user]);
 
-    const loadUserLocation = async () => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const loadUserLocation = useCallback(async () => {
         if (!isLoggedIn) return;
         
         try {
@@ -327,7 +364,7 @@ const Checkout = () => {
         } catch (error) {
             console.warn('Error cargando ubicación:', error);
         }
-    };
+    }, [isLoggedIn]);
 
     const totalPrice = cartItems.reduce((total, item) => 
         total + (item.quantity * item.productId.sellingPrice), 0
@@ -345,47 +382,91 @@ const Checkout = () => {
         }
     };
 
-    // REEMPLAZA estas funciones (líneas ~258-278):
+    // ✅ FUNCIÓN MEJORADA para capturar datos de tracking con ubicación
+    const captureTrackingData = useCallback(() => {
+        return {
+            user_agent: navigator.userAgent,
+            device_type: window.innerWidth < 768 ? 'mobile' : 
+                         window.innerWidth < 1024 ? 'tablet' : 'desktop',
+            referrer_url: document.referrer || 'direct',
+            payment_session_id: sessionStorage.getItem('payment_session') || 
+                                `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            cart_total_items: cartItems.length,
+            
+            // ✅ MEJORAR order_notes CON TODA LA INFORMACIÓN
+            order_notes: JSON.stringify({
+                customerData: formData,
+                needsInvoice: needsInvoice,
+                invoiceData: needsInvoice ? {
+                    companyName: formData.companyName,
+                    ruc: formData.ruc
+                } : null,
+                location: selectedLocation || null,
+                timestamp: new Date().toISOString()
+            }),
+            
+            delivery_method: 'delivery',
+            invoice_number: `INV-${Date.now()}`,
+            tax_amount: (totalPrice * 0.1).toFixed(2),
+            utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
+            utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
+            utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || '',
+            
+            // ✅ AGREGAR UBICACIÓN DIRECTAMENTE EN DELIVERY_LOCATION
+            delivery_location: selectedLocation ? {
+                lat: selectedLocation.lat,
+                lng: selectedLocation.lng,
+                address: selectedLocation.address,
+                manual_address: formData.address,
+                city: formData.city,
+                house_number: formData.houseNumber,
+                reference: formData.reference,
+                source: 'user_selected',
+                google_address: selectedLocation.address,
+                googleMapsUrl: `https://www.google.com/maps?q=${selectedLocation.lat},${selectedLocation.lng}`,
+                timestamp: new Date()
+            } : null
+        };
+    }, [cartItems.length, totalPrice, formData, needsInvoice, selectedLocation]);
 
-const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.name.trim()) newErrors.name = 'Nombre es requerido';
-    if (!formData.phone.trim()) newErrors.phone = 'Teléfono es requerido';
-    if (!formData.address.trim()) newErrors.address = 'Dirección es requerida';
-    if (!formData.city.trim()) newErrors.city = 'Ciudad es requerida';
-    if (!formData.houseNumber.trim()) newErrors.houseNumber = 'Número de casa es requerido';
-    
-    if (needsInvoice) {
-        if (!formData.companyName.trim()) newErrors.companyName = 'Razón social es requerida';
-        if (!formData.ruc.trim()) newErrors.ruc = 'RUC es requerido';
-    }
-    
-    // ✅ NO actualizamos el estado aquí
-    return { errors: newErrors, isValid: Object.keys(newErrors).length === 0 };
-};
+    const validateForm = () => {
+        const newErrors = {};
+        
+        if (!formData.name.trim()) newErrors.name = 'Nombre es requerido';
+        if (!formData.phone.trim()) newErrors.phone = 'Teléfono es requerido';
+        if (!formData.address.trim()) newErrors.address = 'Dirección es requerida';
+        if (!formData.city.trim()) newErrors.city = 'Ciudad es requerida';
+        if (!formData.houseNumber.trim()) newErrors.houseNumber = 'Número de casa es requerido';
+        
+        if (needsInvoice) {
+            if (!formData.companyName.trim()) newErrors.companyName = 'Razón social es requerida';
+            if (!formData.ruc.trim()) newErrors.ruc = 'RUC es requerido';
+        }
+        
+        return { errors: newErrors, isValid: Object.keys(newErrors).length === 0 };
+    };
 
-// ✅ Función separada para validar sin causar re-renders
-const isFormValid = () => {
-    const hasRequiredFields = 
-        formData.name.trim() && 
-        formData.phone.trim() && 
-        formData.address.trim() && 
-        formData.city.trim() && 
-        formData.houseNumber.trim();
-    
-    const hasInvoiceData = !needsInvoice || 
-        (formData.companyName.trim() && formData.ruc.trim());
-    
-    return hasRequiredFields && hasInvoiceData && selectedLocation;
-};
+    // ✅ Función separada para validar sin causar re-renders
+    const isFormValid = () => {
+        const hasRequiredFields = 
+            formData.name.trim() && 
+            formData.phone.trim() && 
+            formData.address.trim() && 
+            formData.city.trim() && 
+            formData.houseNumber.trim();
+        
+        const hasInvoiceData = !needsInvoice || 
+            (formData.companyName.trim() && formData.ruc.trim());
+        
+        return hasRequiredFields && hasInvoiceData && selectedLocation;
+    };
 
-// ✅ Función para validar y mostrar errores solo cuando sea necesario
-const validateAndShowErrors = () => {
-    const validation = validateForm();
-    setErrors(validation.errors);
-    return validation.isValid;
-};
+    // ✅ Función para validar y mostrar errores solo cuando sea necesario
+    const validateAndShowErrors = () => {
+        const validation = validateForm();
+        setErrors(validation.errors);
+        return validation.isValid;
+    };
 
     const handleLocationSave = (locationData) => {
         setSelectedLocation(locationData);
@@ -397,20 +478,45 @@ const validateAndShowErrors = () => {
         toast.success('Ubicación guardada correctamente');
     };
 
-    const canProceedToPayment = () => {
-        return validateForm() && selectedLocation;
-    };
+    // ✅ REEMPLAZAR tu función prepareBancardData actual con esta:
+    const prepareBancardData = () => {
+        const baseData = {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            city: formData.city,
+            address: formData.address,
+            houseNumber: formData.houseNumber,
+            reference: formData.reference,
+            fullAddress: `${formData.address}, ${formData.city}, Casa ${formData.houseNumber}${formData.reference ? ', ' + formData.reference : ''}`
+        };
 
-    const prepareBancardData = () => ({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: `${formData.address}, ${formData.city}, Casa ${formData.houseNumber}${formData.reference ? ', ' + formData.reference : ''}`,
-        ...(needsInvoice && {
-            companyName: formData.companyName,
-            ruc: formData.ruc
-        })
-    });
+        // ✅ AGREGAR DATOS DE FACTURACIÓN SI ES NECESARIO
+        if (needsInvoice) {
+            baseData.invoiceData = {
+                needsInvoice: true,
+                companyName: formData.companyName,
+                ruc: formData.ruc
+            };
+        } else {
+            baseData.invoiceData = {
+                needsInvoice: false
+            };
+        }
+
+        // ✅ AGREGAR UBICACIÓN SI EXISTE
+        if (selectedLocation) {
+            baseData.location = {
+                lat: selectedLocation.lat,
+                lng: selectedLocation.lng,
+                address: selectedLocation.address,
+                googleMapsUrl: `https://www.google.com/maps?q=${selectedLocation.lat},${selectedLocation.lng}`,
+                timestamp: new Date().toISOString()
+            };
+        }
+
+        return baseData;
+    };
 
     const handlePaymentSuccess = (paymentData) => {
         console.log('Pago exitoso desde checkout:', paymentData);
@@ -438,12 +544,28 @@ const validateAndShowErrors = () => {
     };
 
     const updateQuantity = (itemId, change) => {
-        const newItems = [...cartItems];
-        const index = newItems.findIndex(i => i._id === itemId);
-        if (index !== -1) {
-            newItems[index].quantity = Math.max(1, newItems[index].quantity + change);
-            localCartHelper.updateCart(newItems);
-            setCartItems(newItems);
+        try {
+            const newItems = [...cartItems];
+            const index = newItems.findIndex(i => i._id === itemId);
+            
+            if (index !== -1) {
+                const newQuantity = Math.max(1, newItems[index].quantity + change);
+                newItems[index].quantity = newQuantity;
+                
+                // ✅ USAR localCartHelper.updateCart (que ya existe)
+                if (localCartHelper.updateCart(newItems)) {
+                    setCartItems(newItems);
+                    toast.success('Cantidad actualizada');
+                    
+                    // Actualizar también el localStorage individualmente para consistencia
+                    localCartHelper.updateQuantity(itemId, newQuantity);
+                } else {
+                    toast.error('Error al actualizar cantidad');
+                }
+            }
+        } catch (error) {
+            console.error('Error al actualizar cantidad:', error);
+            toast.error('Error al actualizar el producto');
         }
     };
 
@@ -549,295 +671,284 @@ const validateAndShowErrors = () => {
                                         Información personal
                                     </h2>
                                     
-                                    // ESTRUCTURA CORREGIDA para la sección de datos personales:
+                                    {/* ✅ ESTRUCTURA CORREGIDA para la sección de datos personales */}
+                                    {isLoggedIn ? (
+                                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-6">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="p-2 bg-green-100 rounded-full">
+                                                    <FaCheckCircle className="text-green-600 text-lg" />
+                                                </div>
+                                                <span className="font-semibold text-green-800">Datos de tu cuenta verificados</span>
+                                            </div>
+                                            
+                                            {/* Mostrar datos del usuario logueado */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                <div>
+                                                    <span className="text-sm font-medium text-gray-600">Nombre:</span>
+                                                    <p className="font-semibold text-gray-900">{user.name}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-sm font-medium text-gray-600">Email:</span>
+                                                    <p className="font-semibold text-gray-900">{user.email}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-sm font-medium text-gray-600">Teléfono:</span>
+                                                    <p className="font-semibold text-gray-900">{user.phone || 'No registrado'}</p>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Campos adicionales para usuarios logueados */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                        <FaCity className="inline mr-2" />
+                                                        Ciudad *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="city"
+                                                        value={formData.city}
+                                                        onChange={handleInputChange}
+                                                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                                 ${errors.city ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                        placeholder="Ej: Asunción"
+                                                    />
+                                                    {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+                                                </div>
+                                                
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                        <FaMapPin className="inline mr-2" />
+                                                        Dirección completa *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="address"
+                                                        value={formData.address}
+                                                        onChange={handleInputChange}
+                                                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                                 ${errors.address ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                        placeholder="Ej: Av. Mariscal López y Brasil"
+                                                    />
+                                                    {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
+                                                </div>
+                                                
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                        <FaHome className="inline mr-2" />
+                                                        Número de casa *
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="houseNumber"
+                                                        value={formData.houseNumber}
+                                                        onChange={handleInputChange}
+                                                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                                 ${errors.houseNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                        placeholder="Ej: 1234, Edificio A - Piso 5"
+                                                    />
+                                                    {errors.houseNumber && <p className="text-red-500 text-xs mt-1">{errors.houseNumber}</p>}
+                                                </div>
+                                                
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                        <FaInfoCircle className="inline mr-2" />
+                                                        Referencia (opcional)
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="reference"
+                                                        value={formData.reference}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                                        placeholder="Ej: Cerca del shopping, portón azul"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        // Formulario completo para usuarios no logueados
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <FaUser className="inline mr-2" />
+                                                    Nombre completo *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="name"
+                                                    value={formData.name}
+                                                    onChange={handleInputChange}
+                                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                             ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                    placeholder="Tu nombre completo"
+                                                />
+                                                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <FaEnvelope className="inline mr-2" />
+                                                    Email
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    name="email"
+                                                    value={formData.email}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                                    placeholder="tu@email.com"
+                                                />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <FaPhone className="inline mr-2" />
+                                                    Teléfono *
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    name="phone"
+                                                    value={formData.phone}
+                                                    onChange={handleInputChange}
+                                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                             ${errors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                    placeholder="Ej: 0981234567"
+                                                />
+                                                {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <FaCity className="inline mr-2" />
+                                                    Ciudad *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="city"
+                                                    value={formData.city}
+                                                    onChange={handleInputChange}
+                                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                             ${errors.city ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                    placeholder="Ej: Asunción"
+                                                />
+                                                {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+                                            </div>
+                                            
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <FaMapPin className="inline mr-2" />
+                                                    Dirección completa *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="address"
+                                                    value={formData.address}
+                                                    onChange={handleInputChange}
+                                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                             ${errors.address ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                    placeholder="Ej: Av. Mariscal López y Brasil"
+                                                />
+                                                {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <FaHome className="inline mr-2" />
+                                                    Número de casa *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="houseNumber"
+                                                    value={formData.houseNumber}
+                                                    onChange={handleInputChange}
+                                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
+                                                             ${errors.houseNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                                                    placeholder="Ej: 1234, Edificio A - Piso 5"
+                                                />
+                                                {errors.houseNumber && <p className="text-red-500 text-xs mt-1">{errors.houseNumber}</p>}
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <FaInfoCircle className="inline mr-2" />
+                                                    Referencia (opcional)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="reference"
+                                                    value={formData.reference}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                                    placeholder="Ej: Cerca del shopping, portón azul"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
 
-<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-        <div className="p-2 bg-blue-100 rounded-lg">
-            <FaUser className="text-blue-600" />
-        </div>
-        Información personal
-    </h2>
-    
-    {/* FORMULARIO DE DATOS PERSONALES */}
-    {isLoggedIn ? (
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-6">
-            <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-green-100 rounded-full">
-                    <FaCheckCircle className="text-green-600 text-lg" />
-                </div>
-                <span className="font-semibold text-green-800">Datos de tu cuenta verificados</span>
-            </div>
-            
-            {/* Mostrar datos del usuario logueado */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <span className="text-sm font-medium text-gray-600">Nombre:</span>
-                    <p className="font-semibold text-gray-900">{user.name}</p>
-                </div>
-                <div>
-                    <span className="text-sm font-medium text-gray-600">Email:</span>
-                    <p className="font-semibold text-gray-900">{user.email}</p>
-                </div>
-                <div>
-                    <span className="text-sm font-medium text-gray-600">Teléfono:</span>
-                    <p className="font-semibold text-gray-900">{user.phone || 'No registrado'}</p>
-                </div>
-            </div>
-            
-            {/* Campos adicionales para usuarios logueados */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        <FaCity className="inline mr-2" />
-                        Ciudad *
-                    </label>
-                    <input
-                        type="text"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                                 ${errors.city ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                        placeholder="Ej: Asunción"
-                    />
-                    {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-                </div>
-                
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        <FaMapPin className="inline mr-2" />
-                        Dirección completa *
-                    </label>
-                    <input
-                        type="text"
-                        name="address"
-                        value={formData.address}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                                 ${errors.address ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                        placeholder="Ej: Av. Mariscal López y Brasil"
-                    />
-                    {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
-                </div>
-                
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        <FaHome className="inline mr-2" />
-                        Número de casa *
-                    </label>
-                    <input
-                        type="text"
-                        name="houseNumber"
-                        value={formData.houseNumber}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                                 ${errors.houseNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                        placeholder="Ej: 1234, Edificio A - Piso 5"
-                    />
-                    {errors.houseNumber && <p className="text-red-500 text-xs mt-1">{errors.houseNumber}</p>}
-                </div>
-                
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        <FaInfoCircle className="inline mr-2" />
-                        Referencia (opcional)
-                    </label>
-                    <input
-                        type="text"
-                        name="reference"
-                        value={formData.reference}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                        placeholder="Ej: Cerca del shopping, portón azul"
-                    />
-                </div>
-            </div>
-        </div>
-    ) : (
-        // Formulario completo para usuarios no logueados
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FaUser className="inline mr-2" />
-                    Nombre completo *
-                </label>
-                <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                             ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                    placeholder="Tu nombre completo"
-                />
-                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-            </div>
-            
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FaEnvelope className="inline mr-2" />
-                    Email
-                </label>
-                <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    placeholder="tu@email.com"
-                />
-            </div>
-            
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FaPhone className="inline mr-2" />
-                    Teléfono *
-                </label>
-                <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                             ${errors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                    placeholder="Ej: 0981234567"
-                />
-                {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-            </div>
-            
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FaCity className="inline mr-2" />
-                    Ciudad *
-                </label>
-                <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                             ${errors.city ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                    placeholder="Ej: Asunción"
-                />
-                {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-            </div>
-            
-            <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FaMapPin className="inline mr-2" />
-                    Dirección completa *
-                </label>
-                <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                             ${errors.address ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                    placeholder="Ej: Av. Mariscal López y Brasil"
-                />
-                {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
-            </div>
-            
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FaHome className="inline mr-2" />
-                    Número de casa *
-                </label>
-                <input
-                    type="text"
-                    name="houseNumber"
-                    value={formData.houseNumber}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all
-                             ${errors.houseNumber ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                    placeholder="Ej: 1234, Edificio A - Piso 5"
-                />
-                {errors.houseNumber && <p className="text-red-500 text-xs mt-1">{errors.houseNumber}</p>}
-            </div>
-            
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FaInfoCircle className="inline mr-2" />
-                    Referencia (opcional)
-                </label>
-                <input
-                    type="text"
-                    name="reference"
-                    value={formData.reference}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    placeholder="Ej: Cerca del shopping, portón azul"
-                />
-            </div>
-        </div>
-    )}
+                                    {/* ✅ MAPA PARA TODOS LOS USUARIOS - FUERA DEL IF/ELSE */}
+                                    <div className="mt-6">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                            <FaMapMarkerAlt className="inline mr-2" />
+                                            Ubicación en el mapa
+                                        </label>
+                                        
+                                        {selectedLocation ? (
+                                            <div className="border-2 border-green-200 rounded-xl p-6 bg-gradient-to-r from-green-50 to-emerald-50">
+                                                <div className="flex items-start gap-4">
+                                                    <div className="p-3 bg-green-100 rounded-full">
+                                                        <FaMapMarkerAlt className="text-green-600 text-xl" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="font-semibold text-green-900 mb-2">Ubicación confirmada</h4>
+                                                        <p className="text-green-800 mb-3">{selectedLocation.address}</p>
+                                                        <div className="flex gap-3">
+                                                            <button
+                                                                onClick={() => setShowLocationSelector(true)}
+                                                                className="px-4 py-2 text-green-700 bg-green-100 hover:bg-green-200 rounded-lg 
+                                                                         font-medium transition-colors"
+                                                            >
+                                                                Cambiar ubicación
+                                                            </button>
+                                                            <div className="text-xs text-green-600 flex items-center gap-1">
+                                                                <span>Coordenadas: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowLocationSelector(true)}
+                                                className="w-full border-2 border-dashed border-blue-300 rounded-xl p-8 
+                                                         hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                                            >
+                                                <div className="text-center">
+                                                    <div className="p-4 bg-blue-100 rounded-full w-fit mx-auto mb-4 group-hover:bg-blue-200 transition-colors">
+                                                        <FaMapMarkerAlt className="text-3xl text-blue-600" />
+                                                    </div>
+                                                    <h4 className="text-xl font-semibold text-gray-900 mb-2">Marcar ubicación en el mapa</h4>
+                                                    <p className="text-gray-600">Selecciona tu ubicación exacta para un envío preciso</p>
+                                                    <div className="mt-4 inline-flex items-center gap-2 text-blue-600 font-medium">
+                                                        <span>Abrir mapa</span>
+                                                        <FaMapMarkerAlt />
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        )}
 
-    {/* ✅ MAPA PARA TODOS LOS USUARIOS - FUERA DEL IF/ELSE */}
-    <div className="mt-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-3">
-            <FaMapMarkerAlt className="inline mr-2" />
-            Ubicación en el mapa
-        </label>
-        
-        {selectedLocation ? (
-            <div className="border-2 border-green-200 rounded-xl p-6 bg-gradient-to-r from-green-50 to-emerald-50">
-                <div className="flex items-start gap-4">
-                    <div className="p-3 bg-green-100 rounded-full">
-                        <FaMapMarkerAlt className="text-green-600 text-xl" />
-                    </div>
-                    <div className="flex-1">
-                        <h4 className="font-semibold text-green-900 mb-2">Ubicación confirmada</h4>
-                        <p className="text-green-800 mb-3">{selectedLocation.address}</p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowLocationSelector(true)}
-                                className="px-4 py-2 text-green-700 bg-green-100 hover:bg-green-200 rounded-lg 
-                                         font-medium transition-colors"
-                            >
-                                Cambiar ubicación
-                            </button>
-                            <div className="text-xs text-green-600 flex items-center gap-1">
-                                <span>Coordenadas: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        ) : (
-            <button
-                onClick={() => setShowLocationSelector(true)}
-                className="w-full border-2 border-dashed border-blue-300 rounded-xl p-8 
-                         hover:border-blue-500 hover:bg-blue-50 transition-all group"
-            >
-                <div className="text-center">
-                    <div className="p-4 bg-blue-100 rounded-full w-fit mx-auto mb-4 group-hover:bg-blue-200 transition-colors">
-                        <FaMapMarkerAlt className="text-3xl text-blue-600" />
-                    </div>
-                    <h4 className="text-xl font-semibold text-gray-900 mb-2">Marcar ubicación en el mapa</h4>
-                    <p className="text-gray-600">Selecciona tu ubicación exacta para un envío preciso</p>
-                    <div className="mt-4 inline-flex items-center gap-2 text-blue-600 font-medium">
-                        <span>Abrir mapa</span>
-                        <FaMapMarkerAlt />
-                    </div>
-                </div>
-            </button>
-        )}
-
-        {showLocationSelector && (
-            <div className="mt-6">
-                <SimpleLocationSelector
-                    initialLocation={selectedLocation}
-                    onLocationSave={handleLocationSave}
-                    isUserLoggedIn={isLoggedIn}
-                    title="Seleccionar Dirección de Entrega"
-                    onClose={() => setShowLocationSelector(false)}
-                />
-            </div>
-        )}
-    </div>
-</div>
+                                        {showLocationSelector && (
+                                            <div className="mt-6">
+                                                <SimpleLocationSelector
+                                                    initialLocation={selectedLocation}
+                                                    onLocationSave={handleLocationSave}
+                                                    isUserLoggedIn={isLoggedIn}
+                                                    title="Seleccionar Dirección de Entrega"
+                                                    onClose={() => setShowLocationSelector(false)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Facturación */}
@@ -924,7 +1035,7 @@ const validateAndShowErrors = () => {
                                                 toast.error('Completa todos los campos obligatorios');
                                             }
                                         }}
-                                        disabled={!isFormValid()} // ✅ Usa la función segura
+                                        disabled={!isFormValid()}
                                         className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl 
                                                 hover:from-blue-700 hover:to-blue-800 font-semibold text-lg transition-all 
                                                 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center gap-3
@@ -1000,15 +1111,15 @@ const validateAndShowErrors = () => {
                                     </h3>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         {[
-                                            { icon: FaCreditCard, name: "Tarjeta de crédito", color: "text-blue-600" },
-                                            { icon: FaCreditCard, name: "Tarjeta de débito", color: "text-green-600" },
-                                            { icon: FaQrcode, name: "Billeteras digitales", color: "text-purple-600" },
-                                            { icon: FaQrcode, name: "Código QR", color: "text-orange-600" }
+                                            { name: "Tarjeta de crédito", color: "text-blue-600" },
+                                            { name: "Tarjeta de débito", color: "text-green-600" },
+                                            { name: "Billeteras digitales", color: "text-purple-600" },
+                                            { name: "Código QR", color: "text-orange-600" }
                                         ].map((method, index) => (
                                             <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 hover:border-gray-300 
                                                                        transition-all hover:shadow-sm">
                                                 <div className="flex flex-col items-center justify-center text-center">
-                                                    <method.icon className={`${method.color} text-2xl mb-2`} />
+                                                    <FaCreditCard className={`${method.color} text-2xl mb-2`} />
                                                     <span className="text-xs font-medium text-gray-700">{method.name}</span>
                                                 </div>
                                             </div>
@@ -1019,17 +1130,17 @@ const validateAndShowErrors = () => {
                                 {/* Botón de pago Bancard MEJORADO - DIRECTO */}
                                 <div className="space-y-4">
                                     <BancardPayButton
-                                            cartItems={cartItems}
-                                            totalAmount={totalPrice}
-                                            customerData={prepareBancardData()}
-                                            onPaymentStart={() => {
-                                                console.log('Iniciando pago desde checkout');
-                                                toast.info('Procesando pago...');
-                                            }}
-                                            onPaymentSuccess={handlePaymentSuccess}
-                                            onPaymentError={handlePaymentError}
-                                            disabled={!isFormValid()} // ✅ Cambia canProceedToPayment() por isFormValid()
-                                        />
+                                        cartItems={cartItems}
+                                        totalAmount={totalPrice}
+                                        customerData={prepareBancardData()}
+                                        onPaymentStart={() => {
+                                            console.log('Iniciando pago desde checkout');
+                                            toast.info('Procesando pago...');
+                                        }}
+                                        onPaymentSuccess={handlePaymentSuccess}
+                                        onPaymentError={handlePaymentError}
+                                        disabled={!isFormValid()}
+                                    />
                                     
                                     {/* Información adicional de seguridad */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
