@@ -49,6 +49,7 @@ import PurchaseDetails from "../pages/PurchaseDetails"
 import FinancialDashboard from "../pages/FinancialDashboard"
 import CatastroResult from "../pages/CatastroResult"
 
+// ✅ REMOVIDO: RatingPage import que causaba error
 
 const router = createBrowserRouter([
     {
@@ -241,10 +242,9 @@ const router = createBrowserRouter([
                 
                 ]
             }
+            
         ]
     }
 ])
-
-//
 
 export default router

@@ -1,4 +1,5 @@
-// backend/models/bancardTransactionModel.js - VERSIÓN CORREGIDA
+// backend/models/bancardTransactionModel.js - VERSIÓN COMPLETA CON TODOS LOS CAMPOS EXISTENTES + DELIVERY
+
 const mongoose = require('mongoose');
 
 const bancardTransactionSchema = mongoose.Schema({
@@ -39,7 +40,7 @@ const bancardTransactionSchema = mongoose.Schema({
     description: {
         type: String,
         required: true,
-        maxlength: 500 // ✅ AUMENTADO
+        maxlength: 500
     },
     
     // ===== TIPO DE PAGO =====
@@ -97,13 +98,13 @@ const bancardTransactionSchema = mongoose.Schema({
         index: true
     },
     
-    // ===== INFORMACIÓN DEL CLIENTE - CORREGIDO =====
+    // ===== INFORMACIÓN DEL CLIENTE - COMPLETA =====
     customer_info: {
-        type: mongoose.Schema.Types.Mixed, // ✅ CAMBIADO A Mixed para flexibilidad
+        type: mongoose.Schema.Types.Mixed,
         default: {}
     },
     
-    // ===== ITEMS DEL CARRITO - CORREGIDO =====
+    // ===== ITEMS DEL CARRITO - COMPLETO =====
     items: [{
         product_id: {
             type: String,
@@ -111,21 +112,21 @@ const bancardTransactionSchema = mongoose.Schema({
         },
         name: {
             type: String,
-            required: false // ✅ CAMBIADO A false
+            required: false
         },
         quantity: {
             type: Number,
-            required: false, // ✅ CAMBIADO A false
+            required: false,
             min: 0,
             default: 1
         },
         unit_price: {
             type: Number,
-            required: false, // ✅ CAMBIADO A false - ERA EL ERROR PRINCIPAL
+            required: false,
             min: 0,
             default: 0
         },
-        unitPrice: { // ✅ AGREGAR ALIAS PARA COMPATIBILIDAD
+        unitPrice: {
             type: Number,
             required: false,
             min: 0,
@@ -133,7 +134,7 @@ const bancardTransactionSchema = mongoose.Schema({
         },
         total: {
             type: Number,
-            required: false, // ✅ CAMBIADO A false
+            required: false,
             min: 0,
             default: 0
         },
@@ -153,7 +154,7 @@ const bancardTransactionSchema = mongoose.Schema({
     
     // ===== INFORMACIÓN DE SEGURIDAD =====
     security_information: {
-        type: mongoose.Schema.Types.Mixed, // ✅ CAMBIADO A Mixed
+        type: mongoose.Schema.Types.Mixed,
         default: {}
     },
     
@@ -165,7 +166,7 @@ const bancardTransactionSchema = mongoose.Schema({
         index: true
     },
     user_bancard_id: {
-        type: mongoose.Schema.Types.Mixed, // ✅ CAMBIADO PARA ACEPTAR Number O String
+        type: mongoose.Schema.Types.Mixed,
         default: null,
         index: true
     },
@@ -176,7 +177,7 @@ const bancardTransactionSchema = mongoose.Schema({
     user_agent: {
         type: String,
         required: false,
-        maxlength: 1000 // ✅ AUMENTADO
+        maxlength: 1000
     },
     device_type: {
         type: String,
@@ -204,7 +205,7 @@ const bancardTransactionSchema = mongoose.Schema({
     referrer_url: {
         type: String,
         required: false,
-        maxlength: 1000 // ✅ AUMENTADO
+        maxlength: 1000
     },
     landing_page: {
         type: String,
@@ -245,44 +246,85 @@ const bancardTransactionSchema = mongoose.Schema({
         default: 'pickup'
     },
     delivery_address: {
-        type: mongoose.Schema.Types.Mixed, // ✅ CAMBIADO A Mixed
+        type: mongoose.Schema.Types.Mixed,
         default: {}
     },
     estimated_delivery: {
         type: Date,
         required: false
     },
-    // ✅ UBICACIÓN DE ENTREGA CON GOOGLE MAPS - AGREGAR DESPUÉS DE delivery_address
-delivery_location: {
-    lat: { 
-        type: Number,
-        min: -90,
-        max: 90
+    
+    // ===== UBICACIÓN DE ENTREGA CON GOOGLE MAPS =====
+    delivery_location: {
+        lat: { 
+            type: Number,
+            min: -90,
+            max: 90
+        },
+        lng: { 
+            type: Number,
+            min: -180,
+            max: 180
+        },
+        address: {
+            type: String,
+            trim: true
+        },
+        manual_address: {
+            type: String,
+            trim: true
+        },
+        full_address: {
+            type: String,
+            trim: true
+        },
+        city: {
+            type: String,
+            trim: true
+        },
+        house_number: {
+            type: String,
+            trim: true
+        },
+        reference: {
+            type: String,
+            trim: true
+        },
+        source: {
+            type: String,
+            default: 'user_selected'
+        },
+        timestamp: {
+            type: Date,
+            default: Date.now
+        },
+        google_maps_url: {
+            type: String,
+            trim: true
+        },
+        google_maps_alternative_url: {
+            type: String,
+            trim: true
+        },
+        navigation_url: {
+            type: String,
+            trim: true
+        },
+        coordinates_string: {
+            type: String,
+            trim: true
+        },
+        delivery_instructions: {
+            type: String,
+            maxlength: 2000
+        }
     },
-    lng: { 
-        type: Number,
-        min: -180,
-        max: 180
-    },
-    address: {
-        type: String,
-        trim: true
-    },
-    googleMapsUrl: {
-        type: String,
-        trim: true
-    },
-    timestamp: {
-        type: Date,
-        default: Date.now
-    }
-},
     
     // ===== INFORMACIÓN ADICIONAL =====
     order_notes: {
         type: String,
         required: false,
-        maxlength: 1000 // ✅ AUMENTADO
+        maxlength: 1000
     },
     invoice_number: {
         type: String,
@@ -336,7 +378,7 @@ delivery_location: {
         index: true
     },
     created_by: {
-        type: mongoose.Schema.Types.Mixed, // ✅ CAMBIADO PARA ACEPTAR ObjectId O string guest
+        type: mongoose.Schema.Types.Mixed,
         required: false,
         index: true
     },
@@ -418,15 +460,149 @@ delivery_location: {
             type: mongoose.Schema.Types.Mixed
         },
         reason: String
-    }]
+    }],
+    
+    
+    // ===== 🚀 NUEVOS CAMPOS PARA SISTEMA DE DELIVERY COMO EBAY =====
+    delivery_status: {
+        type: String,
+        enum: [
+            'payment_confirmed',  // ✅ Pago Confirmado (automático)
+            'preparing_order',    // 📦 Preparando Pedido
+            'in_transit',        // 🚚 En Camino  
+            'delivered',         // 📍 Entregado
+            'problem'            // ❌ Problema/Devuelto
+        ],
+        default: 'payment_confirmed',
+        index: true
+    },
+    
+    delivery_timeline: [{
+        status: {
+            type: String,
+            enum: ['payment_confirmed', 'preparing_order', 'in_transit', 'delivered', 'problem']
+        },
+        timestamp: {
+            type: Date,
+            default: Date.now
+        },
+        updated_by: {
+            type: mongoose.Schema.ObjectId,
+            ref: 'user',
+            required: false
+        },
+        notes: {
+            type: String,
+            maxlength: 500
+        },
+        automatic: {
+            type: Boolean,
+            default: false // true si fue automático (ej: pago confirmado)
+        }
+    }],
+    
+    estimated_delivery_date: {
+        type: Date,
+        required: false
+    },
+    
+    actual_delivery_date: {
+        type: Date,
+        required: false
+    },
+    
+    tracking_number: {
+        type: String,
+        required: false,
+        trim: true,
+        index: true
+    },
+    
+    courier_company: {
+        type: String,
+        required: false,
+        trim: true,
+        enum: ['Courier Interno', 'Servientrega', 'DHL', 'FedEx', 'Otro', '']
+    },
+    
+    delivery_notes: {
+        type: String,
+        maxlength: 1000,
+        trim: true
+    },
+    
+    delivery_updated_by: {
+        type: mongoose.Schema.ObjectId,
+        ref: 'user',
+        required: false
+    },
+    
+    delivery_updated_at: {
+        type: Date,
+        default: Date.now
+    },
+    
+    // ===== NOTIFICACIONES ENVIADAS =====
+    notifications_sent: [{
+        type: {
+            type: String,
+            enum: ['email', 'sms', 'push']
+        },
+        status: String, // el estado que desencadenó la notificación
+        sent_at: {
+            type: Date,
+            default: Date.now
+        },
+        success: {
+            type: Boolean,
+            default: true
+        },
+        error_message: String
+    }],
+    
+    // ===== INFORMACIÓN DE ENTREGA DETALLADA =====
+    delivery_attempt_count: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    
+    delivery_attempts: [{
+        attempt_date: Date,
+        status: {
+            type: String,
+            enum: ['successful', 'failed', 'customer_not_available', 'address_issue']
+        },
+        notes: String,
+        next_attempt_date: Date
+    }],
+    
+    delivery_photos: [{
+        url: String,
+        description: String,
+        uploaded_at: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    
+    customer_satisfaction: {
+        rating: {
+            type: Number,
+            min: 1,
+            max: 5
+        },
+        feedback: String,
+        submitted_at: Date
+    }
     
 }, {
     timestamps: true,
     collection: 'bancard_transactions',
-    strict: false // ✅ AGREGAR PARA MAYOR FLEXIBILIDAD
+    strict: false
 });
 
-// ===== ÍNDICES COMPUESTOS =====
+// ===== ÍNDICES EXISTENTES =====
 bancardTransactionSchema.index({ shop_process_id: 1, status: 1 });
 bancardTransactionSchema.index({ created_by: 1, status: 1, createdAt: -1 });
 bancardTransactionSchema.index({ user_bancard_id: 1, is_token_payment: 1 });
@@ -435,6 +611,11 @@ bancardTransactionSchema.index({ environment: 1, is_certification_test: 1 });
 bancardTransactionSchema.index({ payment_method: 1, device_type: 1 });
 bancardTransactionSchema.index({ 'customer_info.email': 1, status: 1 });
 bancardTransactionSchema.index({ invoice_number: 1 }, { sparse: true });
+
+// ===== NUEVOS ÍNDICES PARA DELIVERY =====
+bancardTransactionSchema.index({ delivery_status: 1, createdAt: -1 });
+bancardTransactionSchema.index({ estimated_delivery_date: 1 });
+bancardTransactionSchema.index({ tracking_number: 1 }, { sparse: true });
 
 // ===== MIDDLEWARE PRE-SAVE MEJORADO =====
 bancardTransactionSchema.pre('save', function(next) {
@@ -460,6 +641,33 @@ bancardTransactionSchema.pre('save', function(next) {
                     name: item.name || 'Producto'
                 };
             });
+        }
+        
+        // ✅ DELIVERY TIMELINE - Si el delivery_status cambió, agregar al timeline
+        if (this.isModified('delivery_status') && !this.isNew) {
+            const newTimelineEntry = {
+                status: this.delivery_status,
+                timestamp: new Date(),
+                updated_by: this.delivery_updated_by,
+                notes: this.delivery_notes || '',
+                automatic: false
+            };
+            
+            // Evitar duplicados del mismo estado
+            const lastEntry = this.delivery_timeline[this.delivery_timeline.length - 1];
+            if (!lastEntry || lastEntry.status !== this.delivery_status) {
+                this.delivery_timeline.push(newTimelineEntry);
+            }
+        }
+        
+        // ✅ Si es nuevo y está aprobado, crear timeline inicial
+        if (this.isNew && this.status === 'approved') {
+            this.delivery_timeline = [{
+                status: 'payment_confirmed',
+                timestamp: new Date(),
+                automatic: true,
+                notes: 'Pago confirmado por Bancard'
+            }];
         }
         
         // Auto-generar invoice_number si no existe
@@ -488,7 +696,7 @@ bancardTransactionSchema.pre('save', function(next) {
     }
 });
 
-// ===== MÉTODOS ESTÁTICOS CORREGIDOS =====
+// ===== MÉTODOS ESTÁTICOS EXISTENTES =====
 bancardTransactionSchema.statics.findByShopProcessId = function(shopProcessId) {
     return this.findOne({ shop_process_id: parseInt(shopProcessId) });
 };
@@ -521,6 +729,177 @@ bancardTransactionSchema.statics.findByUser = function(userId, options = {}) {
     return this.find(query).sort({ createdAt: -1 });
 };
 
+// ===== NUEVOS MÉTODOS ESTÁTICOS PARA DELIVERY =====
+bancardTransactionSchema.statics.updateDeliveryStatus = async function(transactionId, newStatus, updatedBy, notes = '', estimatedDate = null) {
+    try {
+        const updateData = {
+            delivery_status: newStatus,
+            delivery_updated_by: updatedBy,
+            delivery_updated_at: new Date()
+        };
+        
+        if (notes) updateData.delivery_notes = notes;
+        if (estimatedDate) updateData.estimated_delivery_date = estimatedDate;
+        if (newStatus === 'delivered') updateData.actual_delivery_date = new Date();
+        
+        const transaction = await this.findByIdAndUpdate(transactionId, updateData, { new: true })
+            .populate('created_by', 'name email phone')
+            .populate('delivery_updated_by', 'name email');
+            
+        return transaction;
+    } catch (error) {
+        throw error;
+    }
+};
+
+bancardTransactionSchema.statics.getDeliveryStats = async function() {
+    try {
+        const stats = await this.aggregate([
+            { $match: { status: 'approved' } },
+            { $group: {
+                _id: '$delivery_status',
+                count: { $sum: 1 },
+                avgDays: { $avg: { $divide: [{ $subtract: ['$actual_delivery_date', '$createdAt'] }, 86400000] } }
+            }}
+        ]);
+        
+        return stats;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// ===== MÉTODOS DE INSTANCIA =====
+bancardTransactionSchema.methods.getDeliveryProgress = function() {
+    const statuses = ['payment_confirmed', 'preparing_order', 'in_transit', 'delivered'];
+    const currentIndex = statuses.indexOf(this.delivery_status);
+    
+    return {
+        current: this.delivery_status,
+        currentIndex,
+        progress: Math.round(((currentIndex + 1) / statuses.length) * 100),
+        isCompleted: this.delivery_status === 'delivered',
+        timeline: this.delivery_timeline,
+        estimatedDate: this.estimated_delivery_date,
+        actualDate: this.actual_delivery_date
+    };
+};
+
+bancardTransactionSchema.methods.addDeliveryAttempt = function(status, notes, nextAttemptDate = null) {
+    this.delivery_attempt_count += 1;
+    this.delivery_attempts.push({
+        attempt_date: new Date(),
+        status,
+        notes,
+        next_attempt_date: nextAttemptDate
+    });
+    
+    return this.save();
+};
+
 const BancardTransactionModel = mongoose.model('BancardTransaction', bancardTransactionSchema);
+
+bancardTransactionSchema.pre('save', function(next) {
+    try {
+        // Si el delivery_status cambió, agregar al timeline
+        if (this.isModified('delivery_status') && !this.isNew) {
+            const newTimelineEntry = {
+                status: this.delivery_status,
+                timestamp: new Date(),
+                updated_by: this.delivery_updated_by,
+                notes: this.delivery_notes || '',
+                automatic: false
+            };
+            
+            // Evitar duplicados del mismo estado
+            const lastEntry = this.delivery_timeline[this.delivery_timeline.length - 1];
+            if (!lastEntry || lastEntry.status !== this.delivery_status) {
+                this.delivery_timeline.push(newTimelineEntry);
+            }
+        }
+        
+        // Si es nuevo y está aprobado, crear timeline inicial
+        if (this.isNew && this.status === 'approved') {
+            this.delivery_timeline = [{
+                status: 'payment_confirmed',
+                timestamp: new Date(),
+                automatic: true,
+                notes: 'Pago confirmado por Bancard'
+            }];
+        }
+        
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
+
+// ===== MÉTODOS ESTÁTICOS PARA DELIVERY =====
+bancardTransactionSchema.statics.updateDeliveryStatus = async function(transactionId, newStatus, updatedBy, notes = '', estimatedDate = null) {
+    try {
+        const updateData = {
+            delivery_status: newStatus,
+            delivery_updated_by: updatedBy,
+            delivery_updated_at: new Date()
+        };
+        
+        if (notes) updateData.delivery_notes = notes;
+        if (estimatedDate) updateData.estimated_delivery_date = estimatedDate;
+        if (newStatus === 'delivered') updateData.actual_delivery_date = new Date();
+        
+        const transaction = await this.findByIdAndUpdate(transactionId, updateData, { new: true })
+            .populate('created_by', 'name email phone')
+            .populate('delivery_updated_by', 'name email');
+            
+        return transaction;
+    } catch (error) {
+        throw error;
+    }
+};
+
+bancardTransactionSchema.statics.getDeliveryStats = async function() {
+    try {
+        const stats = await this.aggregate([
+            { $match: { status: 'approved' } },
+            { $group: {
+                _id: '$delivery_status',
+                count: { $sum: 1 },
+                avgDays: { $avg: { $divide: [{ $subtract: ['$actual_delivery_date', '$createdAt'] }, 86400000] } }
+            }}
+        ]);
+        
+        return stats;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// ===== MÉTODOS DE INSTANCIA =====
+bancardTransactionSchema.methods.getDeliveryProgress = function() {
+    const statuses = ['payment_confirmed', 'preparing_order', 'in_transit', 'delivered'];
+    const currentIndex = statuses.indexOf(this.delivery_status);
+    
+    return {
+        current: this.delivery_status,
+        currentIndex,
+        progress: Math.round(((currentIndex + 1) / statuses.length) * 100),
+        isCompleted: this.delivery_status === 'delivered',
+        timeline: this.delivery_timeline,
+        estimatedDate: this.estimated_delivery_date,
+        actualDate: this.actual_delivery_date
+    };
+};
+
+bancardTransactionSchema.methods.addDeliveryAttempt = function(status, notes, nextAttemptDate = null) {
+    this.delivery_attempt_count += 1;
+    this.delivery_attempts.push({
+        attempt_date: new Date(),
+        status,
+        notes,
+        next_attempt_date: nextAttemptDate
+    });
+    
+    return this.save();
+};
 
 module.exports = BancardTransactionModel;

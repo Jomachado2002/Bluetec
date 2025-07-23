@@ -12,12 +12,19 @@ import {
   FaExclamationTriangle
 } from 'react-icons/fa';
 import displayPYGCurrency from '../../helpers/displayCurrency';
+import { deliveryStatuses, calculateProgress, formatDeliveryDate } from '../../helpers/deliveryHelpers';
+import DeliveryProgress from '../delivery/DeliveryProgress';
+import RatingComponent from '../delivery/RatingComponent';
+
+
 
 const UserPurchases = ({ user }) => {
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedRatingPurchase, setSelectedRatingPurchase] = useState(null);
   const [filters, setFilters] = useState({
     status: '',
     startDate: '',
@@ -108,6 +115,14 @@ const UserPurchases = ({ user }) => {
       case 'failed': return <FaExclamationTriangle className="text-red-500" />;
       default: return <FaClock className="text-gray-500" />;
     }
+  };
+  const getDeliveryIcon = (deliveryStatus) => {
+    const status = deliveryStatuses[deliveryStatus || 'payment_confirmed'];
+    return <span style={{color: status.color}}>{status.icon}</span>;
+  };
+
+  const getDeliveryLabel = (deliveryStatus) => {
+    return deliveryStatuses[deliveryStatus || 'payment_confirmed']?.title || 'Pago Confirmado';
   };
 
   const getStatusLabel = (status) => {
@@ -268,16 +283,31 @@ const UserPurchases = ({ user }) => {
                       <h3 className="font-semibold text-gray-800">
                         Compra #{purchase.shop_process_id}
                       </h3>
-                      <div className="flex items-center gap-1">
-                        {getStatusIcon(purchase.status)}
-                        <span className={`text-sm font-medium ${
-                          purchase.status === 'approved' ? 'text-green-600' :
-                          purchase.status === 'rejected' ? 'text-red-600' :
-                          purchase.status === 'rolled_back' ? 'text-orange-600' :
-                          'text-yellow-600'
-                        }`}>
-                          {getStatusLabel(purchase.status)}
-                        </span>
+                     <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          {getStatusIcon(purchase.status)}
+                          <span className={`text-sm font-medium ${
+                            purchase.status === 'approved' ? 'text-green-600' :
+                            purchase.status === 'rejected' ? 'text-red-600' :
+                            purchase.status === 'rolled_back' ? 'text-orange-600' :
+                            'text-yellow-600'
+                          }`}>
+                            {getStatusLabel(purchase.status)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          {getDeliveryIcon(purchase.delivery_status)}
+                          <span className="text-sm font-medium" style={{color: deliveryStatuses[purchase.delivery_status || 'payment_confirmed']?.color}}>
+                            {getDeliveryLabel(purchase.delivery_status)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                             style={{width: `${calculateProgress(purchase.delivery_status || 'payment_confirmed')}%`}}>
+                        </div>
                       </div>
                     </div>
 
@@ -352,7 +382,17 @@ const UserPurchases = ({ user }) => {
             </div>
 
             <div className="p-4 overflow-y-auto max-h-96">
-              
+              {/* Progress Bar de Delivery */}
+                        <div className="mb-6">
+                          <DeliveryProgress
+                            deliveryStatus={selectedPurchase.delivery_status}
+                            timeline={selectedPurchase.delivery_timeline}
+                            estimatedDate={selectedPurchase.estimated_delivery_date}
+                            actualDate={selectedPurchase.actual_delivery_date}
+                            trackingNumber={selectedPurchase.tracking_number}
+                            compact={true}
+                          />
+                        </div>
               {/* Información de la compra */}
               <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                 <div>
@@ -427,18 +467,40 @@ const UserPurchases = ({ user }) => {
               )}
             </div>
 
-            <div className="border-t p-4 bg-gray-50">
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
+             <div className="flex gap-3">
+                  {selectedPurchase?.delivery_status === 'delivered' && !selectedPurchase?.customer_satisfaction?.rating && (
+                    <button
+                      onClick={() => {
+                        setSelectedRatingPurchase(selectedPurchase);
+                        setShowRatingModal(true);
+                        setShowDetailsModal(false);
+                      }}
+                      className="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 transition-colors flex items-center gap-2"
+                    >
+                      ⭐ Calificar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
           </div>
         </div>
+      )}
+       {showRatingModal && selectedRatingPurchase && (
+        <RatingComponent
+          transaction={selectedRatingPurchase}
+          onClose={() => {
+            setShowRatingModal(false);
+            setSelectedRatingPurchase(null);
+          }}
+          onRated={() => {
+            fetchUserPurchases(); // Recargar datos
+          }}
+        />
       )}
     </div>
   );

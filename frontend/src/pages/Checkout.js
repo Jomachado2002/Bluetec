@@ -978,20 +978,20 @@ const hasValidLocation = () => {
                                                             <h4 className="font-semibold text-green-900 mb-2">📍 Ubicación de entrega confirmada</h4>
                                                             <p className="text-green-800 mb-3 font-medium">{selectedLocation.address}</p>
                                                             
-                                                            {/* ✅ MOSTRAR URL DE GOOGLE MAPS */}
-                                                            {selectedLocation.google_maps_url && (
-                                                                <div className="mb-3">
-                                                                    <a
-                                                                        href={selectedLocation.google_maps_url}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium bg-blue-100 px-3 py-2 rounded-lg hover:bg-blue-200 transition-colors"
-                                                                    >
-                                                                        <FaExternalLinkAlt />
-                                                                        Ver en Google Maps
-                                                                    </a>
-                                                                </div>
-                                                            )}
+                                                           {/* ✅ MOSTRAR URL DE GOOGLE MAPS */}
+                                                                {selectedLocation.google_maps_url && (
+                                                                    <div className="mb-3">
+                                                                        <a
+                                                                            href={selectedLocation.google_maps_url}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium bg-blue-100 px-3 py-2 rounded-lg hover:bg-blue-200 transition-colors"
+                                                                        >
+                                                                            <FaExternalLinkAlt />
+                                                                            Ver en Google Maps
+                                                                        </a>
+                                                                    </div>
+                                                                )}
                                                             
                                                             <div className="flex gap-3 items-center mb-4">
                                                                 <div className="text-xs text-green-600 font-mono bg-green-100 px-3 py-1 rounded-full">

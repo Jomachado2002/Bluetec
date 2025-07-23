@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { deliveryStatuses, calculateProgress } from '../helpers/deliveryHelpers';
 import { 
     FaCreditCard, 
     FaUndo, 
@@ -11,19 +12,25 @@ import {
     FaTimesCircle, 
     FaClock,
     FaSyncAlt,
-    FaFileInvoiceDollar
+    FaFileInvoiceDollar,
+    FaTruck 
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import SummaryApi from '../common';
+import DeliveryManagement from '../components/admin/DeliveryManagement';
+
 
 const BancardTransactions = () => {
     const [transactions, setTransactions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showRollbackModal, setShowRollbackModal] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+    const [selectedDeliveryTransaction, setSelectedDeliveryTransaction] = useState(null);
     const [rollbackReason, setRollbackReason] = useState('');
     const [filters, setFilters] = useState({
         status: '',
+        delivery_status: '',
         startDate: '',
         endDate: '',
         search: ''
@@ -348,6 +355,24 @@ const BancardTransactions = () => {
                             <option value="rolled_back">Reversado</option>
                             <option value="failed">Fallido</option>
                         </select>
+                        </div>
+                         <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Estado de Entrega
+                        </label>
+                        <select
+                            name="delivery_status"
+                            value={filters.delivery_status}
+                            onChange={handleFilterChange}
+                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                        >
+                            <option value="">Todos los delivery</option>
+                            <option value="payment_confirmed">✅ Pago Confirmado</option>
+                            <option value="preparing_order">📦 Preparando</option>
+                            <option value="in_transit">🚚 En Camino</option>
+                            <option value="delivered">📍 Entregado</option>
+                            <option value="problem">⚠️ Problema</option>
+                        </select>
                     </div>
 
                     <div>
@@ -428,6 +453,7 @@ const BancardTransactions = () => {
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Productos</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Delivery</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Fecha</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Venta</th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
@@ -511,17 +537,25 @@ const BancardTransactions = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <div className="flex items-center justify-center">
-                                                {getStatusIcon(transaction.status)}
-                                                <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
-                                                    {getStatusLabel(transaction.status)}
+                                            <div className="flex flex-col items-center">
+                                                <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full`} 
+                                                      style={{backgroundColor: deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.bgColor}}>
+                                                    <span className="mr-1">{deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.icon}</span>
+                                                    <span style={{color: deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.color}}>
+                                                        {deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.title}
+                                                    </span>
                                                 </span>
-                                            </div>
-                                            {transaction.authorization_number && (
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    Auth: {transaction.authorization_number}
+                                                {transaction.tracking_number && (
+                                                    <div className="text-xs text-blue-600 mt-1">
+                                                        📦 {transaction.tracking_number}
+                                                    </div>
+                                                )}
+                                                <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                                                    <div className="bg-blue-600 h-1 rounded-full transition-all duration-300" 
+                                                         style={{width: `${calculateProgress(transaction.delivery_status || 'payment_confirmed')}%`}}>
+                                                    </div>
                                                 </div>
-                                            )}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 text-center text-sm text-gray-600">
                                             <div>{formatDate(transaction.transaction_date)}</div>
@@ -553,6 +587,16 @@ const BancardTransactions = () => {
                                                     title="Consultar estado"
                                                 >
                                                     <FaEye />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedDeliveryTransaction(transaction);
+                                                        setShowDeliveryModal(true);
+                                                    }}
+                                                    className="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 p-2 rounded-md transition-all duration-200"
+                                                    title="Gestionar delivery"
+                                                >
+                                                    <FaTruck className="text-sm" />
                                                 </button>
                                                 <button
                                                     onClick={() => {
@@ -852,6 +896,16 @@ const BancardTransactions = () => {
                         </div>
                     </div>
                 </div>
+            )}
+             {showDeliveryModal && selectedDeliveryTransaction && (
+                <DeliveryManagement
+                    transaction={selectedDeliveryTransaction}
+                    onClose={() => {
+                        setShowDeliveryModal(false);
+                        setSelectedDeliveryTransaction(null);
+                    }}
+                    onUpdate={fetchTransactions}
+                />
             )}
         </div>
     );

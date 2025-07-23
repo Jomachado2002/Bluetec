@@ -1121,6 +1121,71 @@ router.get("/bancard/redirect/cancel", (req, res) => {
         const errorUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/pago-cancelado?error=redirect_error&details=${encodeURIComponent(error.message)}`;
         res.redirect(302, errorUrl);
     }
+    
+});
+// ✅ IMPORTAR CONTROLADOR DE DELIVERY
+const {
+    updateDeliveryStatusController,
+    getDeliveryProgressController,
+    getDeliveryStatsController,
+    addDeliveryAttemptController,
+    rateDeliveryController,
+    sendManualNotificationController
+} = require('../controller/bancard/bancardDeliveryController');
+
+// ✅ IMPORTAR SERVICIO DE EMAIL
+const emailService = require('../services/emailService');
+
+// ===========================================
+// ✅ NUEVAS RUTAS DE DELIVERY SYSTEM
+// ===========================================
+
+// ✅ GESTIÓN DE DELIVERY PARA ADMIN
+router.put("/bancard/transactions/:transactionId/delivery-status", authToken, updateDeliveryStatusController);
+router.get("/bancard/transactions/:transactionId/delivery-progress", authToken, getDeliveryProgressController);
+router.get("/bancard/delivery/stats", authToken, getDeliveryStatsController);
+router.post("/bancard/transactions/:transactionId/delivery-attempt", authToken, addDeliveryAttemptController);
+router.post("/bancard/transactions/:transactionId/manual-notification", authToken, sendManualNotificationController);
+
+// ✅ CALIFICACIÓN DE PEDIDOS PARA USUARIOS
+router.post("/bancard/transactions/:transactionId/rate", authToken, rateDeliveryController);
+
+// ✅ ENDPOINT PARA VERIFICAR CONFIGURACIÓN DE EMAIL
+router.get("/bancard/email/verify", authToken, async (req, res) => {
+    try {
+        const uploadProductPermission = require('../helpers/permission');
+        const hasPermission = await uploadProductPermission(req.userId);
+        if (!hasPermission) {
+            return res.status(403).json({
+                message: "Permiso denegado",
+                success: false,
+                error: true
+            });
+        }
+
+        const isValid = await emailService.verifyEmailConfig();
+        
+        res.json({
+            message: "Verificación de configuración de email",
+            success: true,
+            error: false,
+            data: {
+                email_configured: isValid,
+                email_user: process.env.EMAIL_USER ? 'Configurado' : 'No configurado',
+                email_pass: process.env.EMAIL_PASS ? 'Configurado' : 'No configurado',
+                smtp_ready: isValid
+            }
+        });
+
+    } catch (error) {
+        console.error("❌ Error verificando email:", error);
+        res.status(500).json({
+            message: "Error al verificar configuración de email",
+            success: false,
+            error: true,
+            details: error.message
+        });
+    }
 });
 
 module.exports = router;

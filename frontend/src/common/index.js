@@ -463,7 +463,29 @@
         
         // También establece un baseURL para uso gaeneral
         baseURL: backendDomain,
-
+            delivery: {
+            updateStatus: {
+                url: `${backendDomain}/api/bancard/transactions`, // + /:transactionId/delivery-status
+                method: 'put'
+            },
+            getProgress: {
+                url: `${backendDomain}/api/bancard/transactions`, // + /:transactionId/delivery-progress
+                method: 'get'
+            },
+            getStats: {
+                url: `${backendDomain}/api/bancard/delivery/stats`,
+                method: 'get'
+            },
+            rateOrder: {
+                url: `${backendDomain}/api/bancard/transactions`, // + /:transactionId/rate
+                method: 'post'
+            },
+            emailTest: {
+                url: `${backendDomain}/api/bancard/email/test`,
+                method: 'post'
+            }
+        },
+        
          location: {
                 reverseGeocode: {
                     url: `${backendDomain}/api/ubicacion/reverse-geocode`,
