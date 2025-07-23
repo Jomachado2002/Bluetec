@@ -416,58 +416,86 @@ const createPaymentController = async (req, res) => {
     is_certification_test: false,
     
     // ✅ DELIVERY_LOCATION corregido
-    delivery_location: delivery_location ? {
-    // Coordenadas (mantener para referencia)
-    lat: parseFloat(delivery_location.lat) || null,
-    lng: parseFloat(delivery_location.lng) || null,
-    
-    // ✅ URL DIRECTA DE GOOGLE MAPS (LO MÁS IMPORTANTE)
-    google_maps_url: delivery_location.lat && delivery_location.lng ? 
-        `https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&t=m&z=18` :
-        delivery_location.google_maps_url || null,
-    
-    // ✅ URL ALTERNATIVA PARA NAVEGACIÓN
-    navigation_url: delivery_location.lat && delivery_location.lng ? 
-        `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
-        null,
-    
-    // Información de la dirección
-    address: delivery_location.address || delivery_location.google_address || '',
-    manual_address: delivery_location.manual_address || '',
-    full_address: delivery_location.full_address || 
-        `${delivery_location.manual_address || delivery_location.address || ''}, ${delivery_location.city || ''}`,
-    
-    // Detalles específicos
-    city: delivery_location.city || '',
-    house_number: delivery_location.house_number || '',
-    reference: delivery_location.reference || '',
-    
-    // Metadatos
-    source: delivery_location.source || 'user_selected',
-    timestamp: new Date(),
-    
-    // ✅ INSTRUCCIONES PARA EL DELIVERY
-    delivery_instructions: `📍 Ubicación exacta: ${delivery_location.address || 'Ver en mapa'}
-📞 Referencia: ${delivery_location.reference || 'Sin referencia adicional'}
-🏠 Casa/Edificio: ${delivery_location.house_number || 'No especificado'}
-🗺️ Ver ubicación: https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&t=m&z=18`,
+            delivery_location: delivery_location ? {
+                // ✅ COORDENADAS EXACTAS
+                lat: parseFloat(delivery_location.lat) || null,
+                lng: parseFloat(delivery_location.lng) || null,
+                
+                // ✅ URLS DE GOOGLE MAPS (LO MÁS IMPORTANTE PARA EL DELIVERY)
+                google_maps_url: delivery_location.google_maps_url || 
+                    (delivery_location.lat && delivery_location.lng ? 
+                        `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
+                        null),
+                
+                google_maps_alternative_url: delivery_location.google_maps_alternative_url ||
+                    (delivery_location.lat && delivery_location.lng ? 
+                        `https://www.google.com/maps/place/${delivery_location.lat},${delivery_location.lng}/@${delivery_location.lat},${delivery_location.lng},17z` :
+                        null),
+                
+                // ✅ URL DIRECTA PARA NAVEGACIÓN
+                navigation_url: delivery_location.lat && delivery_location.lng ? 
+                    `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
+                    delivery_location.navigation_url || null,
+                
+                // ✅ COORDENADAS COMO STRING
+                coordinates_string: delivery_location.coordinates_string ||
+                    (delivery_location.lat && delivery_location.lng ? 
+                        `${delivery_location.lat},${delivery_location.lng}` : null),
+                
+                // ✅ INFORMACIÓN DE LA DIRECCIÓN
+                address: delivery_location.address || delivery_location.google_address || '',
+                manual_address: delivery_location.manual_address || '',
+                full_address: delivery_location.full_address || 
+                    `${delivery_location.manual_address || delivery_location.address || ''}, ${delivery_location.city || ''}`,
+                
+                // ✅ DETALLES ESPECÍFICOS
+                city: delivery_location.city || '',
+                house_number: delivery_location.house_number || '',
+                reference: delivery_location.reference || '',
+                
+                // ✅ METADATOS
+                source: delivery_location.source || 'user_selected',
+                timestamp: new Date(),
+                
+                // ✅ INSTRUCCIONES DETALLADAS PARA EL DELIVERY
+                delivery_instructions: delivery_location.delivery_instructions || 
+                    `📍 UBICACIÓN DE ENTREGA:
+            🏠 Dirección: ${delivery_location.address || delivery_location.manual_address || 'No especificada'}
+            🏘️ Ciudad: ${delivery_location.city || 'No especificada'}
+            🏡 Casa/Edificio: ${delivery_location.house_number || 'No especificado'}
+            📝 Referencia: ${delivery_location.reference || 'Sin referencia adicional'}
 
-} : {
-    // Valores por defecto cuando no hay ubicación
-    lat: null,
-    lng: null,
-    google_maps_url: null,
-    navigation_url: null,
-    address: '',
-    manual_address: '',
-    full_address: '',
-    city: '',
-    house_number: '',
-    reference: '',
-    source: 'not_provided',
-    timestamp: new Date(),
-    delivery_instructions: '⚠️ Ubicación no proporcionada - Contactar al cliente'
-},
+            🗺️ VER UBICACIÓN EN GOOGLE MAPS:
+            ${delivery_location.google_maps_url || 
+            (delivery_location.lat && delivery_location.lng ? 
+                `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
+                'No disponible')}
+
+            🧭 COORDENADAS EXACTAS: ${delivery_location.lat || 'N/A'}, ${delivery_location.lng || 'N/A'}
+
+            📱 Para navegación: ${delivery_location.lat && delivery_location.lng ? 
+                `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
+                'No disponible'}`,
+
+            } : {
+                // ✅ VALORES POR DEFECTO CUANDO NO HAY UBICACIÓN
+                lat: null,
+                lng: null,
+                google_maps_url: null,
+                google_maps_alternative_url: null,
+                navigation_url: null,
+                coordinates_string: null,
+                address: '',
+                manual_address: '',
+                full_address: '',
+                city: '',
+                house_number: '',
+                reference: '',
+                source: 'not_provided',
+                timestamp: new Date(),
+                delivery_instructions: '⚠️ UBICACIÓN NO PROPORCIONADA\n\n📞 IMPORTANTE: Contactar al cliente para coordinar la entrega\n\nDatos de contacto en customer_info'
+            },
+
     
     // CAMPOS DE TRACKING CORREGIDOS
     user_type: finalUserType,

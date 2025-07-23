@@ -24,7 +24,8 @@ import {
     FaPercentage,
     FaInfoCircle,
     FaSpinner,
-    FaMapMarkerAlt
+    FaMapMarkerAlt,
+    FaExternalLinkAlt
 } from 'react-icons/fa';
 import { localCartHelper } from '../helpers/addToCart';
 import { formatIVABreakdown } from '../helpers/taxCalculator';
@@ -384,50 +385,93 @@ const Checkout = () => {
 
     // ✅ FUNCIÓN MEJORADA para capturar datos de tracking con ubicación
     const captureTrackingData = useCallback(() => {
-        return {
-            user_agent: navigator.userAgent,
-            device_type: window.innerWidth < 768 ? 'mobile' : 
-                         window.innerWidth < 1024 ? 'tablet' : 'desktop',
-            referrer_url: document.referrer || 'direct',
-            payment_session_id: sessionStorage.getItem('payment_session') || 
-                                `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            cart_total_items: cartItems.length,
+    return {
+        user_agent: navigator.userAgent,
+        device_type: window.innerWidth < 768 ? 'mobile' : 
+                     window.innerWidth < 1024 ? 'tablet' : 'desktop',
+        referrer_url: document.referrer || 'direct',
+        payment_session_id: sessionStorage.getItem('payment_session') || 
+                            `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        cart_total_items: cartItems.length,
+        
+        // ✅ MEJORAR order_notes CON TODA LA INFORMACIÓN
+        order_notes: JSON.stringify({
+            customerData: formData,
+            needsInvoice: needsInvoice,
+            invoiceData: needsInvoice ? {
+                companyName: formData.companyName,
+                ruc: formData.ruc
+            } : null,
+            location: selectedLocation || null,
+            timestamp: new Date().toISOString()
+        }),
+        
+        delivery_method: 'delivery',
+        invoice_number: `INV-${Date.now()}`,
+        tax_amount: (totalPrice * 0.1).toFixed(2),
+        utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
+        utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
+        utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || '',
+        
+        // ✅ AGREGAR UBICACIÓN COMPLETA EN DELIVERY_LOCATION
+        delivery_location: selectedLocation ? {
+            lat: selectedLocation.lat,
+            lng: selectedLocation.lng,
+            address: selectedLocation.address,
+            manual_address: formData.address,
+            city: formData.city,
+            house_number: formData.houseNumber,
+            reference: formData.reference,
+            source: 'user_selected',
+            google_address: selectedLocation.address,
+            google_maps_url: selectedLocation.google_maps_url,
+            google_maps_alternative_url: selectedLocation.google_maps_alternative_url,
+            coordinates_string: selectedLocation.coordinates_string,
+            navigation_url: `https://www.google.com/maps/dir/?api=1&destination=${selectedLocation.lat},${selectedLocation.lng}`,
+            timestamp: new Date(),
             
-            // ✅ MEJORAR order_notes CON TODA LA INFORMACIÓN
-            order_notes: JSON.stringify({
-                customerData: formData,
-                needsInvoice: needsInvoice,
-                invoiceData: needsInvoice ? {
-                    companyName: formData.companyName,
-                    ruc: formData.ruc
-                } : null,
-                location: selectedLocation || null,
-                timestamp: new Date().toISOString()
-            }),
-            
-            delivery_method: 'delivery',
-            invoice_number: `INV-${Date.now()}`,
-            tax_amount: (totalPrice * 0.1).toFixed(2),
-            utm_source: new URLSearchParams(window.location.search).get('utm_source') || '',
-            utm_medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
-            utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || '',
-            
-            // ✅ AGREGAR UBICACIÓN DIRECTAMENTE EN DELIVERY_LOCATION
-            delivery_location: selectedLocation ? {
-                lat: selectedLocation.lat,
-                lng: selectedLocation.lng,
-                address: selectedLocation.address,
-                manual_address: formData.address,
-                city: formData.city,
-                house_number: formData.houseNumber,
-                reference: formData.reference,
-                source: 'user_selected',
-                google_address: selectedLocation.address,
-                googleMapsUrl: `https://www.google.com/maps?q=${selectedLocation.lat},${selectedLocation.lng}`,
-                timestamp: new Date()
-            } : null
-        };
-    }, [cartItems.length, totalPrice, formData, needsInvoice, selectedLocation]);
+            // ✅ INSTRUCCIONES DETALLADAS PARA EL DELIVERY
+            delivery_instructions: `📍 UBICACIÓN DE ENTREGA:
+📧 Cliente: ${formData.name} (${formData.phone})
+🏠 Dirección: ${formData.address}
+🏘️ Ciudad: ${formData.city}
+🏡 Casa/Edificio: ${formData.houseNumber}
+📝 Referencia: ${formData.reference || 'Sin referencia adicional'}
+
+🗺️ VER UBICACIÓN EN GOOGLE MAPS:
+${selectedLocation.google_maps_url || 'No disponible'}
+
+🧭 COORDENADAS EXACTAS: ${selectedLocation.lat}, ${selectedLocation.lng}
+
+📱 Para navegación: https://www.google.com/maps/dir/?api=1&destination=${selectedLocation.lat},${selectedLocation.lng}`,
+
+            full_address: `${formData.address}, ${formData.city}, Casa ${formData.houseNumber}${formData.reference ? ', ' + formData.reference : ''}`,
+        } : {
+            // Valores por defecto cuando no hay ubicación
+            lat: null,
+            lng: null,
+            google_maps_url: null,
+            google_maps_alternative_url: null,
+            address: formData.address || '',
+            manual_address: formData.address || '',
+            full_address: `${formData.address}, ${formData.city}`,
+            city: formData.city || '',
+            house_number: formData.houseNumber || '',
+            reference: formData.reference || '',
+            source: 'manual_entry',
+            timestamp: new Date(),
+            delivery_instructions: `📍 UBICACIÓN MANUAL (SIN MAPA):
+📧 Cliente: ${formData.name} (${formData.phone})
+🏠 Dirección: ${formData.address}
+🏘️ Ciudad: ${formData.city}
+🏡 Casa/Edificio: ${formData.houseNumber}
+📝 Referencia: ${formData.reference || 'Sin referencia adicional'}
+
+⚠️ NOTA: El cliente no marcó ubicación en el mapa. Contactar para coordinar entrega.`
+        }
+    };
+}, [cartItems.length, totalPrice, formData, needsInvoice, selectedLocation]);
+
 
     const validateForm = () => {
         const newErrors = {};
@@ -448,18 +492,27 @@ const Checkout = () => {
 
     // ✅ Función separada para validar sin causar re-renders
     const isFormValid = () => {
-        const hasRequiredFields = 
-            formData.name.trim() && 
-            formData.phone.trim() && 
-            formData.address.trim() && 
-            formData.city.trim() && 
-            formData.houseNumber.trim();
-        
-        const hasInvoiceData = !needsInvoice || 
-            (formData.companyName.trim() && formData.ruc.trim());
-        
-        return hasRequiredFields && hasInvoiceData && selectedLocation;
-    };
+    const hasRequiredFields = 
+        formData.name.trim() && 
+        formData.phone.trim() && 
+        formData.address.trim() && 
+        formData.city.trim() && 
+        formData.houseNumber.trim();
+    
+    const hasInvoiceData = !needsInvoice || 
+        (formData.companyName.trim() && formData.ruc.trim());
+    
+    const hasLocation = hasValidLocation();
+    
+    console.log('🔍 Validación de formulario:', {
+        hasRequiredFields,
+        hasInvoiceData,
+        hasLocation,
+        selectedLocation
+    });
+    
+    return hasRequiredFields && hasInvoiceData && hasLocation;
+};
 
     // ✅ Función para validar y mostrar errores solo cuando sea necesario
     const validateAndShowErrors = () => {
@@ -469,54 +522,76 @@ const Checkout = () => {
     };
 
     const handleLocationSave = (locationData) => {
-        setSelectedLocation(locationData);
-        setFormData(prev => ({
-            ...prev,
-            address: locationData.address || ''
-        }));
-        setShowLocationSelector(false);
-        toast.success('Ubicación guardada correctamente');
-    };
+    console.log('📍 Ubicación recibida en checkout:', locationData);
+    
+    // ✅ GUARDAR TODOS LOS DATOS DE UBICACIÓN
+    setSelectedLocation({
+        lat: locationData.lat,
+        lng: locationData.lng,
+        address: locationData.address,
+        google_maps_url: locationData.google_maps_url,
+        google_maps_alternative_url: locationData.google_maps_alternative_url,
+        coordinates_string: locationData.coordinates_string,
+        timestamp: locationData.timestamp
+    });
+    
+    // ✅ ACTUALIZAR TAMBIÉN EL CAMPO DE DIRECCIÓN DEL FORMULARIO
+    setFormData(prev => ({
+        ...prev,
+        address: locationData.address || prev.address
+    }));
+    
+    setShowLocationSelector(false);
+    toast.success('📍 Ubicación de entrega confirmada correctamente');
+};
+const hasValidLocation = () => {
+    return selectedLocation && 
+           selectedLocation.lat && 
+           selectedLocation.lng && 
+           selectedLocation.google_maps_url;
+};
 
     // ✅ REEMPLAZAR tu función prepareBancardData actual con esta:
     const prepareBancardData = () => {
-        const baseData = {
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            city: formData.city,
-            address: formData.address,
-            houseNumber: formData.houseNumber,
-            reference: formData.reference,
-            fullAddress: `${formData.address}, ${formData.city}, Casa ${formData.houseNumber}${formData.reference ? ', ' + formData.reference : ''}`
-        };
-
-        // ✅ AGREGAR DATOS DE FACTURACIÓN SI ES NECESARIO
-        if (needsInvoice) {
-            baseData.invoiceData = {
-                needsInvoice: true,
-                companyName: formData.companyName,
-                ruc: formData.ruc
-            };
-        } else {
-            baseData.invoiceData = {
-                needsInvoice: false
-            };
-        }
-
-        // ✅ AGREGAR UBICACIÓN SI EXISTE
-        if (selectedLocation) {
-            baseData.location = {
-                lat: selectedLocation.lat,
-                lng: selectedLocation.lng,
-                address: selectedLocation.address,
-                googleMapsUrl: `https://www.google.com/maps?q=${selectedLocation.lat},${selectedLocation.lng}`,
-                timestamp: new Date().toISOString()
-            };
-        }
-
-        return baseData;
+    const baseData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        city: formData.city,
+        address: formData.address,
+        houseNumber: formData.houseNumber,
+        reference: formData.reference,
+        fullAddress: `${formData.address}, ${formData.city}, Casa ${formData.houseNumber}${formData.reference ? ', ' + formData.reference : ''}`
     };
+
+    // ✅ AGREGAR DATOS DE FACTURACIÓN SI ES NECESARIO
+    if (needsInvoice) {
+        baseData.invoiceData = {
+            needsInvoice: true,
+            companyName: formData.companyName,
+            ruc: formData.ruc
+        };
+    } else {
+        baseData.invoiceData = {
+            needsInvoice: false
+        };
+    }
+
+    // ✅ AGREGAR UBICACIÓN COMPLETA SI EXISTE
+    if (selectedLocation) {
+        baseData.location = {
+            lat: selectedLocation.lat,
+            lng: selectedLocation.lng,
+            address: selectedLocation.address,
+            google_maps_url: selectedLocation.google_maps_url,
+            google_maps_alternative_url: selectedLocation.google_maps_alternative_url,
+            coordinates_string: selectedLocation.coordinates_string,
+            timestamp: selectedLocation.timestamp || new Date().toISOString()
+        };
+    }
+
+    return baseData;
+};
 
     const handlePaymentSuccess = (paymentData) => {
         console.log('Pago exitoso desde checkout:', paymentData);
@@ -888,67 +963,87 @@ const Checkout = () => {
 
                                     {/* ✅ MAPA PARA TODOS LOS USUARIOS - FUERA DEL IF/ELSE */}
                                     <div className="mt-6">
-                                        <label className="block text-sm font-semibold text-gray-700 mb-3">
-                                            <FaMapMarkerAlt className="inline mr-2" />
-                                            Ubicación en el mapa
-                                        </label>
-                                        
-                                        {selectedLocation ? (
-                                            <div className="border-2 border-green-200 rounded-xl p-6 bg-gradient-to-r from-green-50 to-emerald-50">
-                                                <div className="flex items-start gap-4">
-                                                    <div className="p-3 bg-green-100 rounded-full">
-                                                        <FaMapMarkerAlt className="text-green-600 text-xl" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h4 className="font-semibold text-green-900 mb-2">Ubicación confirmada</h4>
-                                                        <p className="text-green-800 mb-3">{selectedLocation.address}</p>
-                                                        <div className="flex gap-3">
-                                                            <button
-                                                                onClick={() => setShowLocationSelector(true)}
-                                                                className="px-4 py-2 text-green-700 bg-green-100 hover:bg-green-200 rounded-lg 
-                                                                         font-medium transition-colors"
-                                                            >
-                                                                Cambiar ubicación
-                                                            </button>
-                                                            <div className="text-xs text-green-600 flex items-center gap-1">
-                                                                <span>Coordenadas: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}</span>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                                <FaMapMarkerAlt className="inline mr-2" />
+                                                Ubicación en el mapa *
+                                            </label>
+                                            
+                                            {selectedLocation ? (
+                                                <div className="border-2 border-green-200 rounded-xl p-6 bg-gradient-to-r from-green-50 to-emerald-50">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="p-3 bg-green-100 rounded-full">
+                                                            <FaMapMarkerAlt className="text-green-600 text-xl" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <h4 className="font-semibold text-green-900 mb-2">📍 Ubicación de entrega confirmada</h4>
+                                                            <p className="text-green-800 mb-3 font-medium">{selectedLocation.address}</p>
+                                                            
+                                                            {/* ✅ MOSTRAR URL DE GOOGLE MAPS */}
+                                                            {selectedLocation.google_maps_url && (
+                                                                <div className="mb-3">
+                                                                    <a
+                                                                        href={selectedLocation.google_maps_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium bg-blue-100 px-3 py-2 rounded-lg hover:bg-blue-200 transition-colors"
+                                                                    >
+                                                                        <FaExternalLinkAlt />
+                                                                        Ver en Google Maps
+                                                                    </a>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <div className="flex gap-3 items-center mb-4">
+                                                                <div className="text-xs text-green-600 font-mono bg-green-100 px-3 py-1 rounded-full">
+                                                                    📍 {selectedLocation.lat?.toFixed(6)}, {selectedLocation.lng?.toFixed(6)}
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => setShowLocationSelector(true)}
+                                                                    className="px-4 py-2 text-green-700 bg-green-100 hover:bg-green-200 rounded-lg 
+                                                                            font-medium transition-colors text-sm"
+                                                                >
+                                                                    Cambiar ubicación
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => setShowLocationSelector(true)}
-                                                className="w-full border-2 border-dashed border-blue-300 rounded-xl p-8 
-                                                         hover:border-blue-500 hover:bg-blue-50 transition-all group"
-                                            >
-                                                <div className="text-center">
-                                                    <div className="p-4 bg-blue-100 rounded-full w-fit mx-auto mb-4 group-hover:bg-blue-200 transition-colors">
-                                                        <FaMapMarkerAlt className="text-3xl text-blue-600" />
-                                                    </div>
-                                                    <h4 className="text-xl font-semibold text-gray-900 mb-2">Marcar ubicación en el mapa</h4>
-                                                    <p className="text-gray-600">Selecciona tu ubicación exacta para un envío preciso</p>
-                                                    <div className="mt-4 inline-flex items-center gap-2 text-blue-600 font-medium">
-                                                        <span>Abrir mapa</span>
-                                                        <FaMapMarkerAlt />
-                                                    </div>
+                                            ) : (
+                                                <div className="border-2 border-red-200 bg-red-50 rounded-xl p-6">
+                                                    <button
+                                                        onClick={() => setShowLocationSelector(true)}
+                                                        className="w-full border-2 border-dashed border-red-300 rounded-xl p-8 
+                                                                hover:border-red-500 hover:bg-red-100 transition-all group"
+                                                    >
+                                                        <div className="text-center">
+                                                            <div className="p-4 bg-red-100 rounded-full w-fit mx-auto mb-4 group-hover:bg-red-200 transition-colors">
+                                                                <FaMapMarkerAlt className="text-3xl text-red-600" />
+                                                            </div>
+                                                            <h4 className="text-xl font-semibold text-red-900 mb-2">⚠️ Ubicación requerida</h4>
+                                                            <p className="text-red-700 mb-4">
+                                                                Es obligatorio marcar tu ubicación en el mapa para poder procesar el envío
+                                                            </p>
+                                                            <div className="inline-flex items-center gap-2 text-red-600 font-medium">
+                                                                <span>Abrir mapa y marcar ubicación</span>
+                                                                <FaMapMarkerAlt />
+                                                            </div>
+                                                        </div>
+                                                    </button>
                                                 </div>
-                                            </button>
-                                        )}
+                                            )}
 
-                                        {showLocationSelector && (
-                                            <div className="mt-6">
-                                                <SimpleLocationSelector
-                                                    initialLocation={selectedLocation}
-                                                    onLocationSave={handleLocationSave}
-                                                    isUserLoggedIn={isLoggedIn}
-                                                    title="Seleccionar Dirección de Entrega"
-                                                    onClose={() => setShowLocationSelector(false)}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
+                                            {showLocationSelector && (
+                                                <div className="mt-6">
+                                                    <SimpleLocationSelector
+                                                        initialLocation={selectedLocation}
+                                                        onLocationSave={handleLocationSave}
+                                                        isUserLoggedIn={isLoggedIn}
+                                                        title="Marcar Dirección de Entrega"
+                                                        onClose={() => setShowLocationSelector(false)}
+                                                    />
+                                                </div>
+                                            )}
+                                </div>
                                 </div>
 
                                 {/* Facturación */}
@@ -1028,11 +1123,15 @@ const Checkout = () => {
                                 <div className="flex justify-end">
                                     <button
                                         onClick={() => {
-                                            if (validateAndShowErrors() && selectedLocation) {
+                                            if (validateAndShowErrors() && hasValidLocation()) {
                                                 setCurrentStep(2);
                                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                                             } else {
-                                                toast.error('Completa todos los campos obligatorios');
+                                                if (!hasValidLocation()) {
+                                                    toast.error('Por favor marca tu ubicación en el mapa');
+                                                } else {
+                                                    toast.error('Completa todos los campos obligatorios');
+                                                }
                                             }
                                         }}
                                         disabled={!isFormValid()}

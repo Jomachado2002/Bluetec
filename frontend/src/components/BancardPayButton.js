@@ -280,7 +280,7 @@ const BancardPayButton = ({
   };
 
   // ✅ PROCESAR PAGO DIRECTO - UNA SOLA FUNCIÓN
-  const processPaymentDirect = async () => {
+ const processPaymentDirect = async () => {
     // ✅ VALIDACIONES BÁSICAS
     if (cartItems.length === 0) {
         onPaymentError(new Error('No hay productos en el carrito'));
@@ -306,7 +306,8 @@ const BancardPayButton = ({
         console.log('🔗 Configuración de pago:', {
             backendUrl,
             totalAmount,
-            customerData
+            customerData,
+            hasLocation: !!customerData.location
         });
         
         if (!backendUrl) {
@@ -316,7 +317,7 @@ const BancardPayButton = ({
         // ✅ CAPTURAR DATOS DE TRACKING
         const trackingData = captureTrackingData();
 
-        // ✅ PREPARAR DATOS PARA BACKEND
+        // ✅ PREPARAR DATOS PARA BACKEND CON UBICACIÓN COMPLETA
         const paymentRequest = {
             amount: totalAmount.toFixed(2),
             currency: 'PYG',
@@ -325,7 +326,15 @@ const BancardPayButton = ({
                 name: customerData.name || '',
                 email: customerData.email || '',
                 phone: customerData.phone || '',
-                address: customerData.address || ''
+                city: customerData.city || '',
+                address: customerData.address || '',
+                houseNumber: customerData.houseNumber || '',
+                reference: customerData.reference || '',
+                fullAddress: customerData.fullAddress || `${customerData.address}, ${customerData.city}`,
+                // ✅ AGREGAR DATOS DE FACTURACIÓN
+                invoiceData: customerData.invoiceData || { needsInvoice: false },
+                // ✅ AGREGAR UBICACIÓN DEL MAPA
+                location: customerData.location || null
             },
             items: cartItems.map(item => ({
                 product_id: item.productId?._id || item._id,
@@ -338,6 +347,37 @@ const BancardPayButton = ({
                 brand: item.productId?.brandName || ''
             })),
             
+            // ✅ AGREGAR DELIVERY_LOCATION COMPLETO
+            delivery_location: customerData.location ? {
+                lat: customerData.location.lat,
+                lng: customerData.location.lng,
+                address: customerData.location.address,
+                google_maps_url: customerData.location.google_maps_url,
+                google_maps_alternative_url: customerData.location.google_maps_alternative_url,
+                coordinates_string: customerData.location.coordinates_string,
+                manual_address: customerData.address,
+                city: customerData.city,
+                house_number: customerData.houseNumber,
+                reference: customerData.reference,
+                source: 'user_selected',
+                timestamp: new Date(),
+                full_address: customerData.fullAddress || `${customerData.address}, ${customerData.city}`,
+                navigation_url: `https://www.google.com/maps/dir/?api=1&destination=${customerData.location.lat},${customerData.location.lng}`,
+                delivery_instructions: `📍 UBICACIÓN DE ENTREGA:
+📧 Cliente: ${customerData.name} (${customerData.phone})
+🏠 Dirección: ${customerData.address}
+🏘️ Ciudad: ${customerData.city}
+🏡 Casa/Edificio: ${customerData.houseNumber}
+📝 Referencia: ${customerData.reference || 'Sin referencia adicional'}
+
+🗺️ VER UBICACIÓN EN GOOGLE MAPS:
+${customerData.location.google_maps_url || 'No disponible'}
+
+🧭 COORDENADAS EXACTAS: ${customerData.location.lat}, ${customerData.location.lng}
+
+📱 Para navegación: https://www.google.com/maps/dir/?api=1&destination=${customerData.location.lat},${customerData.location.lng}`
+            } : null,
+            
             // ✅ DATOS DE TRACKING
             user_type: 'GUEST',
             payment_method: 'new_card',
@@ -349,7 +389,7 @@ const BancardPayButton = ({
             cart_total_items: trackingData.cart_total_items,
             referrer_url: trackingData.referrer_url,
             order_notes: String(trackingData.order_notes || ''),
-            delivery_method: trackingData.delivery_method,
+            delivery_method: 'delivery', // ✅ CAMBIAR A delivery
             invoice_number: trackingData.invoice_number,
             tax_amount: trackingData.tax_amount,
             utm_source: trackingData.utm_source,
@@ -357,7 +397,15 @@ const BancardPayButton = ({
             utm_campaign: trackingData.utm_campaign
         };
 
-        console.log('📤 Enviando solicitud de pago:', paymentRequest);
+        console.log('📤 Enviando solicitud de pago CON UBICACIÓN:', {
+            ...paymentRequest,
+            delivery_location: paymentRequest.delivery_location ? {
+                lat: paymentRequest.delivery_location.lat,
+                lng: paymentRequest.delivery_location.lng,
+                google_maps_url: paymentRequest.delivery_location.google_maps_url,
+                hasCoordinates: !!(paymentRequest.delivery_location.lat && paymentRequest.delivery_location.lng)
+            } : 'SIN UBICACIÓN'
+        });
 
         const response = await fetch(`${backendUrl}/api/bancard/create-payment`, {
             method: 'POST',
@@ -399,6 +447,7 @@ const BancardPayButton = ({
                 process_id: result.data.process_id,
                 amount: totalAmount,
                 customer: customerData,
+                location: customerData.location, // ✅ GUARDAR UBICACIÓN EN SESIÓN
                 timestamp: Date.now()
             }));
             
@@ -425,7 +474,7 @@ const BancardPayButton = ({
         
         onPaymentError(new Error(userMessage));
     }
-  };
+};
 
   // ✅ CERRAR IFRAME
   const closeIframe = () => {
