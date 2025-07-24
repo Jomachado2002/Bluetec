@@ -82,10 +82,19 @@ const fetchDataFromServer = async () => {
     try {
         console.log('🔄 Cargando productos destacados desde servidor');
         const response = await fetch(SummaryApi.allProduct.url, {
-            method: SummaryApi.allProduct.method,
-            credentials: 'include'
-            });
-        const responseData = await response.json();
+    method: SummaryApi.allProduct.method,
+    credentials: 'include'
+});
+
+const contentType = response.headers.get("content-type");
+if (!response.ok || !contentType || !contentType.includes("application/json")) {
+    const errorText = await response.text();
+    console.error("❌ Error al obtener productos (no JSON):", errorText);
+    throw new Error("Respuesta no válida o no es JSON");
+}
+
+const responseData = await response.json();
+
         
         if (responseData.success) {
             const allProducts = responseData.data || [];

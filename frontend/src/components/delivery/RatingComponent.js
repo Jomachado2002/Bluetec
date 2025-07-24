@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { FaStar, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import StatusBadge from '../common/StatusBadge';
+
 
 const RatingComponent = ({ transaction, onClose, onRated }) => {
   const [rating, setRating] = useState(0);
@@ -70,15 +72,27 @@ const RatingComponent = ({ transaction, onClose, onRated }) => {
 
         <div className="p-6">
           {/* Info del Pedido */}
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <h3 className="font-medium text-gray-800 mb-2">📦 Pedido #{transaction.shop_process_id}</h3>
-            <p className="text-sm text-gray-600">
-              Total: {new Intl.NumberFormat('es-PY', { style: 'currency', currency: 'PYG' }).format(transaction.amount)}
-            </p>
-            <p className="text-sm text-gray-600">
-              Productos: {transaction.items?.length || 0} item(s)
-            </p>
-          </div>
+         <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-green-900">📦 Pedido #{transaction.shop_process_id}</h3>
+                <StatusBadge transaction={transaction} size="xs" />
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <span className="text-green-700 font-medium">Total:</span>
+                    <p className="font-bold text-green-900">
+                        {new Intl.NumberFormat('es-PY', { style: 'currency', currency: 'PYG' }).format(transaction.amount)}
+                    </p>
+                </div>
+                <div>
+                    <span className="text-green-700 font-medium">Productos:</span>
+                    <p className="font-bold text-green-900">{transaction.items?.length || 0} item(s)</p>
+                </div>
+            </div>
+            <div className="mt-3 text-xs text-green-600">
+                ✅ Pedido entregado exitosamente
+            </div>
+        </div>
 
           <form onSubmit={handleSubmit}>
             {/* Rating con Estrellas */}

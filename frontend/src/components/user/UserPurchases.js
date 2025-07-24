@@ -1,5 +1,6 @@
 // frontend/src/components/user/UserPurchases.js
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   FaShoppingBag, 
   FaEye, 
@@ -13,6 +14,10 @@ import {
 } from 'react-icons/fa';
 import displayPYGCurrency from '../../helpers/displayCurrency';
 import { deliveryStatuses, calculateProgress, formatDeliveryDate } from '../../helpers/deliveryHelpers';
+import { getTransactionDisplayStatus, getStatusBadgeClass, getStatusIcon, getStatusTitle, canManageDelivery } from '../../helpers/transactionStatusHelper';
+import StatusBadge, { StatusWithProgress, StatusHistory } from '../common/StatusBadge';
+import OrderActionButtons from '../order/OrderActionButtons';
+import OrderSearchAndFilters from '../order/OrderSearchAndFilters';
 import DeliveryProgress from '../delivery/DeliveryProgress';
 import RatingComponent from '../delivery/RatingComponent';
 
@@ -106,16 +111,16 @@ const UserPurchases = ({ user }) => {
     }
   };
 
-  const getStatusIcon = (status) => {
+ const getPaymentStatusIcon = (status) => {
     switch (status) {
-      case 'approved': return <FaCheckCircle className="text-green-500" />;
-      case 'rejected': return <FaTimesCircle className="text-red-500" />;
-      case 'rolled_back': return <FaUndo className="text-orange-500" />;
-      case 'pending': return <FaClock className="text-yellow-500" />;
-      case 'failed': return <FaExclamationTriangle className="text-red-500" />;
-      default: return <FaClock className="text-gray-500" />;
+        case 'approved': return <FaCheckCircle className="text-green-500" />;
+        case 'rejected': return <FaTimesCircle className="text-red-500" />;
+        case 'rolled_back': return <FaUndo className="text-orange-500" />;
+        case 'pending': return <FaClock className="text-yellow-500" />;
+        case 'failed': return <FaExclamationTriangle className="text-red-500" />;
+        default: return <FaClock className="text-gray-500" />;
     }
-  };
+};
   const getDeliveryIcon = (deliveryStatus) => {
     const status = deliveryStatuses[deliveryStatus || 'payment_confirmed'];
     return <span style={{color: status.color}}>{status.icon}</span>;
@@ -193,75 +198,14 @@ const UserPurchases = ({ user }) => {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center mb-4">
-          <FaFilter className="mr-2 text-gray-600" />
-          <h3 className="font-medium">Filtrar Compras</h3>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">Estado</label>
-            <select
-              name="status"
-              value={filters.status}
-              onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190]"
-            >
-              <option value="">Todos</option>
-              <option value="approved">Pagado</option>
-              <option value="pending">Pendiente</option>
-              <option value="rejected">Rechazado</option>
-              <option value="rolled_back">Devuelto</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">Método de Pago</label>
-            <select
-              name="paymentMethod"
-              value={filters.paymentMethod}
-              onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190]"
-            >
-              <option value="">Todos</option>
-              <option value="saved_card">Tarjeta Guardada</option>
-              <option value="new_card">Nueva Tarjeta</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">Desde</label>
-            <input
-              type="date"
-              name="startDate"
-              value={filters.startDate}
-              onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">Hasta</label>
-            <input
-              type="date"
-              name="endDate"
-              value={filters.endDate}
-              onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2A3190]"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={resetFilters}
-            className="px-4 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-          >
-            Limpiar Filtros
-          </button>
-        </div>
-      </div>
+      <OrderSearchAndFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          onReset={resetFilters}
+          showExport={false}
+          totalResults={purchases.length}
+          loading={loading}
+      />
 
       {/* Lista de compras */}
       <div className="bg-white rounded-xl shadow-lg p-6">
@@ -283,32 +227,7 @@ const UserPurchases = ({ user }) => {
                       <h3 className="font-semibold text-gray-800">
                         Compra #{purchase.shop_process_id}
                       </h3>
-                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(purchase.status)}
-                          <span className={`text-sm font-medium ${
-                            purchase.status === 'approved' ? 'text-green-600' :
-                            purchase.status === 'rejected' ? 'text-red-600' :
-                            purchase.status === 'rolled_back' ? 'text-orange-600' :
-                            'text-yellow-600'
-                          }`}>
-                            {getStatusLabel(purchase.status)}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-1">
-                          {getDeliveryIcon(purchase.delivery_status)}
-                          <span className="text-sm font-medium" style={{color: deliveryStatuses[purchase.delivery_status || 'payment_confirmed']?.color}}>
-                            {getDeliveryLabel(purchase.delivery_status)}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                        <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
-                             style={{width: `${calculateProgress(purchase.delivery_status || 'payment_confirmed')}%`}}>
-                        </div>
-                      </div>
+                    <StatusWithProgress transaction={purchase} showProgress={true} />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-600">
@@ -347,16 +266,15 @@ const UserPurchases = ({ user }) => {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setSelectedPurchase(purchase);
-                        setShowDetailsModal(true);
-                      }}
-                      className="bg-[#2A3190] text-white px-4 py-2 rounded-lg hover:bg-[#1e236b] transition-colors flex items-center gap-2"
-                    >
-                      <FaEye className="text-sm" />
-                      Ver Detalles
-                    </button>
+                                        <OrderActionButtons
+                        transaction={purchase}
+                        variant="compact"
+                        onRatingClick={() => {
+                            setSelectedRatingPurchase(purchase);
+                            setShowRatingModal(true);
+                        }}
+                        className="min-w-fit"
+                    />
                   </div>
                 </div>
               </div>
@@ -384,14 +302,15 @@ const UserPurchases = ({ user }) => {
             <div className="p-4 overflow-y-auto max-h-96">
               {/* Progress Bar de Delivery */}
                         <div className="mb-6">
-                          <DeliveryProgress
-                            deliveryStatus={selectedPurchase.delivery_status}
-                            timeline={selectedPurchase.delivery_timeline}
-                            estimatedDate={selectedPurchase.estimated_delivery_date}
-                            actualDate={selectedPurchase.actual_delivery_date}
-                            trackingNumber={selectedPurchase.tracking_number}
-                            compact={true}
-                          />
+                            <DeliveryProgress
+                                deliveryStatus={selectedPurchase.delivery_status}
+                                timeline={selectedPurchase.delivery_timeline}
+                                estimatedDate={selectedPurchase.estimated_delivery_date}
+                                actualDate={selectedPurchase.actual_delivery_date}
+                                trackingNumber={selectedPurchase.tracking_number}
+                                compact={true}
+                                transaction={selectedPurchase}
+                            />
                         </div>
               {/* Información de la compra */}
               <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
@@ -413,6 +332,11 @@ const UserPurchases = ({ user }) => {
                   <span className="text-gray-600">📱 Dispositivo:</span>
                   <div className="font-medium capitalize">{selectedPurchase.device_type || 'N/A'}</div>
                 </div>
+              </div>
+              {/* Historial de Estados */}
+              <div className="mb-6">
+                  <h3 className="font-semibold text-gray-800 mb-3">📊 Historial de Estados</h3>
+                  <StatusHistory transaction={selectedPurchase} />
               </div>
               {/* Badge de Estado de Delivery */}
               <div className="flex justify-center mb-4">

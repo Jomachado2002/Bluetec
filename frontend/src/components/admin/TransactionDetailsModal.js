@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { FaTimes, FaUser, FaShoppingCart, FaMapMarkerAlt, FaCreditCard, FaChartLine, FaInfoCircle } from 'react-icons/fa';
 import DeliveryProgress from '../delivery/DeliveryProgress';
 import { formatDeliveryDate } from '../../helpers/deliveryHelpers';
+import { getTransactionDisplayStatus, getStatusBadgeClass, canManageDelivery } from '../../helpers/transactionStatusHelper';
+import { formatCurrencyWithOptions } from '../../helpers/displayCurrency';
 
 const TransactionDetailsModal = ({ transaction, onClose }) => {
   const [activeTab, setActiveTab] = useState('general');
@@ -105,28 +107,55 @@ const TransactionDetailsModal = ({ transaction, onClose }) => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-800 mb-3">💳 Información de Transacción</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Shop Process ID:</span>
-                      <span className="font-medium">{details.shop_process_id}</span>
+                <h3 className="font-semibold text-gray-800 mb-3">💳 Información de Transacción</h3>
+                <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Shop Process ID:</span>
+                        <span className="font-medium text-lg">#{details.shop_process_id}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Bancard Process ID:</span>
-                      <span className="font-medium">{details.bancard_process_id || 'N/A'}</span>
+                        <span className="text-gray-600">Bancard Process ID:</span>
+                        <span className="font-medium font-mono text-xs">{details.bancard_process_id || 'N/A'}</span>
                     </div>
+                    
+                    {/* Estado de Pago Mejorado */}
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Estado de Pago:</span>
+                        <span className={getStatusBadgeClass(details)}>
+                            {details.status === 'approved' ? '✅' : 
+                            details.status === 'rejected' ? '❌' : 
+                            details.status === 'pending' ? '⏳' : '❓'} 
+                            {details.status === 'approved' ? 'Aprobado' :
+                            details.status === 'rejected' ? 'Rechazado' :
+                            details.status === 'pending' ? 'Pendiente' : details.status}
+                        </span>
+                    </div>
+                    
+                    {/* Estado de Delivery solo si está aprobado */}
+                    {canManageDelivery(details) && (
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-600">Estado de Entrega:</span>
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {getTransactionDisplayStatus(details).data.icon} {getTransactionDisplayStatus(details).data.title}
+                            </span>
+                        </div>
+                    )}
+                    
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Estado:</span>
-                      <span className={`font-medium ${details.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
-                        {details.status}
-                      </span>
+                        <span className="text-gray-600">Autorización:</span>
+                        <span className="font-medium font-mono text-xs">{details.authorization_number || 'Pendiente'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Autorización:</span>
-                      <span className="font-medium">{details.authorization_number || 'N/A'}</span>
-                    </div>
-                  </div>
+                    
+                    {/* Información adicional si está rechazado */}
+                    {details.status === 'rejected' && details.response_description && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-2">
+                            <span className="text-red-800 font-medium text-xs">
+                                ❌ Motivo: {details.response_description}
+                            </span>
+                        </div>
+                    )}
                 </div>
+            </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h3 className="font-semibold text-gray-800 mb-3">💰 Información Financiera</h3>
@@ -162,7 +191,8 @@ const TransactionDetailsModal = ({ transaction, onClose }) => {
                 estimatedDate={details.estimated_delivery_date}
                 actualDate={details.actual_delivery_date}
                 trackingNumber={details.tracking_number}
-              />
+                transaction={details}
+            />
             </div>
           )}
 

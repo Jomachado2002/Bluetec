@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveryStatuses, calculateProgress } from '../helpers/deliveryHelpers';
+import { getTransactionDisplayStatus, getStatusBadgeClass, getStatusIcon, getStatusTitle, canManageDelivery, canRollback } from '../helpers/transactionStatusHelper';
+import StatusBadge, { StatusWithProgress } from '../components/common/StatusBadge';
+import { AdminOrderActions } from '../components/order/OrderActionButtons';
+import OrderSearchAndFilters from '../components/order/OrderSearchAndFilters';
+
 import { 
     FaCreditCard, 
     FaUndo, 
@@ -174,16 +179,16 @@ const BancardTransactions = () => {
         }
     };
 
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'approved': return <FaCheckCircle className="text-green-500" />;
-            case 'rejected': return <FaTimesCircle className="text-red-500" />;
-            case 'rolled_back': return <FaUndo className="text-orange-500" />;
-            case 'pending': return <FaClock className="text-yellow-500" />;
-            case 'failed': return <FaExclamationTriangle className="text-red-500" />;
-            default: return <FaClock className="text-gray-500" />;
-        }
-    };
+    const getPaymentStatusIcon = (status) => {
+    switch (status) {
+        case 'approved': return <FaCheckCircle className="text-green-500" />;
+        case 'rejected': return <FaTimesCircle className="text-red-500" />;
+        case 'rolled_back': return <FaUndo className="text-orange-500" />;
+        case 'pending': return <FaClock className="text-yellow-500" />;
+        case 'failed': return <FaExclamationTriangle className="text-red-500" />;
+        default: return <FaClock className="text-gray-500" />;
+    }
+};
 
     const getStatusLabel = (status) => {
         switch (status) {
@@ -306,132 +311,92 @@ const BancardTransactions = () => {
 
     return (
         <div className="container mx-auto p-4">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold flex items-center">
-                    <FaCreditCard className="mr-2 text-blue-600" />
-                    Transacciones Bancard
-                </h1>
-                
-                <div className="flex gap-3">
-                    <button
-                        onClick={testRollbackForCertification}
-                        disabled={isLoading}
-                        className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center disabled:opacity-50"
-                        title="Probar rollback para certificación Bancard"
-                    >
-                        <FaUndo className="mr-2" />
-                        Test Rollback
-                    </button>
-                    
-                    <button
-                        onClick={fetchTransactions}
-                        disabled={isLoading}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center disabled:opacity-50"
-                    >
-                        <FaSyncAlt className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                        Actualizar
-                    </button>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 mb-2">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                    <FaCreditCard className="text-blue-600 text-xl" />
                 </div>
+                Gestión de Transacciones Bancard
+            </h1>
+            <p className="text-gray-600">
+                Panel administrativo para gestionar pagos y entregas
+            </p>
+        </div>
+        
+        <div className="flex flex-wrap gap-3">
+            <button
+                onClick={testRollbackForCertification}
+                disabled={isLoading}
+                className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-red-600 flex items-center disabled:opacity-50 shadow-md hover:shadow-lg transition-all transform hover:scale-105"
+                title="Probar rollback para certificación Bancard"
+            >
+                <FaUndo className="mr-2" />
+                Test Rollback
+            </button>
+            
+            <button
+                onClick={fetchTransactions}
+                disabled={isLoading}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-blue-800 flex items-center disabled:opacity-50 shadow-md hover:shadow-lg transition-all transform hover:scale-105"
+            >
+                <FaSyncAlt className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                {isLoading ? 'Cargando...' : 'Actualizar'}
+            </button>
+            
+            <Link
+                to="/panel-admin/dashboard"
+                className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-2 rounded-lg hover:from-gray-700 hover:to-gray-800 flex items-center shadow-md hover:shadow-lg transition-all"
+            >
+                📊 Dashboard
+            </Link>
+        </div>
+    </div>
+
+    {/* Estadísticas rápidas */}
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-gray-200">
+        <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{pagination.total}</div>
+            <div className="text-sm text-gray-600">Total Transacciones</div>
+        </div>
+        <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">
+                {transactions.filter(t => t.status === 'approved').length}
             </div>
+            <div className="text-sm text-gray-600">Aprobadas</div>
+        </div>
+        <div className="text-center">
+            <div className="text-2xl font-bold text-red-600">
+                {transactions.filter(t => t.status === 'rejected').length}
+            </div>
+            <div className="text-sm text-gray-600">Rechazadas</div>
+        </div>
+        <div className="text-center">
+            <div className="text-2xl font-bold text-yellow-600">
+                {transactions.filter(t => t.status === 'pending').length}
+            </div>
+            <div className="text-sm text-gray-600">Pendientes</div>
+        </div>
+    </div>
+</div>
 
             {/* Filtros */}
-            <div className="bg-white p-4 rounded-lg shadow mb-6">
-                <div className="flex items-center mb-3">
-                    <FaFilter className="mr-2 text-gray-600" />
-                    <h3 className="font-medium">Filtros de Búsqueda</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Estado
-                        </label>
-                        <select
-                            name="status"
-                            value={filters.status}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                        >
-                            <option value="">Todos los estados</option>
-                            <option value="pending">Pendiente</option>
-                            <option value="approved">Aprobado</option>
-                            <option value="rejected">Rechazado</option>
-                            <option value="rolled_back">Reversado</option>
-                            <option value="failed">Fallido</option>
-                        </select>
-                        </div>
-                         <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Estado de Entrega
-                        </label>
-                        <select
-                            name="delivery_status"
-                            value={filters.delivery_status}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                        >
-                            <option value="">Todos los delivery</option>
-                            <option value="payment_confirmed">✅ Pago Confirmado</option>
-                            <option value="preparing_order">📦 Preparando</option>
-                            <option value="in_transit">🚚 En Camino</option>
-                            <option value="delivered">📍 Entregado</option>
-                            <option value="problem">⚠️ Problema</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Fecha Desde
-                        </label>
-                        <input
-                            type="date"
-                            name="startDate"
-                            value={filters.startDate}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Fecha Hasta
-                        </label>
-                        <input
-                            type="date"
-                            name="endDate"
-                            value={filters.endDate}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Búsqueda
-                        </label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                name="search"
-                                value={filters.search}
-                                onChange={handleFilterChange}
-                                placeholder="ID, descripción, cliente..."
-                                className="w-full p-2 pl-8 border border-gray-300 rounded-md text-sm"
-                            />
-                            <FaSearch className="absolute left-2 top-3 text-gray-400 text-sm" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                    <button
-                        onClick={resetFilters}
-                        className="px-4 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm"
-                    >
-                        Limpiar
-                    </button>
-                </div>
-            </div>
+            <OrderSearchAndFilters
+                filters={filters}
+                onFiltersChange={(newFilters) => {
+                    setFilters(newFilters);
+                    setPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                onReset={resetFilters}
+                showExport={true}
+                onExport={() => {
+                    // Funcionalidad de exportar (implementar después)
+                    toast.info('🚀 Funcionalidad de exportar próximamente');
+                }}
+                totalResults={pagination.total}
+                loading={isLoading}
+            />
 
             {/* Tabla de transacciones */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -541,24 +506,16 @@ const BancardTransactions = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full`} 
-                                                      style={{backgroundColor: deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.bgColor}}>
-                                                    <span className="mr-1">{deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.icon}</span>
-                                                    <span style={{color: deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.color}}>
-                                                        {deliveryStatuses[transaction.delivery_status || 'payment_confirmed']?.title}
-                                                    </span>
-                                                </span>
+                                            <StatusBadge transaction={transaction} showBoth={true} size="xs" />
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="flex flex-col items-center min-w-32">
+                                                <StatusWithProgress transaction={transaction} showProgress={true} />
                                                 {transaction.tracking_number && (
-                                                    <div className="text-xs text-blue-600 mt-1">
+                                                    <div className="text-xs text-blue-600 mt-2 bg-blue-50 px-2 py-1 rounded-full">
                                                         📦 {transaction.tracking_number}
                                                     </div>
                                                 )}
-                                                <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
-                                                    <div className="bg-blue-600 h-1 rounded-full transition-all duration-300" 
-                                                         style={{width: `${calculateProgress(transaction.delivery_status || 'payment_confirmed')}%`}}>
-                                                    </div>
-                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center text-sm text-gray-600">
@@ -584,57 +541,33 @@ const BancardTransactions = () => {
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <div className="flex justify-center space-x-2">
-                                               <button
-                                                    onClick={() => {
-                                                        setSelectedDetailsTransaction(transaction);
-                                                        setShowDetailsModal(true);
-                                                    }}
-                                                    className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-2 rounded-md transition-all duration-200"
-                                                    title="Ver detalles completos"
-                                                >
-                                                    <FaEye />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedDeliveryTransaction(transaction);
-                                                        setShowDeliveryModal(true);
-                                                    }}
-                                                    className="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 p-2 rounded-md transition-all duration-200"
-                                                    title="Gestionar delivery"
-                                                >
-                                                    <FaTruck className="text-sm" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedTransaction(transaction);
-                                                        setShowProductModal(true);
-                                                    }}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Ver productos"
-                                                >
-                                                    <FaFileInvoiceDollar />
-                                                </button>
-                                                
-                                                {transaction.status === 'approved' && !transaction.is_rolled_back && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedTransaction(transaction);
-                                                            setShowRollbackModal(true);
-                                                        }}
-                                                        className="text-orange-600 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 p-2 rounded-md transition-all duration-200"
-                                                        title="Reversar transacción"
-                                                    >
-                                                        <FaUndo className="text-sm" />
-                                                    </button>
-                                                )}
-                                                {transaction.is_rolled_back && (
-                                                    <div className="text-xs text-orange-600">
-                                                        <div>Reversado</div>
-                                                        <div>{formatDate(transaction.rollback_date)}</div>
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <AdminOrderActions
+                                                transaction={transaction}
+                                                onDeliveryManage={(trans) => {
+                                                    setSelectedDeliveryTransaction(trans);
+                                                    setShowDeliveryModal(true);
+                                                }}
+                                                onRollback={(trans) => {
+                                                    setSelectedTransaction(trans);
+                                                    setShowRollbackModal(true);
+                                                }}
+                                                onViewDetails={(trans) => {
+                                                    setSelectedDetailsTransaction(trans);
+                                                    setShowDetailsModal(true);
+                                                }}
+                                                onViewProducts={(trans) => {
+                                                    setSelectedTransaction(trans);
+                                                    setShowProductModal(true);
+                                                }}
+                                            />
+                                                                                        
+                                            {/* Información adicional si está rollback */}
+                                            {transaction.is_rolled_back && (
+                                                <div className="text-xs text-orange-600 mt-2 bg-orange-50 px-2 py-1 rounded">
+                                                    <div>Reversado</div>
+                                                    <div>{formatDate(transaction.rollback_date)}</div>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

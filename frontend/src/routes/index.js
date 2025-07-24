@@ -22,6 +22,8 @@ import UserProfilePage from "../pages/UserProfilePage"
 
 // ✅ NUEVA PÁGINA DE CALIFICACIÓN
 import RatingPage from "../pages/RatingPage"
+import OrderDetailsPage from "../pages/OrderDetailsPage"
+
 
 // ✅ PÁGINAS DE BANCARD
 import PaymentSuccess from "../pages/PaymentSuccess"
@@ -120,6 +122,10 @@ const router = createBrowserRouter([
             {
                 path: "calificar-pedido/:shop_process_id",
                 element: <RatingPage />
+            },
+            {
+                path: "pedido/:shop_process_id",
+                element: <OrderDetailsPage />
             },
             
             // ✅ RUTAS PARA BANCARD

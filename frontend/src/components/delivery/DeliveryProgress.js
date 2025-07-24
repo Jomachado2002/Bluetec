@@ -8,8 +8,39 @@ const DeliveryProgress = ({
   estimatedDate = null,
   actualDate = null,
   trackingNumber = null,
-  compact = false 
+  compact = false,
+  transaction = null // NUEVA PROP
 }) => {
+  
+  // ✅ Si la transacción no está aprobada, mostrar mensaje
+  if (transaction && transaction.status !== 'approved') {
+    return (
+      <div className="bg-white border rounded-lg p-4">
+        <div className="text-center py-6">
+          <div className="mb-4">
+            {transaction.status === 'rejected' ? '❌' :
+             transaction.status === 'pending' ? '⏳' : '❓'}
+          </div>
+          <h3 className="font-medium text-gray-800 mb-2">
+            {transaction.status === 'rejected' ? 'Pago Rechazado' :
+             transaction.status === 'pending' ? 'Esperando Confirmación de Pago' :
+             'Pago en Proceso'}
+          </h3>
+          <p className="text-sm text-gray-600">
+            {transaction.status === 'rejected' ? 'No se pudo procesar el pago. Contacta a soporte.' :
+             transaction.status === 'pending' ? 'Tu pago está siendo verificado por Bancard.' :
+             'El estado del pedido se actualizará una vez confirmado el pago.'}
+          </p>
+          {transaction.response_description && (
+            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+              {transaction.response_description}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  
   const statuses = ['payment_confirmed', 'preparing_order', 'in_transit', 'delivered'];
   const currentIndex = statuses.indexOf(deliveryStatus);
   const progress = calculateProgress(deliveryStatus);
@@ -184,5 +215,6 @@ const DeliveryProgress = ({
     </div>
   );
 };
+
 
 export default DeliveryProgress;
