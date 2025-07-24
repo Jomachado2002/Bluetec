@@ -1,4 +1,4 @@
-// frontend/src/routes/index.js - ACTUALIZADO CON PERFIL DE USUARIO
+// frontend/src/routes/index.js - ACTUALIZADO CON PERFIL DE USUARIO Y RATING PAGE
 import { createBrowserRouter } from "react-router-dom"
 import App from "../App"
 import Home from "../pages/Home"
@@ -19,6 +19,9 @@ import Nosotros from "../pages/Nosotros"
 
 // ✅ NUEVA PÁGINA DE PERFIL DE USUARIO
 import UserProfilePage from "../pages/UserProfilePage"
+
+// ✅ NUEVA PÁGINA DE CALIFICACIÓN
+import RatingPage from "../pages/RatingPage"
 
 // ✅ PÁGINAS DE BANCARD
 import PaymentSuccess from "../pages/PaymentSuccess"
@@ -48,8 +51,6 @@ import SaleDetails from "../pages/SaleDetails"
 import PurchaseDetails from "../pages/PurchaseDetails"
 import FinancialDashboard from "../pages/FinancialDashboard"
 import CatastroResult from "../pages/CatastroResult"
-
-// ✅ REMOVIDO: RatingPage import que causaba error
 
 const router = createBrowserRouter([
     {
@@ -113,6 +114,12 @@ const router = createBrowserRouter([
             {
                 path: "mi-perfil",
                 element: <UserProfilePage />
+            },
+            
+            // ✅ NUEVA RUTA PARA CALIFICAR PEDIDO
+            {
+                path: "calificar-pedido/:shop_process_id",
+                element: <RatingPage />
             },
             
             // ✅ RUTAS PARA BANCARD

@@ -13,6 +13,7 @@ import { setUserDetails } from './store/userSlice';
 import { localCartHelper } from './helpers/addToCart'; // Importa el helper
 import MetaPixelTracker from './components/MetaPixelTracker'; // Importa el tracker
 
+
 function App() {
   const dispatch = useDispatch()
   const [cartProductCount, setCartProductCount] = useState(0)

@@ -18,6 +18,8 @@ import {
 import { toast } from 'react-toastify';
 import SummaryApi from '../common';
 import DeliveryManagement from '../components/admin/DeliveryManagement';
+import TransactionDetailsModal from '../components/admin/TransactionDetailsModal';
+
 
 
 const BancardTransactions = () => {
@@ -27,6 +29,8 @@ const BancardTransactions = () => {
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [showDeliveryModal, setShowDeliveryModal] = useState(false);
     const [selectedDeliveryTransaction, setSelectedDeliveryTransaction] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [selectedDetailsTransaction, setSelectedDetailsTransaction] = useState(null);
     const [rollbackReason, setRollbackReason] = useState('');
     const [filters, setFilters] = useState({
         status: '',
@@ -581,10 +585,13 @@ const BancardTransactions = () => {
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex justify-center space-x-2">
-                                                <button
-                                                    onClick={() => checkTransactionStatus(transaction)}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Consultar estado"
+                                               <button
+                                                    onClick={() => {
+                                                        setSelectedDetailsTransaction(transaction);
+                                                        setShowDetailsModal(true);
+                                                    }}
+                                                    className="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-2 rounded-md transition-all duration-200"
+                                                    title="Ver detalles completos"
                                                 >
                                                     <FaEye />
                                                 </button>
@@ -905,6 +912,16 @@ const BancardTransactions = () => {
                         setSelectedDeliveryTransaction(null);
                     }}
                     onUpdate={fetchTransactions}
+                />
+            )}
+            {/* Modal de Detalles Completos */}
+            {showDetailsModal && selectedDetailsTransaction && (
+                <TransactionDetailsModal
+                    transaction={selectedDetailsTransaction}
+                    onClose={() => {
+                        setShowDetailsModal(false);
+                        setSelectedDetailsTransaction(null);
+                    }}
                 />
             )}
         </div>

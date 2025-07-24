@@ -414,7 +414,21 @@ const UserPurchases = ({ user }) => {
                   <div className="font-medium capitalize">{selectedPurchase.device_type || 'N/A'}</div>
                 </div>
               </div>
-
+              {/* Badge de Estado de Delivery */}
+              <div className="flex justify-center mb-4">
+                <span 
+                  className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium"
+                  style={{
+                    backgroundColor: deliveryStatuses[selectedPurchase.delivery_status || 'payment_confirmed']?.bgColor,
+                    color: deliveryStatuses[selectedPurchase.delivery_status || 'payment_confirmed']?.color
+                  }}
+                >
+                  <span className="mr-2 text-lg">
+                    {deliveryStatuses[selectedPurchase.delivery_status || 'payment_confirmed']?.icon}
+                  </span>
+                  {deliveryStatuses[selectedPurchase.delivery_status || 'payment_confirmed']?.title}
+                </span>
+              </div>
               {/* Productos */}
               {selectedPurchase.items && selectedPurchase.items.length > 0 && (
                 <div className="mb-6">
