@@ -6,24 +6,69 @@ import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import scrollTop from '../helpers/scrollTop';
 
-// ✅ COMPONENTE OPTIMIZADO CON SPINNERS - SOLO RECIBE DATOS POR PROPS
+// ✅ COMPONENTE OPTIMIZADO PARA MOBILE
 const VerticalCardProduct = ({ 
   category, 
   subcategory, 
   heading, 
-  products = [],        // ✅ DATOS POR PROPS - NO MÁS QUERIES
-  loading = false       // ✅ LOADING POR PROPS
+  products = [],
+  loading = false
 }) => {
     const [data, setData] = useState([]);
     const [showLeftButton, setShowLeftButton] = useState(false);
     const [showRightButton, setShowRightButton] = useState(true);
     const [hoveredProductId, setHoveredProductId] = useState(null);
     const [hoverTimeout, setHoverTimeout] = useState(null);
-    const [imageLoadingStates, setImageLoadingStates] = useState({}); // ✅ ESTADO PARA SPINNERS
+    const [imageLoadingStates, setImageLoadingStates] = useState({});
+    const [visibleProducts, setVisibleProducts] = useState(new Set()); // ✅ PRODUCTOS VISIBLES
+    const [isMobile, setIsMobile] = useState(false); // ✅ DETECTOR MOBILE
+    
     const loadingList = new Array(6).fill(null);
-
     const scrollElement = useRef();
+    const observerRef = useRef();
     const { fetchUserAddToCart } = useContext(Context);
+
+    // ✅ DETECTAR DISPOSITIVO MOBILE
+    useEffect(() => {
+        const checkMobile = () => {
+            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+                                 || window.innerWidth < 768;
+            setIsMobile(isMobileDevice);
+        };
+        
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // ✅ INTERSECTION OBSERVER PARA LAZY LOADING
+    useEffect(() => {
+        if (!isMobile) return; // Solo en mobile
+        
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const productId = entry.target.dataset.productId;
+                        if (productId) {
+                            setVisibleProducts(prev => new Set([...prev, productId]));
+                        }
+                    }
+                });
+            },
+            {
+                root: scrollElement.current,
+                rootMargin: '50px', // Precargar 50px antes
+                threshold: 0.1
+            }
+        );
+
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        };
+    }, [isMobile, data]);
 
     const handleAddToCart = (e, product) => {
         e.preventDefault();
@@ -31,7 +76,6 @@ const VerticalCardProduct = ({
         fetchUserAddToCart();
     };
 
-    // ✅ MANEJAR ESTADOS DE CARGA DE IMÁGENES
     const handleImageLoad = (productId, imageIndex) => {
         setImageLoadingStates(prev => ({
             ...prev,
@@ -50,30 +94,29 @@ const VerticalCardProduct = ({
         return imageLoadingStates[`${productId}-${imageIndex}`] || false;
     };
 
-    // ✅ SINCRONIZAR CON PROPS - INSTANTÁNEO
+    // ✅ SINCRONIZAR CON PROPS
     useEffect(() => {
         if (products && products.length > 0) {
-            // Aplicar límites inteligentes localmente
             const limits = {
-                'mouses': 12,
-                'teclados': 12,
-                'auriculares': 12,
-                'microfonos': 12,
-                'notebooks': 20,
-                'monitores': 20,
-                'memorias_ram': 20,
-                'discos_duros': 20,
-                'tarjeta_grafica': 20,
-                'gabinetes': 20,
-                'procesador': 20,
-                'placas_madre': 20,
+                'mouses': isMobile ? 5 : 12,         // ✅ SOLO 5 PRODUCTOS EN MOBILE
+                'teclados': isMobile ? 5 : 12,
+                'auriculares': isMobile ? 5 : 12,
+                'microfonos': isMobile ? 5 : 12,
+                'notebooks': isMobile ? 5 : 20,
+                'monitores': isMobile ? 5 : 20,
+                'memorias_ram': isMobile ? 5 : 20,
+                'discos_duros': isMobile ? 5 : 20,
+                'tarjeta_grafica': isMobile ? 5 : 20,
+                'gabinetes': isMobile ? 5 : 20,
+                'procesador': isMobile ? 5 : 20,
+                'placas_madre': isMobile ? 5 : 20,
             };
             
-            const limit = limits[subcategory] || 20;
+            const limit = limits[subcategory] || (isMobile ? 5 : 20);
             const limitedProducts = products.slice(0, limit);
             setData(limitedProducts);
 
-            // ✅ INICIALIZAR ESTADOS DE CARGA PARA NUEVOS PRODUCTOS
+            // ✅ CARGAR IMÁGENES DE TODOS LOS PRODUCTOS (SON POCOS EN MOBILE)
             const newImageStates = {};
             limitedProducts.forEach(product => {
                 if (product?.productImage?.[0]) {
@@ -84,16 +127,19 @@ const VerticalCardProduct = ({
                 }
             });
             setImageLoadingStates(newImageStates);
+
+            // ✅ TODOS LOS PRODUCTOS VISIBLES (SIN LAZY LOADING)
+            setVisibleProducts(new Set(limitedProducts.map(p => p._id)));
         } else {
             setData([]);
             setImageLoadingStates({});
+            setVisibleProducts(new Set());
         }
-    }, [products, subcategory]);
+    }, [products, subcategory, isMobile]);
 
-    // ✅ PRECARGAR IMÁGENES SOLO CUANDO HAY DATOS
+    // ✅ PRELOAD OPTIMIZADO PARA AMBOS DISPOSITIVOS
     useEffect(() => {
         if (data.length > 0) {
-            // Precargar en chunks para no saturar la red
             const preloadInChunks = (products, chunkSize = 3) => {
                 for (let i = 0; i < products.length; i += chunkSize) {
                     setTimeout(() => {
@@ -103,25 +149,43 @@ const VerticalCardProduct = ({
                                 const img1 = new Image();
                                 img1.src = product.productImage[0];
                             }
-                            if (product?.productImage?.[1]) {
+                            if (product?.productImage?.[1] && !isMobile) { // Solo preload segunda imagen en desktop
                                 const img2 = new Image();
                                 img2.src = product.productImage[1];
                             }
                         });
-                    }, i * 100); // 100ms entre chunks
+                    }, i * 50); // Más rápido en mobile
                 }
             };
             
             preloadInChunks(data);
         }
-    }, [data]);
+    }, [data, isMobile]);
+
+    // ✅ OBSERVAR PRODUCTOS PARA LAZY LOADING
+    useEffect(() => {
+        if (!isMobile || !observerRef.current) return;
+
+        const productElements = scrollElement.current?.querySelectorAll('[data-product-id]');
+        productElements?.forEach(el => {
+            observerRef.current.observe(el);
+        });
+
+        return () => {
+            productElements?.forEach(el => {
+                observerRef.current?.unobserve(el);
+            });
+        };
+    }, [data, isMobile]);
 
     const scrollRight = () => {
-        scrollElement.current.scrollBy({ left: 300, behavior: 'smooth' });
+        const scrollAmount = isMobile ? 200 : 300; // ✅ SCROLL MÁS PEQUEÑO EN MOBILE
+        scrollElement.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     };
 
     const scrollLeft = () => {
-        scrollElement.current.scrollBy({ left: -300, behavior: 'smooth' });
+        const scrollAmount = isMobile ? 200 : 300;
+        scrollElement.current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
     };
 
     const checkScrollPosition = () => {
@@ -149,17 +213,26 @@ const VerticalCardProduct = ({
         return null;
     };
 
-    // ✅ COMPONENTE SPINNER PERSONALIZADO
-    const ImageSpinner = () => (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-            <div className="relative">
-                <div className="w-8 h-8 border-4 border-gray-200 border-t-[#002060] rounded-full animate-spin"></div>
-                <div className="absolute inset-0 w-8 h-8 border-4 border-transparent border-r-[#002060] rounded-full animate-pulse"></div>
+    // ✅ COMPONENTE PLACEHOLDER PARA MOBILE
+    const ProductPlaceholder = ({ product }) => (
+        <div 
+            data-product-id={product._id}
+            className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] h-[280px] sm:h-[300px] bg-gray-100 rounded-lg shadow-sm border flex items-center justify-center'
+        >
+            <div className="text-center p-4">
+                <div className="w-8 h-8 border-4 border-gray-300 border-t-[#002060] rounded-full animate-spin mx-auto mb-2"></div>
+                <div className="text-xs text-gray-500">Cargando...</div>
             </div>
         </div>
     );
 
-    // ✅ SI NO HAY PRODUCTOS Y NO ESTÁ CARGANDO, NO RENDERIZAR
+    // ✅ SPINNER OPTIMIZADO
+    const ImageSpinner = () => (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+            <div className="w-6 h-6 border-3 border-gray-200 border-t-[#002060] rounded-full animate-spin"></div>
+        </div>
+    );
+
     if (!loading && data.length === 0) {
         return null;
     }
@@ -183,8 +256,8 @@ const VerticalCardProduct = ({
             )}
 
             <div className='relative group'>
-                {/* Botones de scroll */}
-                {showLeftButton && (
+                {/* Botones de scroll - SOLO DESKTOP */}
+                {!isMobile && showLeftButton && (
                     <button
                         className='absolute left-0 top-1/2 transform -translate-y-1/2 z-10 
                                 bg-white shadow-lg rounded-full p-3 hover:bg-blue-50 
@@ -197,7 +270,7 @@ const VerticalCardProduct = ({
                     </button>
                 )}
                 
-                {showRightButton && (
+                {!isMobile && showRightButton && (
                     <button
                         className='absolute right-0 top-1/2 transform -translate-y-1/2 z-10 
                                 bg-white shadow-lg rounded-full p-3 hover:bg-blue-50 
@@ -213,7 +286,9 @@ const VerticalCardProduct = ({
                 {/* Contenedor de productos */}
                 <div
                     ref={scrollElement}
-                    className='flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth py-4 snap-x'
+                    className={`flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth py-4 snap-x ${
+                        isMobile ? 'snap-mandatory' : ''
+                    }`}
                 >
                     {loading
                         ? loadingList.map((_, index) => (
@@ -231,13 +306,15 @@ const VerticalCardProduct = ({
                             </div>
                         ))
                         : data.map((product) => {
+                            // ✅ SIN LAZY LOADING - TODOS LOS PRODUCTOS SE MUESTRAN DIRECTAMENTE
                             const discount = calculateDiscount(product?.price, product?.sellingPrice);
                             const isHovered = hoveredProductId === product?._id;
                             const secondImage = product.productImage?.[1];
-                            const showSecondImage = isHovered && secondImage;
+                            const showSecondImage = isHovered && secondImage && !isMobile; // ✅ NO HOVER EN MOBILE
                             
-                            // Funciones para manejar hover con delay
                             const handleMouseEnter = () => {
+                                if (isMobile) return; // ✅ NO HOVER EN MOBILE
+                                
                                 if (hoverTimeout) {
                                     clearTimeout(hoverTimeout);
                                 }
@@ -250,6 +327,8 @@ const VerticalCardProduct = ({
                             };
                             
                             const handleMouseLeave = () => {
+                                if (isMobile) return;
+                                
                                 if (hoverTimeout) {
                                     clearTimeout(hoverTimeout);
                                     setHoverTimeout(null);
@@ -265,28 +344,25 @@ const VerticalCardProduct = ({
                                     onMouseEnter={handleMouseEnter}
                                     onMouseLeave={handleMouseLeave}
                                 >
-                                    {/* ✅ IMAGEN DEL PRODUCTO CON SPINNERS */}
+                                    {/* Imagen del producto */}
                                     <div className='h-32 sm:h-36 rounded-t-lg flex items-center justify-center overflow-hidden relative bg-gray-50'>
-                                        {/* ✅ SPINNER PARA IMAGEN PRINCIPAL */}
                                         {isImageLoading(product?._id, 0) && <ImageSpinner />}
                                         
-                                        {/* Imagen principal */}
                                         <img
                                             src={product.productImage[0]}
                                             alt={product.productName}
                                             className={`object-contain h-full w-full transition-all duration-500 ease-in-out ${
                                                 showSecondImage ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
                                             }`}
-                                            loading="lazy"
+                                            loading="lazy" // ✅ LAZY LOADING PARA TODOS
                                             onLoadStart={() => handleImageStart(product?._id, 0)}
                                             onLoad={() => handleImageLoad(product?._id, 0)}
                                             onError={() => handleImageLoad(product?._id, 0)}
                                         />
                                         
-                                        {/* ✅ IMAGEN DE HOVER CON SPINNER */}
-                                        {secondImage && (
+                                        {/* Segunda imagen solo en desktop */}
+                                        {secondImage && !isMobile && (
                                             <>
-                                                {/* Spinner para segunda imagen */}
                                                 {isImageLoading(product?._id, 1) && showSecondImage && <ImageSpinner />}
                                                 
                                                 <img
@@ -303,7 +379,6 @@ const VerticalCardProduct = ({
                                             </>
                                         )}
 
-                                        {/* Badge de descuento */}
                                         {discount && (
                                             <div className="absolute top-2 left-2 z-10">
                                                 <span className='bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm'>
