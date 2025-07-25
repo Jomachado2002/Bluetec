@@ -6,7 +6,7 @@ import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import scrollTop from '../helpers/scrollTop';
 
-// ✅ COMPONENTE OPTIMIZADO - SOLO RECIBE DATOS POR PROPS
+// ✅ COMPONENTE OPTIMIZADO CON SPINNERS - SOLO RECIBE DATOS POR PROPS
 const VerticalCardProduct = ({ 
   category, 
   subcategory, 
@@ -19,6 +19,7 @@ const VerticalCardProduct = ({
     const [showRightButton, setShowRightButton] = useState(true);
     const [hoveredProductId, setHoveredProductId] = useState(null);
     const [hoverTimeout, setHoverTimeout] = useState(null);
+    const [imageLoadingStates, setImageLoadingStates] = useState({}); // ✅ ESTADO PARA SPINNERS
     const loadingList = new Array(6).fill(null);
 
     const scrollElement = useRef();
@@ -28,6 +29,25 @@ const VerticalCardProduct = ({
         e.preventDefault();
         addToCart(e, product);
         fetchUserAddToCart();
+    };
+
+    // ✅ MANEJAR ESTADOS DE CARGA DE IMÁGENES
+    const handleImageLoad = (productId, imageIndex) => {
+        setImageLoadingStates(prev => ({
+            ...prev,
+            [`${productId}-${imageIndex}`]: false
+        }));
+    };
+
+    const handleImageStart = (productId, imageIndex) => {
+        setImageLoadingStates(prev => ({
+            ...prev,
+            [`${productId}-${imageIndex}`]: true
+        }));
+    };
+
+    const isImageLoading = (productId, imageIndex) => {
+        return imageLoadingStates[`${productId}-${imageIndex}`] || false;
     };
 
     // ✅ SINCRONIZAR CON PROPS - INSTANTÁNEO
@@ -52,8 +72,21 @@ const VerticalCardProduct = ({
             const limit = limits[subcategory] || 20;
             const limitedProducts = products.slice(0, limit);
             setData(limitedProducts);
+
+            // ✅ INICIALIZAR ESTADOS DE CARGA PARA NUEVOS PRODUCTOS
+            const newImageStates = {};
+            limitedProducts.forEach(product => {
+                if (product?.productImage?.[0]) {
+                    newImageStates[`${product._id}-0`] = true;
+                }
+                if (product?.productImage?.[1]) {
+                    newImageStates[`${product._id}-1`] = true;
+                }
+            });
+            setImageLoadingStates(newImageStates);
         } else {
             setData([]);
+            setImageLoadingStates({});
         }
     }, [products, subcategory]);
 
@@ -115,6 +148,16 @@ const VerticalCardProduct = ({
         }
         return null;
     };
+
+    // ✅ COMPONENTE SPINNER PERSONALIZADO
+    const ImageSpinner = () => (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="relative">
+                <div className="w-8 h-8 border-4 border-gray-200 border-t-[#002060] rounded-full animate-spin"></div>
+                <div className="absolute inset-0 w-8 h-8 border-4 border-transparent border-r-[#002060] rounded-full animate-pulse"></div>
+            </div>
+        </div>
+    );
 
     // ✅ SI NO HAY PRODUCTOS Y NO ESTÁ CARGANDO, NO RENDERIZAR
     if (!loading && data.length === 0) {
@@ -222,8 +265,11 @@ const VerticalCardProduct = ({
                                     onMouseEnter={handleMouseEnter}
                                     onMouseLeave={handleMouseLeave}
                                 >
-                                    {/* Imagen del producto */}
+                                    {/* ✅ IMAGEN DEL PRODUCTO CON SPINNERS */}
                                     <div className='h-32 sm:h-36 rounded-t-lg flex items-center justify-center overflow-hidden relative bg-gray-50'>
+                                        {/* ✅ SPINNER PARA IMAGEN PRINCIPAL */}
+                                        {isImageLoading(product?._id, 0) && <ImageSpinner />}
+                                        
                                         {/* Imagen principal */}
                                         <img
                                             src={product.productImage[0]}
@@ -232,24 +278,35 @@ const VerticalCardProduct = ({
                                                 showSecondImage ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
                                             }`}
                                             loading="lazy"
+                                            onLoadStart={() => handleImageStart(product?._id, 0)}
+                                            onLoad={() => handleImageLoad(product?._id, 0)}
+                                            onError={() => handleImageLoad(product?._id, 0)}
                                         />
                                         
-                                        {/* Imagen de hover (segunda imagen) */}
+                                        {/* ✅ IMAGEN DE HOVER CON SPINNER */}
                                         {secondImage && (
-                                            <img
-                                                src={secondImage}
-                                                alt={product.productName}
-                                                className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
-                                                    showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
-                                                }`}
-                                                loading="lazy"
-                                            />
+                                            <>
+                                                {/* Spinner para segunda imagen */}
+                                                {isImageLoading(product?._id, 1) && showSecondImage && <ImageSpinner />}
+                                                
+                                                <img
+                                                    src={secondImage}
+                                                    alt={product.productName}
+                                                    className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
+                                                        showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
+                                                    }`}
+                                                    loading="lazy"
+                                                    onLoadStart={() => handleImageStart(product?._id, 1)}
+                                                    onLoad={() => handleImageLoad(product?._id, 1)}
+                                                    onError={() => handleImageLoad(product?._id, 1)}
+                                                />
+                                            </>
                                         )}
 
                                         {/* Badge de descuento */}
                                         {discount && (
-                                            <div className="absolute top-2 left-2">
-                                                <span className='bg-red-500 text-white text-xs font-bold px-2 py-1 rounded'>
+                                            <div className="absolute top-2 left-2 z-10">
+                                                <span className='bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm'>
                                                     -{Math.round(((product?.price - product?.sellingPrice) / product?.price) * 100)}%
                                                 </span>
                                             </div>

@@ -107,7 +107,8 @@ const Home = () => {
         </script>
       </Helmet>
       
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-inter text-gray-800">
+      {/* ✅ FONDO BLANCO SÓLIDO - SIN GRADIENTES VERDES */}
+      <div className="min-h-screen bg-white font-inter text-gray-800">
         {/* Hero Banner con animación */}
         <motion.div 
           initial="hidden"
@@ -115,14 +116,10 @@ const Home = () => {
           variants={fadeIn}
           className="relative bg-white shadow-xl overflow-hidden mt-0 md:mt-4"
         >
-          <div className="absolute inset-0 bg-pattern opacity-10"></div>
+          {/* ✅ ELIMINADOS EFECTOS DECORATIVOS QUE PODRÍAN CAUSAR VERDE */}
           <div className="container mx-auto py-1 sm:py-6 px-4">
             <BannerProduct />
           </div>
-          
-          {/* Elementos decorativos */}
-          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-400 rounded-full opacity-20 blur-xl"></div>
-          <div className="absolute bottom-0 left-1/4 -mb-10 w-32 h-32 bg-blue-300 rounded-full opacity-20 blur-xl"></div>
         </motion.div>
 
         {/* Contenido principal con animaciones */}
@@ -597,10 +594,6 @@ const Home = () => {
               </div>
               
               <div className="relative py-4">
-                {/* Efectos decorativos */}
-                <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-200 rounded-full opacity-20 blur-xl"></div>
-                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-300 rounded-full opacity-20 blur-xl"></div>
-                
                 <BrandCarousel />
               </div>
             </div>
@@ -641,9 +634,6 @@ const Home = () => {
                   </div>
                 </div>
               </div>
-              
-              {/* Elementos decorativos */}
-              <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-blue-300 rounded-full opacity-20 blur-xl"></div>
             </div>
           </motion.section>
         </div>
