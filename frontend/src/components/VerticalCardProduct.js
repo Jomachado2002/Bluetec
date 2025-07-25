@@ -1,6 +1,4 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import fetchCategoryWiseProduct from '../helpers/fetchCategoryWiseProduct';
 import displayPYGCurrency from '../helpers/displayCurrency';
 import { FaAngleLeft, FaAngleRight, FaShoppingCart } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
@@ -8,9 +6,15 @@ import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import scrollTop from '../helpers/scrollTop';
 
-const VerticalCardProduct = ({ category, subcategory, heading }) => {
+// ✅ COMPONENTE OPTIMIZADO - SOLO RECIBE DATOS POR PROPS
+const VerticalCardProduct = ({ 
+  category, 
+  subcategory, 
+  heading, 
+  products = [],        // ✅ DATOS POR PROPS - NO MÁS QUERIES
+  loading = false       // ✅ LOADING POR PROPS
+}) => {
     const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [showLeftButton, setShowLeftButton] = useState(false);
     const [showRightButton, setShowRightButton] = useState(true);
     const [hoveredProductId, setHoveredProductId] = useState(null);
@@ -18,7 +22,6 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
     const loadingList = new Array(6).fill(null);
 
     const scrollElement = useRef();
-
     const { fetchUserAddToCart } = useContext(Context);
 
     const handleAddToCart = (e, product) => {
@@ -27,80 +30,58 @@ const VerticalCardProduct = ({ category, subcategory, heading }) => {
         fetchUserAddToCart();
     };
 
-    // ✅ QUERY CON CACHÉ Y LÍMITES INTELIGENTES
-const { data: queryData, isLoading: queryLoading } = useQuery({
-    queryKey: ['category-products', category, subcategory],
-    queryFn: async () => {
-        const categoryProduct = await fetchCategoryWiseProduct(category, subcategory);
-        let products = categoryProduct?.data || [];
-        
-        // Filtrar productos sin stock
-        products = products.filter(product => 
-            product?.stock === undefined || product?.stock === null || product?.stock > 0
-        );
-        
-        // 🚀 LÍMITES INTELIGENTES POR CATEGORÍA
-        const limits = {
-            // Categorías pequeñas
-            'mouses': 12,
-            'teclados': 12,
-            'auriculares': 12,
-            'microfonos': 12,
-            // Categorías medianas  
-            'notebooks': 20,
-            'monitores': 20,
-            'memorias_ram': 20,
-            'discos_duros': 20,
-            'tarjeta_grafica': 20,
-            'gabinetes': 20,
-            'procesador': 20,
-            'placas_madre': 20,
-            // Por defecto
-            'default': 20
-        };
-        
-        const limit = limits[subcategory] || limits['default'];
-        
-        // Aplicar límite
-        if (products.length > limit) {
-            products = products.slice(0, limit);
+    // ✅ SINCRONIZAR CON PROPS - INSTANTÁNEO
+    useEffect(() => {
+        if (products && products.length > 0) {
+            // Aplicar límites inteligentes localmente
+            const limits = {
+                'mouses': 12,
+                'teclados': 12,
+                'auriculares': 12,
+                'microfonos': 12,
+                'notebooks': 20,
+                'monitores': 20,
+                'memorias_ram': 20,
+                'discos_duros': 20,
+                'tarjeta_grafica': 20,
+                'gabinetes': 20,
+                'procesador': 20,
+                'placas_madre': 20,
+            };
+            
+            const limit = limits[subcategory] || 20;
+            const limitedProducts = products.slice(0, limit);
+            setData(limitedProducts);
+        } else {
+            setData([]);
         }
-        
-        return products;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    cacheTime: 10 * 60 * 1000, // 10 minutos
-    retry: 1,
-    refetchOnWindowFocus: false,
-});
+    }, [products, subcategory]);
 
-// Sincronizar con estado local
-useEffect(() => {
-    if (queryData) {
-        setData(queryData);
-    }
-    setLoading(queryLoading);
-}, [queryData, queryLoading]);
-    // Precargar todas las imágenes cuando se cargan los datos
+    // ✅ PRECARGAR IMÁGENES SOLO CUANDO HAY DATOS
     useEffect(() => {
         if (data.length > 0) {
+            // Precargar en chunks para no saturar la red
+            const preloadInChunks = (products, chunkSize = 3) => {
+                for (let i = 0; i < products.length; i += chunkSize) {
+                    setTimeout(() => {
+                        const chunk = products.slice(i, i + chunkSize);
+                        chunk.forEach(product => {
+                            if (product?.productImage?.[0]) {
+                                const img1 = new Image();
+                                img1.src = product.productImage[0];
+                            }
+                            if (product?.productImage?.[1]) {
+                                const img2 = new Image();
+                                img2.src = product.productImage[1];
+                            }
+                        });
+                    }, i * 100); // 100ms entre chunks
+                }
+            };
             
-            data.forEach(product => {
-                // Precargar primera imagen
-                if (product?.productImage?.[0]) {
-                    const img1 = new Image();
-                    img1.src = product.productImage[0];
-                }
-                // Precargar segunda imagen si existe
-                if (product?.productImage?.[1]) {
-                    const img2 = new Image();
-                    img2.src = product.productImage[1];
-                }
-            });
+            preloadInChunks(data);
         }
     }, [data]);
-
-  
 
     const scrollRight = () => {
         scrollElement.current.scrollBy({ left: 300, behavior: 'smooth' });
@@ -135,7 +116,7 @@ useEffect(() => {
         return null;
     };
 
-    // Si no hay datos y terminó de cargar, no renderizar nada
+    // ✅ SI NO HAY PRODUCTOS Y NO ESTÁ CARGANDO, NO RENDERIZAR
     if (!loading && data.length === 0) {
         return null;
     }
@@ -186,7 +167,7 @@ useEffect(() => {
                     </button>
                 )}
 
-                {/* Contenedor de productos - MANTIENE EL DISEÑO ORIGINAL */}
+                {/* Contenedor de productos */}
                 <div
                     ref={scrollElement}
                     className='flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth py-4 snap-x'
@@ -214,12 +195,10 @@ useEffect(() => {
                             
                             // Funciones para manejar hover con delay
                             const handleMouseEnter = () => {
-                                // Limpiar cualquier timeout previo
                                 if (hoverTimeout) {
                                     clearTimeout(hoverTimeout);
                                 }
                                 
-                                // Establecer nuevo timeout de 300ms
                                 const timeout = setTimeout(() => {
                                     setHoveredProductId(product?._id);
                                 }, 300);
@@ -228,13 +207,10 @@ useEffect(() => {
                             };
                             
                             const handleMouseLeave = () => {
-                                // Limpiar timeout si existe
                                 if (hoverTimeout) {
                                     clearTimeout(hoverTimeout);
                                     setHoverTimeout(null);
                                 }
-                                
-                                // Inmediatamente quitar el hover
                                 setHoveredProductId(null);
                             };
                             
@@ -270,7 +246,7 @@ useEffect(() => {
                                             />
                                         )}
 
-                                        {/* Badge de descuento - solo en la esquina superior izquierda */}
+                                        {/* Badge de descuento */}
                                         {discount && (
                                             <div className="absolute top-2 left-2">
                                                 <span className='bg-red-500 text-white text-xs font-bold px-2 py-1 rounded'>
@@ -280,9 +256,8 @@ useEffect(() => {
                                         )}
                                     </div>
 
-                                    {/* Detalles del producto - ESTRUCTURA FIJA */}
+                                    {/* Detalles del producto */}
                                     <div className='p-2.5 flex flex-col flex-grow'>
-                                        {/* Contenido superior que puede variar */}
                                         <div className='flex-grow space-y-1.5'>
                                             <h3 className='font-medium text-xs text-gray-600 leading-tight line-clamp-4 min-h-[2.8rem]'>
                                                 {product?.productName}
@@ -293,7 +268,6 @@ useEffect(() => {
                                             </div>
                                         </div>
                                         
-                                        {/* Contenido inferior fijo - SIEMPRE EN LA MISMA POSICIÓN */}
                                         <div className='mt-auto space-y-2'>
                                             <div className='space-y-0.5 text-center'>
                                                 <div className='text-lg font-bold text-black'>

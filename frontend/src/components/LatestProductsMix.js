@@ -82,25 +82,25 @@ const fetchDataFromServer = async () => {
     try {
         console.log('🔄 Cargando productos destacados desde servidor');
         const response = await fetch(SummaryApi.allProduct.url, {
-    method: SummaryApi.allProduct.method,
-    credentials: 'include'
-});
+            method: SummaryApi.allProduct.method,
+            credentials: 'include'
+        });
 
-const contentType = response.headers.get("content-type");
-if (!response.ok || !contentType || !contentType.includes("application/json")) {
-    const errorText = await response.text();
-    console.error("❌ Error al obtener productos (no JSON):", errorText);
-    throw new Error("Respuesta no válida o no es JSON");
-}
+        const contentType = response.headers.get("content-type");
+        if (!response.ok || !contentType || !contentType.includes("application/json")) {
+            const errorText = await response.text();
+            console.error("❌ Error al obtener productos (no JSON):", errorText);
+            throw new Error("Respuesta no válida o no es JSON");
+        }
 
-const responseData = await response.json();
+        const responseData = await response.json();
 
-        
-        if (responseData.success) {
-            const allProducts = responseData.data || [];
+        // ✅ VALIDACIÓN Y PROCESAMIENTO DE DATOS:
+        if (responseData.success && Array.isArray(responseData.data)) {
+            const allProducts = responseData.data;
             
             // Filtrar productos con stock
-            const filteredProducts = allProducts.filter(product => 
+            const filteredProducts = allProducts.filter(product =>
                 product?.stock === undefined || product?.stock === null || product?.stock > 0
             );
             
@@ -109,9 +109,13 @@ const responseData = await response.json();
             const latestProducts = filteredProducts.slice(0, 15);
             
             setData(latestProducts);
+        } else {
+            console.error("❌ Respuesta del servidor no válida:", responseData);
+            setData([]);
         }
     } catch (error) {
         console.error("Error al cargar productos destacados:", error);
+        setData([]);
     } finally {
         setLoading(false);
     }

@@ -1,8 +1,8 @@
-    // frontend/src/hooks/useProducts.js
+// hooks/useProducts.js - ✅ VERSIÓN CORREGIDA
 import { useQuery } from '@tanstack/react-query';
 import SummaryApi from '../common';
 
-// ✅ HOOK PARA PRODUCTOS DEL HOME
+// ✅ HOOK PARA PRODUCTOS DEL HOME - CORREGIDO
 export const useHomeProducts = () => {
   return useQuery({
     queryKey: ['category-products', 'all'],
@@ -13,31 +13,58 @@ export const useHomeProducts = () => {
           method: SummaryApi.allProduct.method,
           credentials: 'include'
         });
-        
+                
         if (!response.ok) {
           throw new Error('Error al cargar productos');
         }
-        
+                
         const result = await response.json();
-        
+                
         if (!result.success) {
           throw new Error(result.message || 'Error en la respuesta');
         }
+                
+        // ✅ VERIFICACIÓN CORREGIDA - ACEPTAR TANTO ARRAY COMO OBJETO
+        let products = [];
         
-        // ✅ VERIFICAR QUE result.data EXISTE Y ES UN ARRAY
-let products = [];
-if (result && result.data && Array.isArray(result.data)) {
-  products = result.data;
-} else {
-  console.warn('⚠️ Datos no válidos recibidos:', result);
-  return { success: false, data: {} };
-}
+        console.log('🔍 ESTRUCTURA DE DATOS RECIBIDA:', result);
+        
+        if (result && result.data) {
+          // Si result.data ya es un array de productos
+          if (Array.isArray(result.data)) {
+            products = result.data;
+            console.log('✅ Datos recibidos como ARRAY:', products.length, 'productos');
+          }
+          // Si result.data es un objeto con la estructura organizada
+          else if (typeof result.data === 'object' && result.data !== null) {
+            console.log('✅ Datos recibidos como OBJETO ORGANIZADO');
+            
+            // Si ya viene organizado por categorías, usarlo directamente
+            if (result.data.informatica || result.data.perifericos || result.data.telefonia) {
+              console.log('✅ Datos ya vienen organizados por categoría');
+              return {
+                success: true,
+                data: result.data
+              };
+            }
+            // Si es un objeto plano, convertir a array
+            else {
+              products = Object.values(result.data).flat();
+              console.log('✅ Objeto convertido a array:', products.length, 'productos');
+            }
+          }
+        } else {
+          console.warn('⚠️ Datos no válidos recibidos:', result);
+          return { success: false, data: {} };
+        }
 
-// Filtrar productos con stock
-const filteredProducts = products.filter(product => 
-  product?.stock === undefined || product?.stock === null || product?.stock > 0
-);
+        // Filtrar productos con stock
+        const filteredProducts = products.filter(product => 
+          product?.stock === undefined || product?.stock === null || product?.stock > 0
+        );
         
+        console.log('✅ Productos después del filtro de stock:', filteredProducts.length);
+                
         // Organizar productos por categoría y subcategoría
         const organizedData = {
           informatica: {
@@ -81,13 +108,21 @@ const filteredProducts = products.filter(product =>
           }
         };
         
+        // ✅ LOG FINAL PARA VERIFICAR RESULTADOS
+        console.log('✅ DATOS ORGANIZADOS FINALES:', {
+          notebooks: organizedData.informatica.notebooks.length,
+          placas_madre: organizedData.informatica.placas_madre.length,
+          telefonos: organizedData.telefonia.telefonos_moviles.length,
+          mouses: organizedData.perifericos.mouses.length
+        });
+                
         return {
           success: true,
           data: organizedData
         };
-        
+                
       } catch (error) {
-        console.error('Error en useHomeProducts:', error);
+        console.error('❌ Error en useHomeProducts:', error);
         throw error;
       }
     },

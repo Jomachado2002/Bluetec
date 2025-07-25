@@ -22,7 +22,8 @@ import {
     FaStar,
     FaComments,
     FaEye,
-    FaSpinner
+    FaSpinner,
+    FaWhatsapp
 } from 'react-icons/fa';
 import StatusBadge, { StatusWithProgress, StatusHistory } from '../components/common/StatusBadge';
 import DeliveryProgress from '../components/delivery/DeliveryProgress';
@@ -49,7 +50,7 @@ const OrderDetailsPage = () => {
     const fetchOrderDetails = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/transactions?search=${shop_process_id}`, {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/transactions?shop_process_id=${shop_process_id}`, {
                 method: 'GET',
                 credentials: 'include'
             });
@@ -491,13 +492,28 @@ const OrderDetailsPage = () => {
                                 )}
 
                                 {/* Contactar soporte */}
-                                <Link
-                                    to={`/contacto?pedido=${order.shop_process_id}`}
-                                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center gap-2 font-medium"
-                                >
-                                    <FaComments />
-                                    Contactar Soporte
-                                </Link>
+                                <button
+                                    onClick={() => {
+                                        const phoneNumber = "595984133733"; // ← TU NÚMERO DE WHATSAPP
+                                        const message = `Hola! Necesito ayuda con mi pedido:
+
+                                    📦 *Pedido #${order.shop_process_id}*
+                                    📅 Fecha: ${new Date(order.createdAt).toLocaleDateString('es-ES')}
+                                    💰 Total: ${displayINRCurrency(order.amount)}
+                                    📋 Estado: ${order.status === 'approved' ? 'Pago Aprobado ✅' : order.status}
+                                    🚚 Entrega: ${order.delivery_status || 'Confirmado ✅'}
+
+                                    Por favor, ¿me pueden ayudar?`;
+                                        
+                                        const encodedMessage = encodeURIComponent(message);
+                                        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+                                        window.open(whatsappUrl, '_blank');
+                                    }}
+                                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-all flex items-center justify-center gap-2 font-medium"
+                                    >
+                                    <FaWhatsapp />
+                                    Contactar por WhatsApp
+                                    </button>
 
                                 {/* Ver en mi perfil */}
                                 {user && (

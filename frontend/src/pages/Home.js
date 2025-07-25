@@ -8,7 +8,6 @@ import BannerProduct from '../components/BannerProduct';
 import VerticalCardProduct from '../components/VerticalCardProduct';
 import InfiniteCarousel from '../components/products/InfiniteCarousel';
 import { useHomeProducts } from '../hooks/useProducts';
-import { useQueryClient } from '@tanstack/react-query';
 import BrandCarousel from '../components/BrandCarousel';
 import NotebookBanner from '../components/NotebookBanner';
 import LatestProductsMix from '../components/LatestProductsMix';
@@ -17,7 +16,6 @@ import '../styles/global.css';
 // Importar la función scrollTop mejorada
 import scrollTop from '../helpers/scrollTop';
 import VerticalCard from '../components/VerticalCard';
-
 
 // Animaciones predefinidas
 const fadeIn = {
@@ -41,38 +39,36 @@ const staggerChildren = {
 };
 
 const Home = () => {
-  // ✅ HOOK PARA CARGAR PRODUCTOS OPTIMIZADOS
+  // ✅ ÚNICA FUENTE DE DATOS - UNA SOLA LLAMADA HTTP
   const { data: homeData, isLoading: homeLoading } = useHomeProducts();
 
-// ✅ PRE-LLENAR CACHÉ INDIVIDUAL
-const queryClient = useQueryClient();
-useEffect(() => {
-  if (homeData?.data) {
-    Object.entries(homeData.data).forEach(([category, subcategories]) => {
-      Object.entries(subcategories).forEach(([subcategory, products]) => {
-        queryClient.setQueryData(['category-products', category, subcategory], products);
-      });
-    });
-  }
-}, [homeData, queryClient]);
-  // Lazy load imágenes y componentes
+  // ✅ EXTRAER DATOS POR CATEGORÍA PARA PASAR COMO PROPS
+  const getProductsForCategory = (category, subcategory) => {
+    if (!homeData?.data?.[category]?.[subcategory]) {
+      return [];
+    }
+    return homeData.data[category][subcategory];
+  };
+
+  // Optimizaciones de carga
   useEffect(() => {
-    // Asegurarse de que la página se cargue desde arriba al entrar
     scrollTop();
 
-    // Prefetch imágenes críticas
-    const prefetchImages = () => {
-      const imageUrls = [
-        // Agrega URLs de imágenes críticas aquí
+    // ✅ PREFETCH CRÍTICO - Solo imágenes del banner
+    const prefetchCriticalImages = () => {
+      const criticalImages = [
+        // Agregar URLs de imágenes críticas del banner aquí si las tienes estáticas
       ];
       
-      imageUrls.forEach(url => {
-        const img = new Image();
-        img.src = url;
+      criticalImages.forEach(url => {
+        const link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = url;
+        document.head.appendChild(link);
       });
     };
     
-    prefetchImages();
+    prefetchCriticalImages();
   }, []);
 
   // Función para abrir WhatsApp
@@ -80,13 +76,6 @@ useEffect(() => {
     const message = "Hola, necesito asesoramiento sobre productos de informática. ¿Podrían ayudarme?";
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/595984133733?text=${encodedMessage}`, '_blank');
-  };
-
-  // Función para navegar a categorías con scroll suave
-  const navigateToCategory = (category, subcategory = '') => {
-    scrollTop();
-    // La navegación se maneja a través de Link, pero si necesitas hacerlo programáticamente:
-    // navigate(`/categoria-producto?category=${category}${subcategory ? `&subcategory=${subcategory}` : ''}`);
   };
 
   return (
@@ -119,25 +108,25 @@ useEffect(() => {
       </Helmet>
       
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-inter text-gray-800">
-  {/* Hero Banner con animación */}
-  <motion.div 
-    initial="hidden"
-    animate="visible"
-    variants={fadeIn}
-    className="relative bg-white shadow-xl overflow-hidden mt-0 md:mt-4"
-  >
-    <div className="absolute inset-0 bg-pattern opacity-10"></div>
-    <div className="container mx-auto py-1 sm:py-6 px-4">
-      <BannerProduct />
-    </div>
-    
-    {/* Elementos decorativos */}
-    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-400 rounded-full opacity-20 blur-xl"></div>
-    <div className="absolute bottom-0 left-1/4 -mb-10 w-32 h-32 bg-blue-300 rounded-full opacity-20 blur-xl"></div>
-  </motion.div>
+        {/* Hero Banner con animación */}
+        <motion.div 
+          initial="hidden"
+          animate="visible"
+          variants={fadeIn}
+          className="relative bg-white shadow-xl overflow-hidden mt-0 md:mt-4"
+        >
+          <div className="absolute inset-0 bg-pattern opacity-10"></div>
+          <div className="container mx-auto py-1 sm:py-6 px-4">
+            <BannerProduct />
+          </div>
+          
+          {/* Elementos decorativos */}
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-400 rounded-full opacity-20 blur-xl"></div>
+          <div className="absolute bottom-0 left-1/4 -mb-10 w-32 h-32 bg-blue-300 rounded-full opacity-20 blur-xl"></div>
+        </motion.div>
 
-  {/* Contenido principal con animaciones */}
-  <div className="space-y-8 sm:space-y-16 py-8 sm:py-16">
+        {/* Contenido principal con animaciones */}
+        <div className="space-y-8 sm:space-y-16 py-8 sm:py-16">
           {/* Sección: Notebooks */}
           <motion.section 
             initial="hidden"
@@ -191,15 +180,19 @@ useEffect(() => {
                     </Link>
                   </div>
                   
-                 <VerticalCardProduct
+                  {/* ✅ DATOS POR PROPS - SIN QUERIES DUPLICADAS */}
+                  <VerticalCardProduct
                     category="informatica"
                     subcategory="notebooks"
                     heading=""
+                    products={getProductsForCategory('informatica', 'notebooks')}
+                    loading={homeLoading}
                   />
                 </div>
               </motion.div>
             </div>
           </motion.section>
+
           {/* Sección: Teléfonos Móviles */}
           <motion.section 
             initial="hidden"
@@ -225,17 +218,20 @@ useEffect(() => {
                 </div>
                 
                 <div className="mt-6">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="telefonia"
                     subcategory="telefonos_moviles"
                     heading=""
+                    products={getProductsForCategory('telefonia', 'telefonos_moviles')}
+                    loading={homeLoading}
                   />
                 </div>
               </div>
             </div>
           </motion.section>
 
-          {/* Sección: Placas Madre - Cambiada a fondo blanco con VerticalCardProduct */}
+          {/* Sección: Placas Madre */}
           <motion.section 
             initial="hidden"
             whileInView="visible"
@@ -260,10 +256,13 @@ useEffect(() => {
                 </div>
                 
                 <div className="mt-6">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="informatica"
                     subcategory="placas_madre"
                     heading=""
+                    products={getProductsForCategory('informatica', 'placas_madre')}
+                    loading={homeLoading}
                   />
                 </div>
               </div>
@@ -293,10 +292,13 @@ useEffect(() => {
                   <div className="h-1 w-24 bg-blue-300 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="perifericos"
                     subcategory="mouses"
                     heading=""
+                    products={getProductsForCategory('perifericos', 'mouses')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -323,10 +325,13 @@ useEffect(() => {
                   <div className="h-1 w-20 bg-blue-200 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="perifericos"
                     subcategory="monitores"
                     heading=""
+                    products={getProductsForCategory('perifericos', 'monitores')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -353,10 +358,13 @@ useEffect(() => {
                   <div className="h-1 w-20 bg-blue-300 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="informatica"
                     subcategory="memorias_ram"
                     heading=""
+                    products={getProductsForCategory('informatica', 'memorias_ram')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -383,10 +391,13 @@ useEffect(() => {
                   <div className="h-1 w-20 bg-indigo-300 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="informatica"
                     subcategory="discos_duros"
                     heading=""
+                    products={getProductsForCategory('informatica', 'discos_duros')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -413,10 +424,13 @@ useEffect(() => {
                   <div className="h-1 w-24 bg-blue-300 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="informatica"
                     subcategory="tarjeta_grafica"
                     heading=""
+                    products={getProductsForCategory('informatica', 'tarjeta_grafica')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -443,10 +457,13 @@ useEffect(() => {
                   <div className="h-1 w-20 bg-blue-200 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="informatica"
                     subcategory="gabinetes"
                     heading=""
+                    products={getProductsForCategory('informatica', 'gabinetes')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -473,10 +490,13 @@ useEffect(() => {
                   <div className="h-1 w-24 bg-blue-300 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="informatica"
                     subcategory="procesador"
                     heading=""
+                    products={getProductsForCategory('informatica', 'procesador')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">
@@ -503,10 +523,13 @@ useEffect(() => {
                   <div className="h-1 w-20 bg-indigo-300 mt-2 mb-4 rounded-full"></div>
                 </div>
                 <div className="p-4">
+                  {/* ✅ DATOS POR PROPS */}
                   <VerticalCardProduct
                     category="perifericos"
                     subcategory="teclados"
                     heading=""
+                    products={getProductsForCategory('perifericos', 'teclados')}
+                    loading={homeLoading}
                   />
                 </div>
                 <div className="p-4 pt-0 text-center">

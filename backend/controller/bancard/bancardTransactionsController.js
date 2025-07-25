@@ -93,17 +93,22 @@ const getAllBancardTransactionsController = async (req, res) => {
         
         if (payment_method) query.payment_method = payment_method;
         
+    
+
         if (search) {
             const searchQuery = {
                 $or: [
-                    { shop_process_id: { $regex: search, $options: 'i' } },
+                    // ✅ CORREGIDO: Para shop_process_id (Number) - solo coincidencia exacta
+                    ...(isNaN(search) ? [] : [{ shop_process_id: parseInt(search) }]),
+                    
+                    // ✅ Para campos de texto - usar regex normal
                     { bancard_process_id: { $regex: search, $options: 'i' } },
                     { description: { $regex: search, $options: 'i' } },
                     { 'customer_info.name': { $regex: search, $options: 'i' } },
                     { 'customer_info.email': { $regex: search, $options: 'i' } },
                     { invoice_number: { $regex: search, $options: 'i' } },
                     { authorization_number: { $regex: search, $options: 'i' } },
-                    { tracking_number: { $regex: search, $options: 'i' } } // ✅ NUEVO
+                    { tracking_number: { $regex: search, $options: 'i' } }
                 ]
             };
             
