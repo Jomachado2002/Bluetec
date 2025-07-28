@@ -708,37 +708,50 @@ const Header = () => {
       </div>
 
       {/* Barra de navegación móvil */}
-      <div className="lg:hidden fixed bottom-0 w-full bg-white shadow-inner border-t p-2 flex justify-around z-[100]">
-        <Link to="/" className="flex flex-col items-center text-gray-600 hover:text-blue-600" onClick={scrollTop}>
-          <CiHome className="text-2xl" />
-          <span className="text-xs">Inicio</span>
-        </Link>
-        <button onClick={() => { toggleCategoryMenu(); scrollTop(); }} className="flex flex-col items-center text-gray-600 hover:text-blue-600">
-          <BiCategoryAlt className="text-2xl" />
-          <span className="text-xs">Categorías</span>
-        </button>
-        <Link to="/carrito" className="flex flex-col items-center text-gray-600 hover:text-blue-600" onClick={scrollTop}>
-          <CiShoppingCart className="text-2xl" />
-          <span className="text-xs">Carrito</span>
-        </Link>
-        <a 
-          href="tel:+595984133733" 
-          className="flex flex-col items-center text-gray-600 hover:text-blue-600"
-        >
-          <FaPhone className="text-2xl" />
-          <span className="text-xs">Llamar</span>
-        </a>
-        <a 
-          href="https://wa.me/595984133733?text=Hola,%20estoy%20interesado%20en%20obtener%20información%20sobre%20insumos%20de%20tecnología." 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex flex-col items-center text-gray-600 hover:text-blue-600"
-          onClick={scrollTop}
-        >
-          <FaWhatsapp className="text-2xl" />
-          <span className="text-xs">WhatsApp</span>
-        </a>
-      </div>
+<div className="lg:hidden fixed bottom-0 w-full bg-white shadow-inner border-t p-2 flex justify-around z-[100]">
+  <Link to="/" className="flex flex-col items-center text-gray-600 hover:text-blue-600" onClick={scrollTop}>
+    <CiHome className="text-2xl" />
+    <span className="text-xs">Inicio</span>
+  </Link>
+  <button onClick={() => { toggleCategoryMenu(); scrollTop(); }} className="flex flex-col items-center text-gray-600 hover:text-blue-600">
+    <BiCategoryAlt className="text-2xl" />
+    <span className="text-xs">Categorías</span>
+  </button>
+  <Link to="/carrito" className="flex flex-col items-center text-gray-600 hover:text-blue-600" onClick={scrollTop}>
+    <CiShoppingCart className="text-2xl" />
+    <span className="text-xs">Carrito</span>
+  </Link>
+  <a 
+    href="https://wa.me/595984133733?text=Hola,%20estoy%20interesado%20en%20obtener%20información%20sobre%20insumos%20de%20tecnología." 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="flex flex-col items-center text-gray-600 hover:text-blue-600"
+  >
+    <FaWhatsapp className="text-2xl" />
+    <span className="text-xs">WhatsApp</span>
+  </a>
+  <button 
+    onClick={handleUserIconClick}
+    className="flex flex-col items-center text-gray-600 hover:text-blue-600"
+  >
+    {!user ? (
+      <>
+        <FaSignInAlt className="text-2xl" />
+        <span className="text-xs">Entrar</span>
+      </>
+    ) : user.role === ROLE.ADMIN ? (
+      <>
+        <FaUserShield className="text-2xl" />
+        <span className="text-xs">Admin</span>
+      </>
+    ) : (
+      <>
+        <FaUser className="text-2xl" />
+        <span className="text-xs">Mi Perfil</span>
+      </>
+    )}
+  </button>
+</div>
 
       {/* Espaciador mínimo para el contenido - Altura reducida significativamente */}
       <div className={`lg:hidden ${showMobileSearch ? 'h-10' : 'h-8'}`}></div>
