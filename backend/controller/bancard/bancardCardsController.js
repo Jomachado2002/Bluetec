@@ -1,8 +1,9 @@
-// backend/controller/bancard/bancardCardsController.js - VERSIÓN FINAL CORREGIDA
+// backend/controller/bancard/bancardCardsController.js - CON EMAILS PARA PAGOS CON TOKEN
 
 const crypto = require('crypto');
 const axios = require('axios');
 const BancardTransactionModel = require('../../models/bancardTransactionModel');
+const emailService = require('../../services/emailService'); // ✅ IMPORTAR EMAIL SERVICE
 const { 
     validateBancardConfig,
     getBancardBaseUrl,
@@ -11,11 +12,11 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ PAGO CON ALIAS TOKEN - VERSIÓN FINAL CORREGIDA
+ * ✅ PAGO CON ALIAS TOKEN - CON EMAILS AUTOMÁTICOS
  */
 const chargeWithTokenController = async (req, res) => {
     try {
-        console.log("💳 === PAGO CON ALIAS TOKEN - VERSIÓN FINAL ===");
+        console.log("💳 === PAGO CON ALIAS TOKEN - CON EMAILS AUTOMÁTICOS ===");
 
         const {
             shop_process_id,
@@ -104,7 +105,7 @@ const chargeWithTokenController = async (req, res) => {
 
         const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
 
-        // ✅ PAYLOAD CORREGIDO - SIN extra_response_attributes
+        // ✅ PAYLOAD CORREGIDO
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
@@ -158,27 +159,24 @@ const chargeWithTokenController = async (req, res) => {
         });
 
         // ✅ GUARDAR TRANSACCIÓN EN BD ANTES DE ENVIAR A BANCARD
+        let savedTransaction;
         try {
             const normalizedCustomerInfo = {
-                    name: customer_info?.name || '',
-                    email: customer_info?.email || '',
-                    phone: customer_info?.phone || '',
-                    city: customer_info?.city || '',
-                    address: customer_info?.address || customer_info?.fullAddress || '',
-                    houseNumber: customer_info?.houseNumber || '',
-                    reference: customer_info?.reference || '',
-                    fullAddress: customer_info?.fullAddress || '',
-                    document_type: customer_info?.document_type || 'CI',
-                    document_number: customer_info?.document_number || '',
-                    
-                    // ✅ INFORMACIÓN DE FACTURACIÓN
-                    invoiceData: customer_info?.invoiceData || {
-                        needsInvoice: false
-                    },
-                    
-                    // ✅ INFORMACIÓN DE UBICACIÓN
-                    location: customer_info?.location || null
-                };
+                name: customer_info?.name || '',
+                email: customer_info?.email || '',
+                phone: customer_info?.phone || '',
+                city: customer_info?.city || '',
+                address: customer_info?.address || customer_info?.fullAddress || '',
+                houseNumber: customer_info?.houseNumber || '',
+                reference: customer_info?.reference || '',
+                fullAddress: customer_info?.fullAddress || '',
+                document_type: customer_info?.document_type || 'CI',
+                document_number: customer_info?.document_number || '',
+                invoiceData: customer_info?.invoiceData || {
+                    needsInvoice: false
+                },
+                location: customer_info?.location || null
+            };
 
             const normalizedItems = (items || []).map(item => ({
                 product_id: item.product_id || item._id || '',
@@ -192,7 +190,6 @@ const chargeWithTokenController = async (req, res) => {
                 sku: item.sku || ''
             }));
 
-            
             const newTransaction = new BancardTransactionModel({
                 shop_process_id: parseInt(finalShopProcessId),
                 bancard_process_id: null,
@@ -210,7 +207,39 @@ const chargeWithTokenController = async (req, res) => {
                     house_number: delivery_location.house_number || '',
                     reference: delivery_location.reference || '',
                     source: delivery_location.source || 'unknown',
-                    timestamp: new Date()
+                    timestamp: new Date(),
+                    google_maps_url: delivery_location.google_maps_url || 
+                        (delivery_location.lat && delivery_location.lng ? 
+                            `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
+                            null),
+                    google_maps_alternative_url: delivery_location.google_maps_alternative_url ||
+                        (delivery_location.lat && delivery_location.lng ? 
+                            `https://www.google.com/maps/place/${delivery_location.lat},${delivery_location.lng}/@${delivery_location.lat},${delivery_location.lng},17z` :
+                            null),
+                    navigation_url: delivery_location.lat && delivery_location.lng ? 
+                        `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
+                        delivery_location.navigation_url || null,
+                    coordinates_string: delivery_location.coordinates_string ||
+                        (delivery_location.lat && delivery_location.lng ? 
+                            `${delivery_location.lat},${delivery_location.lng}` : null),
+                    delivery_instructions: delivery_location.delivery_instructions || 
+                        `📍 UBICACIÓN DE ENTREGA:
+                🏠 Dirección: ${delivery_location.address || delivery_location.manual_address || 'No especificada'}
+                🏘️ Ciudad: ${delivery_location.city || 'No especificada'}
+                🏡 Casa/Edificio: ${delivery_location.house_number || 'No especificado'}
+                📝 Referencia: ${delivery_location.reference || 'Sin referencia adicional'}
+
+                🗺️ VER UBICACIÓN EN GOOGLE MAPS:
+                ${delivery_location.google_maps_url || 
+                (delivery_location.lat && delivery_location.lng ? 
+                    `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
+                    'No disponible')}
+
+                🧭 COORDENADAS EXACTAS: ${delivery_location.lat || 'N/A'}, ${delivery_location.lng || 'N/A'}
+
+                📱 Para navegación: ${delivery_location.lat && delivery_location.lng ? 
+                    `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
+                    'No disponible'}`,
                 } : null,
                 return_url: `${backendUrl}/api/bancard/redirect/success`,
                 cancel_url: `${backendUrl}/api/bancard/redirect/cancel`,
@@ -239,12 +268,25 @@ const chargeWithTokenController = async (req, res) => {
                 has_promotion: !!payload.operation.additional_data
             });
 
-            const savedTransaction = await newTransaction.save();
-            console.log("✅ Transacción guardada exitosamente:", {
+            savedTransaction = await newTransaction.save();
+            console.log("✅ Transacción de pago con token guardada exitosamente:", {
                 id: savedTransaction._id,
                 shop_process_id: savedTransaction.shop_process_id,
                 has_promotion: savedTransaction.has_promotion
             });
+
+            // ✅ ENVIAR NOTIFICACIÓN A ADMINS DE NUEVO PAGO CON TOKEN
+            try {
+                console.log("📧 Enviando notificación admin de pago con token...");
+                const adminEmailResult = await emailService.sendAdminNotificationEmail(savedTransaction, 'nueva_compra');
+                if (adminEmailResult.success) {
+                    console.log("✅ Notificación admin de pago con token enviada:", adminEmailResult.messageId);
+                } else {
+                    console.error("❌ Error enviando notificación admin:", adminEmailResult.error);
+                }
+            } catch (emailError) {
+                console.error("❌ Error en envío de notificación admin:", emailError);
+            }
 
         } catch (dbError) {
             console.error("❌ Error crítico guardando transacción en BD:", dbError);
@@ -274,10 +316,7 @@ const chargeWithTokenController = async (req, res) => {
         if (response.status === 200) {
             console.log("📥 Respuesta completa de Bancard:", JSON.stringify(response.data, null, 2));
             
-            // ✅ BANCARD PUEDE DEVOLVER DATOS EN DIFERENTES UBICACIONES
             const operationData = response.data?.operation || response.data?.confirmation || response.data;
-            
-            // ✅ VERIFICAR SI REQUIERE 3DS
             const requiresAuth = response.data?.operation?.process_id && !operationData?.response;
             
             console.log("🔍 Datos extraídos:", {
@@ -298,7 +337,7 @@ const chargeWithTokenController = async (req, res) => {
                     user_bancard_id: finalUserBancardId
                 };
 
-                // ✅ SI HAY RESPUESTA INMEDIATA, GUARDAR TODOS LOS DATOS
+                // ✅ SI HAY RESPUESTA INMEDIATA, GUARDAR TODOS LOS DATOS Y ENVIAR EMAILS
                 if (operationData?.response) {
                     const isApproved = operationData.response === 'S' && operationData.response_code === '00';
                     
@@ -322,12 +361,64 @@ const chargeWithTokenController = async (req, res) => {
                         status: updateData.status,
                         authorization_number: operationData.authorization_number
                     });
-                }
 
-                await BancardTransactionModel.findOneAndUpdate(
-                    { shop_process_id: parseInt(finalShopProcessId) },
-                    updateData
-                );
+                    // ✅ ACTUALIZAR EN BD PRIMERO
+                    const updatedTransaction = await BancardTransactionModel.findOneAndUpdate(
+                        { shop_process_id: parseInt(finalShopProcessId) },
+                        updateData,
+                        { new: true }
+                    );
+
+                    // ✅ ENVIAR EMAILS INMEDIATAMENTE
+                    if (updatedTransaction) {
+                        try {
+                            console.log(`📧 Enviando email de pago ${isApproved ? 'APROBADO' : 'RECHAZADO'} con token...`);
+                            
+                            // ✅ EMAIL AL CLIENTE
+                            const customerEmailResult = await emailService.sendPurchaseConfirmationEmail(updatedTransaction, isApproved);
+                            
+                            if (customerEmailResult.success) {
+                                console.log("✅ Email al cliente enviado:", customerEmailResult.messageId);
+                                
+                                // ✅ REGISTRAR NOTIFICACIÓN EN LA TRANSACCIÓN
+                                updatedTransaction.notifications_sent = updatedTransaction.notifications_sent || [];
+                                updatedTransaction.notifications_sent.push({
+                                    type: 'email',
+                                    status: isApproved ? 'purchase_approved' : 'purchase_rejected',
+                                    sent_at: new Date(),
+                                    success: true,
+                                    recipient: updatedTransaction.customer_info?.email,
+                                    is_token_payment: true
+                                });
+                                await updatedTransaction.save();
+                                
+                            } else {
+                                console.error("❌ Error enviando email al cliente:", customerEmailResult.error);
+                            }
+
+                            // ✅ NOTIFICACIÓN A ADMINS
+                            const adminEmailResult = await emailService.sendAdminNotificationEmail(
+                                updatedTransaction, 
+                                isApproved ? 'pago_aprobado' : 'pago_rechazado'
+                            );
+                            
+                            if (adminEmailResult.success) {
+                                console.log("✅ Notificación admin enviada:", adminEmailResult.messageId);
+                            } else {
+                                console.error("❌ Error enviando notificación admin:", adminEmailResult.error);
+                            }
+
+                        } catch (emailError) {
+                            console.error("❌ Error enviando emails de pago con token:", emailError);
+                        }
+                    }
+                } else {
+                    // ✅ SOLO ACTUALIZAR SIN EMAILS (REQUIERE 3DS)
+                    await BancardTransactionModel.findOneAndUpdate(
+                        { shop_process_id: parseInt(finalShopProcessId) },
+                        updateData
+                    );
+                }
                 
                 console.log("✅ Transacción actualizada exitosamente");
             } catch (dbError) {
@@ -364,6 +455,7 @@ const chargeWithTokenController = async (req, res) => {
                     success: isApproved,
                     error: !isApproved,
                     requires3DS: false,
+                    email_sent: true, // ✅ INDICAR QUE SE ENVIÓ EMAIL
                     data: {
                         ...response.data,
                         shop_process_id: finalShopProcessId,
@@ -371,20 +463,37 @@ const chargeWithTokenController = async (req, res) => {
                         transaction_approved: isApproved,
                         authorization_number: operationData?.authorization_number,
                         ticket_number: operationData?.ticket_number,
-                        response_description: operationData?.response_description
+                        response_description: operationData?.response_description,
+                        customer_email_sent: true, // ✅ CONFIRMACIÓN DE EMAIL AL CLIENTE
+                        admin_notification_sent: true // ✅ CONFIRMACIÓN DE NOTIFICACIÓN ADMIN
                     }
                 });
             }
         } else {
-            // ✅ ACTUALIZAR TRANSACCIÓN COMO FALLIDA
+            // ✅ ACTUALIZAR TRANSACCIÓN COMO FALLIDA Y ENVIAR EMAIL
             try {
-                await BancardTransactionModel.findOneAndUpdate(
+                const failedTransaction = await BancardTransactionModel.findOneAndUpdate(
                     { shop_process_id: parseInt(finalShopProcessId) },
                     { 
                         status: 'failed',
                         response_description: response.data?.message || 'Error en Bancard'
-                    }
+                    },
+                    { new: true }
                 );
+
+                // ✅ ENVIAR EMAIL DE PAGO FALLIDO
+                if (failedTransaction) {
+                    try {
+                        console.log("📧 Enviando email de pago FALLIDO...");
+                        const emailResult = await emailService.sendPurchaseConfirmationEmail(failedTransaction, false);
+                        
+                        if (emailResult.success) {
+                            console.log("✅ Email de pago fallido enviado:", emailResult.messageId);
+                        }
+                    } catch (emailError) {
+                        console.error("❌ Error enviando email de pago fallido:", emailError);
+                    }
+                }
             } catch (dbError) {
                 console.error("⚠️ Error actualizando transacción fallida:", dbError);
             }
@@ -402,13 +511,24 @@ const chargeWithTokenController = async (req, res) => {
         
         if (req.body.shop_process_id || error.shop_process_id) {
             try {
-                await BancardTransactionModel.findOneAndUpdate(
+                const errorTransaction = await BancardTransactionModel.findOneAndUpdate(
                     { shop_process_id: parseInt(req.body.shop_process_id || error.shop_process_id) },
                     { 
                         status: 'failed',
                         response_description: error.message || 'Error interno'
-                    }
+                    },
+                    { new: true }
                 );
+
+                // ✅ ENVIAR EMAIL DE ERROR
+                if (errorTransaction) {
+                    try {
+                        console.log("📧 Enviando email de error en pago...");
+                        await emailService.sendPurchaseConfirmationEmail(errorTransaction, false);
+                    } catch (emailError) {
+                        console.error("❌ Error enviando email de error:", emailError);
+                    }
+                }
             } catch (dbError) {
                 console.error("⚠️ Error actualizando transacción en catch:", dbError);
             }
@@ -430,6 +550,8 @@ const chargeWithTokenController = async (req, res) => {
         });
     }
 };
+
+// ✅ RESTO DE CONTROLADORES SIN CAMBIOS (mantener funcionalidad existente)
 
 const createCardController = async (req, res) => {
     try {

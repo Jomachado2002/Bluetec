@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const BancardTransactionModel = require('../../models/bancardTransactionModel');
 const SaleModel = require('../../models/saleModel');
+const emailService = require('../../services/emailService');
 const { 
     verifyConfirmationToken, 
     validateBancardConfig,
@@ -15,14 +16,14 @@ const {
 } = require('../../helpers/bancardUtils');
 
 /**
- * ✅ CONTROLADOR MEJORADO PARA CONFIRMACIÓN
+ * ✅ CONTROLADOR MEJORADO PARA CONFIRMACIÓN - CON EMAILS
  */
 const bancardConfirmController = async (req, res) => {
     const startTime = Date.now();
     
     try {
         console.log("🔔 ============================================");
-        console.log("🔔 CONFIRMACIÓN RECIBIDA DE BANCARD");
+        console.log("🔔 CONFIRMACIÓN RECIBIDA DE BANCARD - CON EMAILS");
         console.log("🔔 ============================================");
         console.log("📅 Timestamp:", new Date().toISOString());
         console.log("🌐 IP origen:", req.ip || req.connection.remoteAddress);
@@ -38,9 +39,9 @@ const bancardConfirmController = async (req, res) => {
         console.log("📤 Respondiendo a Bancard:", responseData);
         res.status(200).json(responseData);
 
-        // ✅ PROCESAR EN BACKGROUND
+        // ✅ PROCESAR EN BACKGROUND CON EMAILS
         setImmediate(() => {
-            processConfirmationInBackground(req.body, req.query, req.headers, req.ip);
+            processConfirmationWithEmails(req.body, req.query, req.headers, req.ip);
         });
 
     } catch (error) {
@@ -54,38 +55,12 @@ const bancardConfirmController = async (req, res) => {
     }
 };
 
-const bancardConfirmGetController = (req, res) => {
-    try {
-        console.log("🔍 === GET REQUEST A CONFIRMACIÓN BANCARD ===");
-        console.log("Query params:", req.query);
-        console.log("Headers:", req.headers);
-        
-        res.status(200).json({
-            status: "success",
-            message: "Endpoint de confirmación activo",
-            timestamp: new Date().toISOString(),
-            service: "bancard-confirmation",
-            method: "GET",
-            ready: true,
-            environment: process.env.BANCARD_ENVIRONMENT || 'staging'
-        });
-        
-    } catch (error) {
-        console.error("❌ Error en GET confirmación:", error);
-        res.status(200).json({
-            status: "success",
-            message: "Endpoint funcionando",
-            timestamp: new Date().toISOString()
-        });
-    }
-};
-
 /**
- * ✅ PROCESAMIENTO EN BACKGROUND CORREGIDO
+ * ✅ PROCESAMIENTO EN BACKGROUND CON EMAILS
  */
-const processConfirmationInBackground = async (body, query, headers, clientIp) => {
+const processConfirmationWithEmails = async (body, query, headers, clientIp) => {
     try {
-        console.log("🔄 Procesando confirmación en background...");
+        console.log("🔄 Procesando confirmación en background CON EMAILS...");
         
         const queryParams = query || {};
         const { operation } = body || {};
@@ -132,7 +107,11 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
                 });
 
                 if (transaction) {
+                    let shouldSendEmail = false;
+                    let emailSent = false;
+
                     if (isSuccessful) {
+                        // ✅ ACTUALIZAR COMO APROBADA
                         await BancardTransactionModel.findByIdAndUpdate(transaction._id, {
                             status: 'approved',
                             response: transactionData.response,
@@ -147,7 +126,34 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
                         });
 
                         console.log("✅ Transacción APROBADA y actualizada");
+                        shouldSendEmail = true;
+
+                        // ✅ ENVIAR EMAIL DE COMPRA APROBADA
+                        try {
+                            const updatedTransaction = await BancardTransactionModel.findById(transaction._id);
+                            
+                            console.log("📧 Enviando email de compra APROBADA...");
+                            const emailResult = await emailService.sendPurchaseConfirmationEmail(updatedTransaction, true);
+                            
+                            if (emailResult.success) {
+                                console.log("✅ Email de compra aprobada enviado:", emailResult.messageId);
+                                emailSent = true;
+                            } else {
+                                console.error("❌ Error enviando email de compra aprobada:", emailResult.error);
+                            }
+
+                            // ✅ ENVIAR NOTIFICACIÓN A ADMINS
+                            const adminEmailResult = await emailService.sendAdminNotificationEmail(updatedTransaction, 'pago_aprobado');
+                            if (adminEmailResult.success) {
+                                console.log("✅ Notificación admin enviada:", adminEmailResult.messageId);
+                            }
+
+                        } catch (emailError) {
+                            console.error("❌ Error en envío de emails:", emailError);
+                        }
+
                     } else {
+                        // ✅ ACTUALIZAR COMO RECHAZADA
                         await BancardTransactionModel.findByIdAndUpdate(transaction._id, {
                             status: 'rejected',
                             response: transactionData.response,
@@ -159,26 +165,79 @@ const processConfirmationInBackground = async (body, query, headers, clientIp) =
                         });
 
                         console.log("❌ Transacción RECHAZADA y actualizada");
+                        shouldSendEmail = true;
+
+                        // ✅ ENVIAR EMAIL DE COMPRA RECHAZADA
+                        try {
+                            const updatedTransaction = await BancardTransactionModel.findById(transaction._id);
+                            
+                            console.log("📧 Enviando email de compra RECHAZADA...");
+                            const emailResult = await emailService.sendPurchaseConfirmationEmail(updatedTransaction, false);
+                            
+                            if (emailResult.success) {
+                                console.log("✅ Email de compra rechazada enviado:", emailResult.messageId);
+                                emailSent = true;
+                            } else {
+                                console.error("❌ Error enviando email de compra rechazada:", emailResult.error);
+                            }
+
+                            // ✅ ENVIAR NOTIFICACIÓN A ADMINS
+                            const adminEmailResult = await emailService.sendAdminNotificationEmail(updatedTransaction, 'pago_rechazado');
+                            if (adminEmailResult.success) {
+                                console.log("✅ Notificación admin enviada:", adminEmailResult.messageId);
+                            }
+
+                        } catch (emailError) {
+                            console.error("❌ Error en envío de emails:", emailError);
+                        }
                     }
+
+                    console.log("📧 Estado de emails:", { shouldSendEmail, emailSent });
                 }
             } catch (dbError) {
                 console.error("⚠️ Error actualizando BD:", dbError);
             }
         }
 
-        console.log("✅ Procesamiento background completado");
+        console.log("✅ Procesamiento background completado CON EMAILS");
 
     } catch (error) {
-        console.error("❌ Error en procesamiento background:", error);
+        console.error("❌ Error en procesamiento background con emails:", error);
+    }
+};
+
+const bancardConfirmGetController = (req, res) => {
+    try {
+        console.log("🔍 === GET REQUEST A CONFIRMACIÓN BANCARD ===");
+        console.log("Query params:", req.query);
+        console.log("Headers:", req.headers);
+        
+        res.status(200).json({
+            status: "success",
+            message: "Endpoint de confirmación activo",
+            timestamp: new Date().toISOString(),
+            service: "bancard-confirmation",
+            method: "GET",
+            ready: true,
+            environment: process.env.BANCARD_ENVIRONMENT || 'staging'
+        });
+        
+    } catch (error) {
+        console.error("❌ Error en GET confirmación:", error);
+        res.status(200).json({
+            status: "success",
+            message: "Endpoint funcionando",
+            timestamp: new Date().toISOString()
+        });
     }
 };
 
 /**
- * ✅ CONTROLADOR PARA CREAR PAGOS OCASIONALES - CORREGIDO
+ * ✅ CONTROLADOR PARA CREAR PAGOS OCASIONALES - CON EMAILS
  */
 const createPaymentController = async (req, res) => {
     try {
-        console.log("🛒 === INICIO PROCESO DE PAGO OCASIONAL BANCARD - VERSIÓN CORREGIDA ===");
+        console.log("🛒 === INICIO PROCESO DE PAGO OCASIONAL BANCARD - CON EMAILS ===");
         console.log("📦 Request body:", JSON.stringify(req.body, null, 2));
         console.log("👤 Usuario autenticado:", req.isAuthenticated);
         console.log("🆔 User ID:", req.userId);
@@ -197,37 +256,33 @@ const createPaymentController = async (req, res) => {
         console.log("✅ Configuración de Bancard válida");
 
         const {
-    amount,
-    currency = 'PYG',
-    description,
-    return_url,
-    cancel_url,
-    customer_info,
-    items,
-    sale_id,
-    // ✅ AGREGAR ESTE CAMPO
-    delivery_location, // ← FALTABA ESTO
-    // Campo de promoción específico
-    promotion_code = "",
-    // Campos de tracking corregidos
-    user_type = 'GUEST',
-    payment_method = 'new_card',
-    user_bancard_id = null,
-    user_agent = '',
-    payment_session_id = '',
-    device_type = 'unknown',
-    cart_total_items = 0,
-    referrer_url = '',
-    order_notes = '',
-    delivery_method = 'pickup',
-    invoice_number = '',
-    tax_amount = 0,
-    utm_source = '',
-    utm_medium = '',
-    utm_campaign = ''
-} = req.body;
+            amount,
+            currency = 'PYG',
+            description,
+            return_url,
+            cancel_url,
+            customer_info,
+            items,
+            sale_id,
+            delivery_location,
+            promotion_code = "",
+            user_type = 'GUEST',
+            payment_method = 'new_card',
+            user_bancard_id = null,
+            user_agent = '',
+            payment_session_id = '',
+            device_type = 'unknown',
+            cart_total_items = 0,
+            referrer_url = '',
+            order_notes = '',
+            delivery_method = 'pickup',
+            invoice_number = '',
+            tax_amount = 0,
+            utm_source = '',
+            utm_medium = '',
+            utm_campaign = ''
+        } = req.body;
 
-        // ✅ DECLARAR VARIABLES DE TRACKING AL INICIO
         const finalUserType = req.isAuthenticated === true ? 'REGISTERED' : 'GUEST';
         const finalUserBancardId = req.isAuthenticated === true ? (req.bancardUserId || req.user?.bancardUserId) : null;
         const clientIpAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -283,7 +338,7 @@ const createPaymentController = async (req, res) => {
         const backendUrl = process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || 'https://bluetec.vercel.app';
         console.log("🔗 Backend URL para redirecciones:", backendUrl);
 
-        // ✅ PAYLOAD CORREGIDO PARA PAGO OCASIONAL - SIN additional_data POR DEFECTO
+        // ✅ PAYLOAD PARA PAGO OCASIONAL
         const payload = {
             public_key: process.env.BANCARD_PUBLIC_KEY,
             operation: {
@@ -297,13 +352,8 @@ const createPaymentController = async (req, res) => {
             }
         };
 
-        // ✅ IMPORTANTE: Solo agregar additional_data si hay una promoción válida
-        // Según documentación Bancard (páginas 12-13), el formato debe ser:
-        // Entidad (3 dígitos) + Marca (2 caracteres) + Producto (3 caracteres) + Afinidad (6 dígitos)
-        // Ejemplo válido: "099VS ORO000045"
-        
+        // ✅ AGREGAR PROMOCIÓN SI ES VÁLIDA
         if (promotion_code && promotion_code.trim() !== "") {
-            // Validar formato de promoción
             const promotionRegex = /^\d{3}[A-Z]{2}\s[A-Z]{3}\d{6}$/;
             const cleanPromotionCode = promotion_code.trim();
             
@@ -318,13 +368,12 @@ const createPaymentController = async (req, res) => {
                 console.log("💡 Formato requerido: '099VS ORO000045' (Entidad+Marca+Producto+Afinidad)");
             }
         }
-        // ✅ Si no hay promoción válida, NO incluir additional_data en el payload
 
-        console.log("📤 Payload para Bancard (PAGO OCASIONAL CORREGIDO):", {
+        console.log("📤 Payload para Bancard (PAGO OCASIONAL):", {
             ...JSON.parse(JSON.stringify(payload, null, 2)),
             operation: {
                 ...payload.operation,
-                token: "***OCULTO***" // Ocultar token en logs
+                token: "***OCULTO***"
             }
         });
 
@@ -354,31 +403,25 @@ const createPaymentController = async (req, res) => {
                 const processId = response.data.process_id;
                 const iframeUrl = `${getBancardBaseUrl()}/checkout/javascript/dist/bancard-checkout-4.0.0.js`;
 
-                // ✅ GUARDAR TRANSACCIÓN EN BD CON DATOS NORMALIZADOS
+                // ✅ GUARDAR TRANSACCIÓN EN BD
                 try {
-                    // ✅ NORMALIZAR CUSTOMER_INFO
                     const normalizedCustomerInfo = {
-                    name: customer_info?.name || '',
-                    email: customer_info?.email || '',
-                    phone: customer_info?.phone || '',
-                    city: customer_info?.city || '',
-                    address: customer_info?.address || customer_info?.fullAddress || '',
-                    houseNumber: customer_info?.houseNumber || '',
-                    reference: customer_info?.reference || '',
-                    fullAddress: customer_info?.fullAddress || '',
-                    document_type: customer_info?.document_type || 'CI',
-                    document_number: customer_info?.document_number || '',
-                    
-                    // ✅ INFORMACIÓN DE FACTURACIÓN
-                    invoiceData: customer_info?.invoiceData || {
-                        needsInvoice: false
-                    },
-                    
-                    // ✅ INFORMACIÓN DE UBICACIÓN
-                    location: customer_info?.location || null
-                };
+                        name: customer_info?.name || '',
+                        email: customer_info?.email || '',
+                        phone: customer_info?.phone || '',
+                        city: customer_info?.city || '',
+                        address: customer_info?.address || customer_info?.fullAddress || '',
+                        houseNumber: customer_info?.houseNumber || '',
+                        reference: customer_info?.reference || '',
+                        fullAddress: customer_info?.fullAddress || '',
+                        document_type: customer_info?.document_type || 'CI',
+                        document_number: customer_info?.document_number || '',
+                        invoiceData: customer_info?.invoiceData || {
+                            needsInvoice: false
+                        },
+                        location: customer_info?.location || null
+                    };
 
-                    // ✅ NORMALIZAR ITEMS
                     const normalizedItems = (items || []).map(item => ({
                         product_id: item.product_id || item._id || '',
                         name: item.name || item.productName || 'Producto',
@@ -399,154 +442,137 @@ const createPaymentController = async (req, res) => {
                     });
 
                     const newTransaction = new BancardTransactionModel({
-    // ✅ CAMBIAR DE finalShopProcessId A shopProcessId
-    shop_process_id: parseInt(shopProcessId), // ← CORREGIR AQUÍ
-    bancard_process_id: processId,
-    amount: parseFloat(formattedAmount),
-    currency: currency,
-    description: description,
-    customer_info: normalizedCustomerInfo,
-    items: normalizedItems,
-    return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
-    cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
-    status: 'pending',
-    environment: process.env.BANCARD_ENVIRONMENT || 'staging',
-    sale_id: sale_id || null,
-    created_by: req.userId || null,
-    is_certification_test: false,
-    
-    // ✅ DELIVERY_LOCATION corregido
-            delivery_location: delivery_location ? {
-                // ✅ COORDENADAS EXACTAS
-                lat: parseFloat(delivery_location.lat) || null,
-                lng: parseFloat(delivery_location.lng) || null,
-                
-                // ✅ URLS DE GOOGLE MAPS (LO MÁS IMPORTANTE PARA EL DELIVERY)
-                google_maps_url: delivery_location.google_maps_url || 
-                    (delivery_location.lat && delivery_location.lng ? 
-                        `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
-                        null),
-                
-                google_maps_alternative_url: delivery_location.google_maps_alternative_url ||
-                    (delivery_location.lat && delivery_location.lng ? 
-                        `https://www.google.com/maps/place/${delivery_location.lat},${delivery_location.lng}/@${delivery_location.lat},${delivery_location.lng},17z` :
-                        null),
-                
-                // ✅ URL DIRECTA PARA NAVEGACIÓN
-                navigation_url: delivery_location.lat && delivery_location.lng ? 
-                    `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
-                    delivery_location.navigation_url || null,
-                
-                // ✅ COORDENADAS COMO STRING
-                coordinates_string: delivery_location.coordinates_string ||
-                    (delivery_location.lat && delivery_location.lng ? 
-                        `${delivery_location.lat},${delivery_location.lng}` : null),
-                
-                // ✅ INFORMACIÓN DE LA DIRECCIÓN
-                address: delivery_location.address || delivery_location.google_address || '',
-                manual_address: delivery_location.manual_address || '',
-                full_address: delivery_location.full_address || 
-                    `${delivery_location.manual_address || delivery_location.address || ''}, ${delivery_location.city || ''}`,
-                
-                // ✅ DETALLES ESPECÍFICOS
-                city: delivery_location.city || '',
-                house_number: delivery_location.house_number || '',
-                reference: delivery_location.reference || '',
-                
-                // ✅ METADATOS
-                source: delivery_location.source || 'user_selected',
-                timestamp: new Date(),
-                
-                // ✅ INSTRUCCIONES DETALLADAS PARA EL DELIVERY
-                delivery_instructions: delivery_location.delivery_instructions || 
-                    `📍 UBICACIÓN DE ENTREGA:
-            🏠 Dirección: ${delivery_location.address || delivery_location.manual_address || 'No especificada'}
-            🏘️ Ciudad: ${delivery_location.city || 'No especificada'}
-            🏡 Casa/Edificio: ${delivery_location.house_number || 'No especificado'}
-            📝 Referencia: ${delivery_location.reference || 'Sin referencia adicional'}
+                        shop_process_id: parseInt(shopProcessId),
+                        bancard_process_id: processId,
+                        amount: parseFloat(formattedAmount),
+                        currency: currency,
+                        description: description,
+                        customer_info: normalizedCustomerInfo,
+                        items: normalizedItems,
+                        return_url: `${process.env.FRONTEND_URL}/pago-exitoso`,
+                        cancel_url: `${process.env.FRONTEND_URL}/pago-cancelado`,
+                        status: 'pending',
+                        environment: process.env.BANCARD_ENVIRONMENT || 'staging',
+                        sale_id: sale_id || null,
+                        created_by: req.userId || null,
+                        is_certification_test: false,
+                        
+                        delivery_location: delivery_location ? {
+                            lat: parseFloat(delivery_location.lat) || null,
+                            lng: parseFloat(delivery_location.lng) || null,
+                            address: delivery_location.address || delivery_location.google_address || '',
+                            manual_address: delivery_location.manual_address || '',
+                            full_address: delivery_location.full_address || 
+                                `${delivery_location.manual_address || delivery_location.address || ''}, ${delivery_location.city || ''}`,
+                            city: delivery_location.city || '',
+                            house_number: delivery_location.house_number || '',
+                            reference: delivery_location.reference || '',
+                            source: delivery_location.source || 'user_selected',
+                            timestamp: new Date(),
+                            google_maps_url: delivery_location.google_maps_url || 
+                                (delivery_location.lat && delivery_location.lng ? 
+                                    `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
+                                    null),
+                            google_maps_alternative_url: delivery_location.google_maps_alternative_url ||
+                                (delivery_location.lat && delivery_location.lng ? 
+                                    `https://www.google.com/maps/place/${delivery_location.lat},${delivery_location.lng}/@${delivery_location.lat},${delivery_location.lng},17z` :
+                                    null),
+                            navigation_url: delivery_location.lat && delivery_location.lng ? 
+                                `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
+                                delivery_location.navigation_url || null,
+                            coordinates_string: delivery_location.coordinates_string ||
+                                (delivery_location.lat && delivery_location.lng ? 
+                                    `${delivery_location.lat},${delivery_location.lng}` : null),
+                            delivery_instructions: delivery_location.delivery_instructions || 
+                                `📍 UBICACIÓN DE ENTREGA:
+                        🏠 Dirección: ${delivery_location.address || delivery_location.manual_address || 'No especificada'}
+                        🏘️ Ciudad: ${delivery_location.city || 'No especificada'}
+                        🏡 Casa/Edificio: ${delivery_location.house_number || 'No especificado'}
+                        📝 Referencia: ${delivery_location.reference || 'Sin referencia adicional'}
 
-            🗺️ VER UBICACIÓN EN GOOGLE MAPS:
-            ${delivery_location.google_maps_url || 
-            (delivery_location.lat && delivery_location.lng ? 
-                `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
-                'No disponible')}
+                        🗺️ VER UBICACIÓN EN GOOGLE MAPS:
+                        ${delivery_location.google_maps_url || 
+                        (delivery_location.lat && delivery_location.lng ? 
+                            `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${delivery_location.lat},${delivery_location.lng}&z=18&t=m` :
+                            'No disponible')}
 
-            🧭 COORDENADAS EXACTAS: ${delivery_location.lat || 'N/A'}, ${delivery_location.lng || 'N/A'}
+                        🧭 COORDENADAS EXACTAS: ${delivery_location.lat || 'N/A'}, ${delivery_location.lng || 'N/A'}
 
-            📱 Para navegación: ${delivery_location.lat && delivery_location.lng ? 
-                `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
-                'No disponible'}`,
+                        📱 Para navegación: ${delivery_location.lat && delivery_location.lng ? 
+                            `https://www.google.com/maps/dir/?api=1&destination=${delivery_location.lat},${delivery_location.lng}` :
+                            'No disponible'}`,
 
-            } : {
-                // ✅ VALORES POR DEFECTO CUANDO NO HAY UBICACIÓN
-                lat: null,
-                lng: null,
-                google_maps_url: null,
-                google_maps_alternative_url: null,
-                navigation_url: null,
-                coordinates_string: null,
-                address: '',
-                manual_address: '',
-                full_address: '',
-                city: '',
-                house_number: '',
-                reference: '',
-                source: 'not_provided',
-                timestamp: new Date(),
-                delivery_instructions: '⚠️ UBICACIÓN NO PROPORCIONADA\n\n📞 IMPORTANTE: Contactar al cliente para coordinar la entrega\n\nDatos de contacto en customer_info'
-            },
+                        } : {
+                            lat: null,
+                            lng: null,
+                            google_maps_url: null,
+                            google_maps_alternative_url: null,
+                            navigation_url: null,
+                            coordinates_string: null,
+                            address: '',
+                            manual_address: '',
+                            full_address: '',
+                            city: '',
+                            house_number: '',
+                            reference: '',
+                            source: 'not_provided',
+                            timestamp: new Date(),
+                            delivery_instructions: '⚠️ UBICACIÓN NO PROPORCIONADA\n\n📞 IMPORTANTE: Contactar al cliente para coordinar la entrega\n\nDatos de contacto en customer_info'
+                        },
 
-    
-    // CAMPOS DE TRACKING CORREGIDOS
-    user_type: finalUserType,
-    payment_method: payment_method,
-    user_bancard_id: finalUserBancardId,
-    ip_address: clientIpAddress,
-    user_agent: user_agent || req.headers['user-agent'] || '',
-    payment_session_id: payment_session_id,
-    device_type: device_type,
-    cart_total_items: cart_total_items || normalizedItems.length,
-    referrer_url: referrer_url || req.headers.referer || '',
-    order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
-    delivery_method: delivery_method,
-    invoice_number: invoice_number || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    tax_amount: parseFloat(tax_amount) || 0,
-    utm_source: utm_source,
-    utm_medium: utm_medium,
-    utm_campaign: utm_campaign,
-    
-    // CAMPOS ESPECÍFICOS PARA PAGO OCASIONAL
-    is_token_payment: false,
-    alias_token: null,
-    
-    // GUARDAR INFORMACIÓN DE PROMOCIÓN SI EXISTE
-    promotion_code: promotion_code || null,
-    has_promotion: !!payload.operation.additional_data
-});
+                        user_type: finalUserType,
+                        payment_method: payment_method,
+                        user_bancard_id: finalUserBancardId,
+                        ip_address: clientIpAddress,
+                        user_agent: user_agent || req.headers['user-agent'] || '',
+                        payment_session_id: payment_session_id,
+                        device_type: device_type,
+                        cart_total_items: cart_total_items || normalizedItems.length,
+                        referrer_url: referrer_url || req.headers.referer || '',
+                        order_notes: typeof order_notes === 'object' ? JSON.stringify(order_notes) : String(order_notes || ''),
+                        delivery_method: delivery_method,
+                        invoice_number: invoice_number || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                        tax_amount: parseFloat(tax_amount) || 0,
+                        utm_source: utm_source,
+                        utm_medium: utm_medium,
+                        utm_campaign: utm_campaign,
+                        is_token_payment: false,
+                        alias_token: null,
+                        promotion_code: promotion_code || null,
+                        has_promotion: !!payload.operation.additional_data
+                    });
 
+                    const savedTransaction = await newTransaction.save();
+                    console.log("✅ Transacción de pago ocasional guardada en BD:", {
+                        id: savedTransaction._id,
+                        shop_process_id: savedTransaction.shop_process_id,
+                        has_promotion: savedTransaction.has_promotion,
+                        delivery_location_saved: !!savedTransaction.delivery_location,
+                        google_maps_url: savedTransaction.delivery_location?.google_maps_url || 'No disponible',
+                        navigation_url: savedTransaction.delivery_location?.navigation_url || 'No disponible',
+                        delivery_address: savedTransaction.delivery_location?.full_address || 'Sin dirección',
+                        delivery_coordinates: savedTransaction.delivery_location ? {
+                            lat: savedTransaction.delivery_location.lat,
+                            lng: savedTransaction.delivery_location.lng,
+                            hasCoords: !!(savedTransaction.delivery_location.lat && savedTransaction.delivery_location.lng)
+                        } : null
+                    });
 
-                const savedTransaction = await newTransaction.save();
-                console.log("✅ Transacción de pago ocasional guardada en BD:", {
-                    id: savedTransaction._id,
-                    shop_process_id: savedTransaction.shop_process_id,
-                    has_promotion: savedTransaction.has_promotion,
-                    delivery_location_saved: !!savedTransaction.delivery_location,
-                    
-                    // ✅ MOSTRAR URL DE GOOGLE MAPS EN EL LOG
-                    google_maps_url: savedTransaction.delivery_location?.google_maps_url || 'No disponible',
-                    navigation_url: savedTransaction.delivery_location?.navigation_url || 'No disponible',
-                    delivery_address: savedTransaction.delivery_location?.full_address || 'Sin dirección',
-                    
-                    delivery_coordinates: savedTransaction.delivery_location ? {
-                        lat: savedTransaction.delivery_location.lat,
-                        lng: savedTransaction.delivery_location.lng,
-                        hasCoords: !!(savedTransaction.delivery_location.lat && savedTransaction.delivery_location.lng)
-                    } : null
-                });
+                    // ✅ ENVIAR NOTIFICACIÓN A ADMINS DE NUEVA COMPRA INICIADA
+                    try {
+                        console.log("📧 Enviando notificación admin de nueva compra...");
+                        const adminEmailResult = await emailService.sendAdminNotificationEmail(savedTransaction, 'nueva_compra');
+                        if (adminEmailResult.success) {
+                            console.log("✅ Notificación admin de nueva compra enviada:", adminEmailResult.messageId);
+                        } else {
+                            console.error("❌ Error enviando notificación admin:", adminEmailResult.error);
+                        }
+                    } catch (emailError) {
+                        console.error("❌ Error en envío de notificación admin:", emailError);
+                    }
 
                 } catch (dbError) {
                     console.error("⚠️ Error guardando transacción en BD:", dbError);
-                    // ✅ NO FALLAR EL PAGO POR ERROR DE BD
                     console.log("⚠️ Continuando con el pago aunque hubo error en BD");
                 }
                 
@@ -568,7 +594,6 @@ const createPaymentController = async (req, res) => {
                         has_promotion: !!payload.operation.additional_data,
                         promotion_applied: payload.operation.additional_data || null,
                         
-                        // ✅ DATOS PARA EL IFRAME
                         iframe_config: {
                             script_url: iframeUrl,
                             process_id: processId,
@@ -630,9 +655,6 @@ const createPaymentController = async (req, res) => {
     }
 };
 
-/**
- * ✅ CONTROLADOR PARA CONSULTAR ESTADO
- */
 const getTransactionStatusController = async (req, res) => {
     try {
         const { transactionId } = req.params;
@@ -692,9 +714,6 @@ const getTransactionStatusController = async (req, res) => {
     }
 };
 
-/**
- * ✅ CONTROLADOR PARA ROLLBACK
- */
 const rollbackPaymentController = async (req, res) => {
     try {
         console.log("🔄 === INICIANDO ROLLBACK DE PAGO ===");
@@ -800,9 +819,6 @@ const rollbackPaymentController = async (req, res) => {
     }
 };
 
-/**
- * ✅ HEALTH CHECK
- */
 const bancardHealthController = (req, res) => {
     console.log("🏥 Health check de Bancard");
     
