@@ -115,7 +115,7 @@
             method : 'post'
         },
         allProduct: {
-            url: `${backendDomain}/api/obtener-productos-home`,
+            url: `${backendDomain}/api/obtener-productos-admin`,
             method : 'get'
         },
         updateProduct : {

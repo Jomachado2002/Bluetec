@@ -36,9 +36,30 @@ const AllProducts = () => {
 
   const fetchAllProduct = async() => {
     try {
-      const response = await fetch(SummaryApi.allProduct.url)
+      const response = await fetch(SummaryApi.allProduct.url, {
+        method: SummaryApi.allProduct.method,
+        credentials: 'include'
+      })
       const dataResponse = await response.json()
-      const products = dataResponse?.data || []
+      console.log('📊 Respuesta del servidor:', dataResponse); // DEBUG
+let products = [];
+if (dataResponse?.data) {
+  if (Array.isArray(dataResponse.data)) {
+    products = dataResponse.data;
+  } else if (typeof dataResponse.data === 'object') {
+    // Convertir objeto organizado a array plano
+    products = [];
+    Object.values(dataResponse.data).forEach(category => {
+      if (typeof category === 'object') {
+        Object.values(category).forEach(subcategoryProducts => {
+          if (Array.isArray(subcategoryProducts)) {
+            products.push(...subcategoryProducts);
+          }
+        });
+      }
+    });
+  }
+}
       setAllProduct(products)
       applyFiltersAndSort(products)
     } catch (error) {

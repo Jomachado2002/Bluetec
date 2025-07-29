@@ -2,6 +2,7 @@
 
     const express = require('express');
     const router = express.Router();
+    const productModel = require('../models/productModel');
 
     // ===== CONTROLADORES EXISTENTES =====
     const userSignUpController = require("../controller/user/userSignUp");
@@ -779,6 +780,25 @@
     // ===========================================
     router.post("/cargar-producto", authToken, UploadProductController);
     router.get("/obtener-productos-home", authToken, getHomeProductsController);
+router.get("/obtener-productos-admin", authToken, async (req, res) => {
+    try {
+        const products = await productModel.find({}).sort({ createdAt: -1 });
+        
+        res.json({
+            message: "Todos los productos para admin",
+            success: true,
+            error: false,
+            data: products
+        });
+    } catch (err) {
+        res.status(400).json({
+            message: err.message || err,
+            error: true,
+            success: false
+        });
+    }
+});
+router.post("/actualizar-producto", authToken, updateProductController);
     router.get("/obtener-productos", getHomeProductsController);
     router.post("/actualizar-producto", authToken, updateProductController);
     router.get("/obtener-categorias", getCategoryProduct);

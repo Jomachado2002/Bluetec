@@ -9,24 +9,43 @@ async function userDetailsController(req, res) {
         console.log("👤 userRole:", req.userRole);
 
         // ✅ VERIFICAR SI ES UN USUARIO INVITADO
-        if (!req.userId || (typeof req.userId === 'string' && req.userId.startsWith('guest-'))) {
-            console.log("⚠️ Usuario invitado detectado, rechazando acceso a detalles");
-            return res.status(401).json({
-                message: "Debes iniciar sesión para acceder a los detalles del usuario",
-                error: true,
-                success: false,
-                isGuest: true
+        // ✅ VERIFICAR SI ES UN USUARIO INVITADO (MEJORADO PARA GENERAL)
+            if (!req.userId || (typeof req.userId === 'string' && req.userId.startsWith('guest-'))) {
+                console.log("⚠️ Usuario invitado detectado, rechazando acceso a detalles");
+                return res.status(401).json({
+                    message: "Debes iniciar sesión para acceder a los detalles del usuario",
+                    error: true,
+                    success: false,
+                    isGuest: true
+                });
+            }
+
+            // ✅ AGREGAR LOG ESPECÍFICO PARA DEBUGGING EN DISPOSITIVOS MÓVILES
+            console.log("📱 Información de dispositivo:", {
+                userAgent: req.headers['user-agent'] || 'No disponible',
+                userId: req.userId,
+                isAuthenticated: req.isAuthenticated,
+                userRole: req.userRole
             });
-        }
 
         // ✅ VERIFICAR SI EL USUARIO ESTÁ AUTENTICADO
+        // ✅ VERIFICAR SI EL USUARIO ESTÁ AUTENTICADO (MEJORADO)
         if (!req.isAuthenticated) {
-            console.log("❌ Usuario no autenticado");
+            console.log("❌ Usuario no autenticado - Detalles:", {
+                userId: req.userId,
+                isAuthenticated: req.isAuthenticated,
+                userRole: req.userRole,
+                cookieExists: !!req.cookies?.token
+            });
             return res.status(401).json({
-                message: "Usuario no autenticado",
+                message: "Usuario no autenticado. Por favor, inicia sesión nuevamente.",
                 error: true,
                 success: false,
-                isGuest: true
+                isGuest: true,
+                debug: process.env.NODE_ENV === 'development' ? {
+                    userId: req.userId,
+                    hasToken: !!req.cookies?.token
+                } : undefined
             });
         }
 

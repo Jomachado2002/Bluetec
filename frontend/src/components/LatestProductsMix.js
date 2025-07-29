@@ -81,8 +81,8 @@ const fetchDataFromServer = async () => {
     setLoading(true);
     try {
         console.log('🔄 Cargando productos destacados desde servidor');
-        const response = await fetch(SummaryApi.allProduct.url, {
-            method: SummaryApi.allProduct.method,
+        const response = await fetch(`${SummaryApi.baseURL}/api/obtener-productos-home`, {
+            method: 'get',
             credentials: 'include'
         });
 
@@ -96,8 +96,24 @@ const fetchDataFromServer = async () => {
         const responseData = await response.json();
 
         // ✅ VALIDACIÓN Y PROCESAMIENTO DE DATOS:
-        if (responseData.success && Array.isArray(responseData.data)) {
-            const allProducts = responseData.data;
+        // ✅ VALIDACIÓN Y PROCESAMIENTO DE DATOS:
+        if (responseData.success && responseData.data) {
+            let allProducts = [];
+            
+            if (Array.isArray(responseData.data)) {
+                allProducts = responseData.data;
+            } else if (typeof responseData.data === 'object') {
+                // Convertir objeto organizado a array plano
+                Object.values(responseData.data).forEach(category => {
+                    if (typeof category === 'object') {
+                        Object.values(category).forEach(subcategoryProducts => {
+                            if (Array.isArray(subcategoryProducts)) {
+                                allProducts.push(...subcategoryProducts);
+                            }
+                        });
+                    }
+                });
+            }
             
             // Filtrar productos con stock
             const filteredProducts = allProducts.filter(product =>

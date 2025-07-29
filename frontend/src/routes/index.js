@@ -166,6 +166,7 @@ const router = createBrowserRouter([
                         element: <AllProducts />
                     },
                     
+                    
                     // ✅ RUTA PARA TRANSACCIONES BANCARD
                     {
                         path: "transacciones-bancard",
