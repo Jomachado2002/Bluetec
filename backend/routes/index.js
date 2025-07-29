@@ -778,7 +778,8 @@
     // RUTAS DE PRODUCTOS
     // ===========================================
     router.post("/cargar-producto", authToken, UploadProductController);
-    router.get("/obtener-productos-home", getHomeProductsController);
+    router.get("/obtener-productos-home", authToken, getHomeProductsController);
+    router.get("/obtener-productos", getHomeProductsController);
     router.post("/actualizar-producto", authToken, updateProductController);
     router.get("/obtener-categorias", getCategoryProduct);
     router.post("/productos-por-categoria", getCategoryWiseProduct);
