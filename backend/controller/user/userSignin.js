@@ -70,25 +70,25 @@ async function userSignInController(req, res) {
         console.log("✅ Token creado exitosamente");
 
         // ✅ CONFIGURAR COOKIE CON CONFIGURACIÓN ESPECÍFICA PARA VERCEL
-        const cookieOptions = {
-            httpOnly: true,
-            secure: true, // ✅ SIEMPRE TRUE PARA HTTPS
-            sameSite: 'none', // ✅ SIEMPRE NONE PARA CORS
-            maxAge: 24 * 60 * 60 * 1000, // 24 horas
-            path: '/', // ✅ PATH EXPLÍCITO
-            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined // ✅ DOMINIO PARA VERCEL
-        };
+        // ✅ CONFIGURACIÓN ESPECÍFICA PARA iOS/SAFARI
+            const cookieOptions = {
+                httpOnly: true,
+                secure: true, // ✅ SIEMPRE true para HTTPS (requerido por iOS)
+                sameSite: 'none', // ✅ SIEMPRE 'none' para cross-site (requerido por iOS)
+                maxAge: 24 * 60 * 60 * 1000, // 24 horas
+                path: '/' // ✅ PATH explícito
+            };
 
-        // ✅ PARA PRODUCCIÓN EN VERCEL, NO USAR DOMINIO ESPECÍFICO
-        if (process.env.NODE_ENV === 'production') {
-            // No establecer domain para permitir subdominios
-            delete cookieOptions.domain;
-        }
+            // ✅ NO configurar domain - dejar que el navegador lo maneje
+            console.log("🍪 Configurando cookie con opciones iOS-compatible:", cookieOptions);
 
         console.log("🍪 Configurando cookie con opciones:", cookieOptions);
 
         res.cookie('token', token, cookieOptions);
-
+        
+                // ✅ LOG ESPECÍFICO PARA iOS
+        console.log("🍪 Cookie configurada para iOS - token length:", token.length);
+        console.log("📱 Request desde iOS:", req.headers['user-agent']?.includes('iPhone') ? 'SÍ' : 'NO');
         // ✅ TRANSFERIR CARRITO DE INVITADO (si existe)
         try {
             if (req.session && req.session.guestId) {
