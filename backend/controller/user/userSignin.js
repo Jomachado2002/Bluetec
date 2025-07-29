@@ -72,10 +72,11 @@ async function userSignInController(req, res) {
         // ✅ CONFIGURAR COOKIE CON CONFIGURACIÓN ESPECÍFICA PARA VERCEL
         const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            secure: true, // ✅ SIEMPRE TRUE PARA HTTPS
+            sameSite: 'none', // ✅ SIEMPRE NONE PARA CORS
             maxAge: 24 * 60 * 60 * 1000, // 24 horas
-            path: '/' // ✅ AGREGAR PATH EXPLÍCITO
+            path: '/', // ✅ PATH EXPLÍCITO
+            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined // ✅ DOMINIO PARA VERCEL
         };
 
         // ✅ PARA PRODUCCIÓN EN VERCEL, NO USAR DOMINIO ESPECÍFICO

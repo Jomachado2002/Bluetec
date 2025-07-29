@@ -46,11 +46,11 @@ const uploadProductPermission = async (userId) => {
             return true;
         }
         
-        // ✅ GENERAL también tiene algunos permisos (para compatibilidad)
-        if (user.role === 'GENERAL') {
-            console.log("⚠️ Usuario GENERAL - permisos limitados");
-            return false; // ✅ CAMBIAR: GENERAL no tiene permisos admin por defecto
-        }
+                    // ✅ GENERAL puede acceder a su perfil (compatibilidad con iPhone)
+            if (user.role === 'GENERAL') {
+                console.log("✅ Usuario GENERAL - acceso a perfil permitido");
+                return true; // ✅ PERMITIR acceso a perfil para GENERAL
+            }
         
         console.log(`🚫 Rol ${user.role} no tiene permisos admin`);
         return false; // ✅ CAMBIAR: sin rol específico = sin permisos

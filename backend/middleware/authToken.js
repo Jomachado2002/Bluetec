@@ -10,6 +10,12 @@ async function authToken(req, res, next) {
         const token = req.cookies?.token;
         console.log('🎫 Token presente:', !!token);
 
+        console.log('🍪 COOKIES DEBUG:', {
+            allCookies: req.cookies,
+            tokenExists: !!token,
+            tokenPreview: token ? token.substring(0, 20) + '...' : 'NO TOKEN',
+            userAgent: req.headers['user-agent']?.includes('iPhone') ? 'IPHONE' : 'OTHER'
+        });
         if (token) {
             try {
                 // ✅ VERIFICAR TOKEN
