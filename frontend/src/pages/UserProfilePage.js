@@ -54,6 +54,12 @@ const UserProfilePage = () => {
         method: SummaryApi.current_user.method,
         credentials: 'include'
       });
+      console.log('📱 DEBUG MÓVIL - Request details:', {
+        url: SummaryApi.current_user.url,
+        method: SummaryApi.current_user.method,
+        userAgent: navigator.userAgent,
+        cookies: document.cookie
+      });
 
       const result = await response.json();
       if (result.success) {
@@ -61,7 +67,7 @@ const UserProfilePage = () => {
         setUserData(result.data);
       } else {
         console.error('❌ Error en respuesta:', result);
-        toast.error('Error al cargar perfil');
+        toast.error(`Error: ${result.message || 'Error desconocido'} - Status: ${response.status}`);
       }
     } catch (error) {
       console.error('❌ Error:', error);

@@ -67,6 +67,22 @@ async function userDetailsController(req, res) {
             email: user.email,
             role: user.role
         });
+        // ✅ LOG ESPECÍFICO PARA DEBUGGING MÓVIL
+        console.log("=================== DEBUG MÓVIL ===================");
+        console.log("🔍 USER AGENT:", req.headers['user-agent']);
+        console.log("📱 ES IPHONE:", req.headers['user-agent']?.includes('iPhone'));
+        console.log("🍪 COOKIE TOKEN:", req.cookies?.token ? 'PRESENTE' : 'AUSENTE');
+        console.log("👤 USER ID:", req.userId);
+        console.log("🔐 IS AUTHENTICATED:", req.isAuthenticated);
+        console.log("🎭 USER ROLE:", req.userRole);
+        console.log("👥 USUARIO EN BD:", {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            isActive: user.isActive
+        });
+        console.log("==================================================");
 
         // ✅ RESPUESTA EXITOSA
         res.status(200).json({
