@@ -6,7 +6,7 @@ import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import scrollTop from '../helpers/scrollTop';
 
-// ✅ COMPONENTE OPTIMIZADO PARA MOBILE
+// ✅ COMPONENTE OPTIMIZADO PARA MOBILE/DESKTOP
 const VerticalCardProduct = ({ 
   category, 
   subcategory, 
@@ -18,20 +18,21 @@ const VerticalCardProduct = ({
     const [showLeftButton, setShowLeftButton] = useState(false);
     const [showRightButton, setShowRightButton] = useState(true);
     const [hoveredProductId, setHoveredProductId] = useState(null);
-    const [hoverTimeout, setHoverTimeout] = useState(null);
-    const [imageLoadingStates, setImageLoadingStates] = useState({});
-    const [visibleProducts, setVisibleProducts] = useState(new Set()); // ✅ PRODUCTOS VISIBLES
-    const [isMobile, setIsMobile] = useState(false); // ✅ DETECTOR MOBILE
+    const [isMobile, setIsMobile] = useState(false);
+    
+    // ✅ ESTADOS SIMPLIFICADOS
+    const [loadedImages, setLoadedImages] = useState(new Set());
+    const [visibleProductIds, setVisibleProductIds] = useState(new Set());
     
     const loadingList = new Array(6).fill(null);
     const scrollElement = useRef();
     const observerRef = useRef();
     const { fetchUserAddToCart } = useContext(Context);
 
-    // ✅ DETECTAR DISPOSITIVO MOBILE
+    // ✅ DETECTOR MOBILE OPTIMIZADO
     useEffect(() => {
         const checkMobile = () => {
-            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+            const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) 
                                  || window.innerWidth < 768;
             setIsMobile(isMobileDevice);
         };
@@ -41,9 +42,9 @@ const VerticalCardProduct = ({
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // ✅ INTERSECTION OBSERVER PARA LAZY LOADING
+    // ✅ INTERSECTION OBSERVER REAL PARA MOBILE
     useEffect(() => {
-        if (!isMobile) return; // Solo en mobile
+        if (!isMobile) return;
         
         observerRef.current = new IntersectionObserver(
             (entries) => {
@@ -51,17 +52,23 @@ const VerticalCardProduct = ({
                     if (entry.isIntersecting) {
                         const productId = entry.target.dataset.productId;
                         if (productId) {
-                            setVisibleProducts(prev => new Set([...prev, productId]));
+                            setVisibleProductIds(prev => new Set([...prev, productId]));
                         }
                     }
                 });
             },
             {
                 root: scrollElement.current,
-                rootMargin: '50px', // Precargar 50px antes
+                rootMargin: '100px', // ✅ Precargar 100px antes
                 threshold: 0.1
             }
         );
+
+        // ✅ OBSERVAR PRODUCTOS EXISTENTES
+        const productElements = scrollElement.current?.querySelectorAll('[data-product-id]');
+        productElements?.forEach(el => {
+            observerRef.current.observe(el);
+        });
 
         return () => {
             if (observerRef.current) {
@@ -70,116 +77,81 @@ const VerticalCardProduct = ({
         };
     }, [isMobile, data]);
 
+    // ✅ CONFIGURACIÓN DE DATOS OPTIMIZADA
+    useEffect(() => {
+        if (products && products.length > 0) {
+            const limits = {
+                'mouses': isMobile ? 4 : 12,         // ✅ REDUCIDO PARA MOBILE
+                'teclados': isMobile ? 4 : 12,
+                'auriculares': isMobile ? 4 : 12,
+                'microfonos': isMobile ? 4 : 12,
+                'notebooks': isMobile ? 4 : 20,
+                'monitores': isMobile ? 4 : 20,
+                'memorias_ram': isMobile ? 4 : 20,
+                'discos_duros': isMobile ? 4 : 20,
+                'tarjeta_grafica': isMobile ? 4 : 20,
+                'gabinetes': isMobile ? 4 : 20,
+                'procesador': isMobile ? 4 : 20,
+                'placas_madre': isMobile ? 4 : 20,
+            };
+            
+            const limit = limits[subcategory] || (isMobile ? 4 : 20);
+            const limitedProducts = products.slice(0, limit);
+            setData(limitedProducts);
+
+            if (isMobile) {
+                // ✅ EN MOBILE: Solo los primeros 2 productos visibles inicialmente
+                const initialVisible = new Set(limitedProducts.slice(0, 2).map(p => p._id));
+                setVisibleProductIds(initialVisible);
+            } else {
+                // ✅ EN DESKTOP: Todos los productos visibles (comportamiento actual)
+                setVisibleProductIds(new Set(limitedProducts.map(p => p._id)));
+            }
+        } else {
+            setData([]);
+            setVisibleProductIds(new Set());
+        }
+    }, [products, subcategory, isMobile]);
+
+    // ✅ PRELOAD INTELIGENTE SOLO PARA DESKTOP
+    useEffect(() => {
+        if (isMobile || data.length === 0) return;
+        
+        // ✅ SOLO DESKTOP: Preload ambas imágenes
+        const preloadDesktopImages = () => {
+            data.forEach((product, index) => {
+                // Preload con prioridad decreciente
+                setTimeout(() => {
+                    if (product?.productImage?.[0]) {
+                        const img1 = new Image();
+                        img1.fetchPriority = index < 3 ? 'high' : 'low';
+                        img1.src = product.productImage[0];
+                    }
+                    if (product?.productImage?.[1]) {
+                        const img2 = new Image();
+                        img2.fetchPriority = 'low';
+                        img2.src = product.productImage[1];
+                    }
+                }, index * 50);
+            });
+        };
+        
+        preloadDesktopImages();
+    }, [data, isMobile]);
+
+    // ✅ FUNCIÓN DE MANEJO DE IMAGEN CARGADA
+    const handleImageLoad = (productId) => {
+        setLoadedImages(prev => new Set([...prev, productId]));
+    };
+
     const handleAddToCart = (e, product) => {
         e.preventDefault();
         addToCart(e, product);
         fetchUserAddToCart();
     };
 
-    const handleImageLoad = (productId, imageIndex) => {
-        setImageLoadingStates(prev => ({
-            ...prev,
-            [`${productId}-${imageIndex}`]: false
-        }));
-    };
-
-    const handleImageStart = (productId, imageIndex) => {
-        setImageLoadingStates(prev => ({
-            ...prev,
-            [`${productId}-${imageIndex}`]: true
-        }));
-    };
-
-    const isImageLoading = (productId, imageIndex) => {
-        return imageLoadingStates[`${productId}-${imageIndex}`] || false;
-    };
-
-    // ✅ SINCRONIZAR CON PROPS
-    useEffect(() => {
-        if (products && products.length > 0) {
-            const limits = {
-                'mouses': isMobile ? 5 : 12,         // ✅ SOLO 5 PRODUCTOS EN MOBILE
-                'teclados': isMobile ? 5 : 12,
-                'auriculares': isMobile ? 5 : 12,
-                'microfonos': isMobile ? 5 : 12,
-                'notebooks': isMobile ? 5 : 20,
-                'monitores': isMobile ? 5 : 20,
-                'memorias_ram': isMobile ? 5 : 20,
-                'discos_duros': isMobile ? 5 : 20,
-                'tarjeta_grafica': isMobile ? 5 : 20,
-                'gabinetes': isMobile ? 5 : 20,
-                'procesador': isMobile ? 5 : 20,
-                'placas_madre': isMobile ? 5 : 20,
-            };
-            
-            const limit = limits[subcategory] || (isMobile ? 5 : 20);
-            const limitedProducts = products.slice(0, limit);
-            setData(limitedProducts);
-
-            // ✅ CARGAR IMÁGENES DE TODOS LOS PRODUCTOS (SON POCOS EN MOBILE)
-            const newImageStates = {};
-            limitedProducts.forEach(product => {
-                if (product?.productImage?.[0]) {
-                    newImageStates[`${product._id}-0`] = true;
-                }
-                if (product?.productImage?.[1]) {
-                    newImageStates[`${product._id}-1`] = true;
-                }
-            });
-            setImageLoadingStates(newImageStates);
-
-            // ✅ TODOS LOS PRODUCTOS VISIBLES (SIN LAZY LOADING)
-            setVisibleProducts(new Set(limitedProducts.map(p => p._id)));
-        } else {
-            setData([]);
-            setImageLoadingStates({});
-            setVisibleProducts(new Set());
-        }
-    }, [products, subcategory, isMobile]);
-
-    // ✅ PRELOAD OPTIMIZADO PARA AMBOS DISPOSITIVOS
-    useEffect(() => {
-        if (data.length > 0) {
-            const preloadInChunks = (products, chunkSize = 3) => {
-                for (let i = 0; i < products.length; i += chunkSize) {
-                    setTimeout(() => {
-                        const chunk = products.slice(i, i + chunkSize);
-                        chunk.forEach(product => {
-                            if (product?.productImage?.[0]) {
-                                const img1 = new Image();
-                                img1.src = product.productImage[0];
-                            }
-                            if (product?.productImage?.[1] && !isMobile) { // Solo preload segunda imagen en desktop
-                                const img2 = new Image();
-                                img2.src = product.productImage[1];
-                            }
-                        });
-                    }, i * 50); // Más rápido en mobile
-                }
-            };
-            
-            preloadInChunks(data);
-        }
-    }, [data, isMobile]);
-
-    // ✅ OBSERVAR PRODUCTOS PARA LAZY LOADING
-    useEffect(() => {
-        if (!isMobile || !observerRef.current) return;
-
-        const productElements = scrollElement.current?.querySelectorAll('[data-product-id]');
-        productElements?.forEach(el => {
-            observerRef.current.observe(el);
-        });
-
-        return () => {
-            productElements?.forEach(el => {
-                observerRef.current?.unobserve(el);
-            });
-        };
-    }, [data, isMobile]);
-
     const scrollRight = () => {
-        const scrollAmount = isMobile ? 200 : 300; // ✅ SCROLL MÁS PEQUEÑO EN MOBILE
+        const scrollAmount = isMobile ? 200 : 300;
         scrollElement.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     };
 
@@ -213,23 +185,23 @@ const VerticalCardProduct = ({
         return null;
     };
 
-    // ✅ COMPONENTE PLACEHOLDER PARA MOBILE
+    // ✅ PLACEHOLDER OPTIMIZADO PARA MOBILE
     const ProductPlaceholder = ({ product }) => (
         <div 
             data-product-id={product._id}
-            className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] h-[280px] sm:h-[300px] bg-gray-100 rounded-lg shadow-sm border flex items-center justify-center'
+            className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] h-[280px] sm:h-[300px] bg-gray-50 rounded-lg shadow-sm border flex items-center justify-center'
         >
             <div className="text-center p-4">
-                <div className="w-8 h-8 border-4 border-gray-300 border-t-[#002060] rounded-full animate-spin mx-auto mb-2"></div>
-                <div className="text-xs text-gray-500">Cargando...</div>
+                <div className="w-6 h-6 border-3 border-gray-200 border-t-[#002060] rounded-full animate-spin mx-auto mb-2"></div>
+                <div className="text-xs text-gray-400">Cargando...</div>
             </div>
         </div>
     );
 
     // ✅ SPINNER OPTIMIZADO
     const ImageSpinner = () => (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-            <div className="w-6 h-6 border-3 border-gray-200 border-t-[#002060] rounded-full animate-spin"></div>
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-t-lg">
+            <div className="w-5 h-5 border-2 border-gray-200 border-t-[#002060] rounded-full animate-spin"></div>
         </div>
     );
 
@@ -286,8 +258,8 @@ const VerticalCardProduct = ({
                 {/* Contenedor de productos */}
                 <div
                     ref={scrollElement}
-                    className={`flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth py-4 snap-x ${
-                        isMobile ? 'snap-mandatory' : ''
+                    className={`flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth py-4 ${
+                        isMobile ? 'snap-x snap-mandatory' : ''
                     }`}
                 >
                     {loading
@@ -306,77 +278,58 @@ const VerticalCardProduct = ({
                             </div>
                         ))
                         : data.map((product) => {
-                            // ✅ SIN LAZY LOADING - TODOS LOS PRODUCTOS SE MUESTRAN DIRECTAMENTE
                             const discount = calculateDiscount(product?.price, product?.sellingPrice);
-                            const isHovered = hoveredProductId === product?._id;
+                            const isVisible = visibleProductIds.has(product?._id);
+                            const isImageLoaded = loadedImages.has(product?._id);
+                            
+                            // ✅ LÓGICA HOVER SOLO PARA DESKTOP
+                            const isHovered = !isMobile && hoveredProductId === product?._id;
                             const secondImage = product.productImage?.[1];
-                            const showSecondImage = isHovered && secondImage && !isMobile; // ✅ NO HOVER EN MOBILE
+                            const showSecondImage = isHovered && secondImage && isImageLoaded;
                             
-                            const handleMouseEnter = () => {
-                                if (isMobile) return; // ✅ NO HOVER EN MOBILE
-                                
-                                if (hoverTimeout) {
-                                    clearTimeout(hoverTimeout);
-                                }
-                                
-                                const timeout = setTimeout(() => {
-                                    setHoveredProductId(product?._id);
-                                }, 300);
-                                
-                                setHoverTimeout(timeout);
-                            };
-                            
-                            const handleMouseLeave = () => {
-                                if (isMobile) return;
-                                
-                                if (hoverTimeout) {
-                                    clearTimeout(hoverTimeout);
-                                    setHoverTimeout(null);
-                                }
-                                setHoveredProductId(null);
-                            };
+                            // ✅ EN MOBILE: Mostrar placeholder si no es visible
+                            if (isMobile && !isVisible) {
+                                return <ProductPlaceholder key={product?._id} product={product} />;
+                            }
                             
                             return (
                                 <Link to={`/producto/${product?.slug || product?._id}`}
                                     key={product?._id} 
+                                    data-product-id={product?._id}
                                     className='snap-center flex-none w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] h-[280px] sm:h-[300px] bg-white rounded-lg shadow-sm border hover:shadow-md transition-all duration-200 group/card relative flex flex-col'
                                     onClick={scrollTop}
-                                    onMouseEnter={handleMouseEnter}
-                                    onMouseLeave={handleMouseLeave}
+                                    onMouseEnter={() => !isMobile && setHoveredProductId(product?._id)}
+                                    onMouseLeave={() => !isMobile && setHoveredProductId(null)}
                                 >
                                     {/* Imagen del producto */}
                                     <div className='h-32 sm:h-36 rounded-t-lg flex items-center justify-center overflow-hidden relative bg-gray-50'>
-                                        {isImageLoading(product?._id, 0) && <ImageSpinner />}
+                                        {/* Spinner mientras carga */}
+                                        {!isImageLoaded && <ImageSpinner />}
                                         
+                                        {/* Imagen principal */}
                                         <img
                                             src={product.productImage[0]}
                                             alt={product.productName}
                                             className={`object-contain h-full w-full transition-all duration-500 ease-in-out ${
                                                 showSecondImage ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-                                            }`}
-                                            loading="lazy" // ✅ LAZY LOADING PARA TODOS
-                                            onLoadStart={() => handleImageStart(product?._id, 0)}
-                                            onLoad={() => handleImageLoad(product?._id, 0)}
-                                            onError={() => handleImageLoad(product?._id, 0)}
+                                            } ${!isImageLoaded ? 'opacity-0' : 'opacity-100'}`}
+                                            loading={isMobile ? "lazy" : "eager"} // ✅ LAZY EN MOBILE, EAGER EN DESKTOP
+                                            fetchPriority={isMobile ? "low" : "high"} // ✅ PRIORIDAD BAJA EN MOBILE
+                                            onLoad={() => handleImageLoad(product?._id)}
+                                            onError={() => handleImageLoad(product?._id)}
                                         />
                                         
                                         {/* Segunda imagen solo en desktop */}
-                                        {secondImage && !isMobile && (
-                                            <>
-                                                {isImageLoading(product?._id, 1) && showSecondImage && <ImageSpinner />}
-                                                
-                                                <img
-                                                    src={secondImage}
-                                                    alt={product.productName}
-                                                    className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
-                                                        showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
-                                                    }`}
-                                                    loading="lazy"
-                                                    onLoadStart={() => handleImageStart(product?._id, 1)}
-                                                    onLoad={() => handleImageLoad(product?._id, 1)}
-                                                    onError={() => handleImageLoad(product?._id, 1)}
-                                                />
-                                            </>
+                                        {secondImage && !isMobile && isImageLoaded && (
+                                            <img
+                                                src={secondImage}
+                                                alt={product.productName}
+                                                className={`absolute inset-0 object-contain h-full w-full transition-all duration-500 ease-in-out ${
+                                                    showSecondImage ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
+                                                }`}
+                                                loading="lazy"
+                                                fetchPriority="low"
+                                            />
                                         )}
 
                                         {discount && (
