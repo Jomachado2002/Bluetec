@@ -7,6 +7,7 @@ import productCategory from '../helpers/productCategory'
 import * as XLSX from 'xlsx'
 import ProductFinanceModal from '../components/admin/ProductFinanceModal'
 import ExchangeRateConfig from '../components/admin/ExchangeRateConfig'
+import StockManagement from '../components/admin/StockManagement'
 
 
 
@@ -26,6 +27,7 @@ const AllProducts = () => {
   
   // Estado para gestión financiera
   const [selectedProductForFinance, setSelectedProductForFinance] = useState(null)
+  const [showStockManagement, setShowStockManagement] = useState(false)
   
   // Estado para el tipo de cambio global
   const [exchangeRate, setExchangeRate] = useState(() => {
@@ -230,11 +232,18 @@ if (dataResponse?.data) {
             Exportar a Excel
           </button>
           <button
+            className='flex items-center gap-2 border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all py-1 px-4 rounded-full mr-2'
+            onClick={() => setShowStockManagement(true)}
+          >
+            📊 Gestionar Stock
+          </button>
+          <button
             className='border border-gray-400 hover:bg-green-200 transition-all py-1 px-4 rounded-full'
             onClick={() => setOpenUploadProduct(true)}
           >
             Cargar Productos
           </button>
+
         </div>
       </div>
       
@@ -427,6 +436,7 @@ if (dataResponse?.data) {
 
       {/* Modal para gestión financiera */}
       {selectedProductForFinance && (
+        
         <ProductFinanceModal
           product={selectedProductForFinance}
           onClose={() => setSelectedProductForFinance(null)}
@@ -447,6 +457,27 @@ if (dataResponse?.data) {
             }
           }}
         />
+      )}
+      {/* Modal para gestión de stock */}
+      {showStockManagement && (
+        <div className="fixed inset-0 bg-black/60 z-[200] overflow-y-auto">
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+              <div className="flex justify-between items-center p-4 border-b">
+                <h2 className="text-xl font-semibold">Gestión de Stock con Mayoristas</h2>
+                <button 
+                  onClick={() => setShowStockManagement(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="overflow-y-auto max-h-[80vh]">
+                <StockManagement onClose={() => setShowStockManagement(false)} />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       

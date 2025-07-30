@@ -1,30 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ProductSpecifications from './ProductSpecifications';
+import SummaryApi from '../common';
 import { IoIosClose } from "react-icons/io";
-import productCategory from '../helpers/productCategory';
 import { FaUpload } from "react-icons/fa";
+import { FaDeleteLeft } from "react-icons/fa6";
+import productCategory from '../helpers/productCategory';
+import { MdClose } from "react-icons/md";
+import { FaCloudUploadAlt } from "react-icons/fa";
+import { MdDelete } from "react-icons/md";
 import uploadImage from '../helpers/uploadImage';
 import DisplayImage from './DisplayImage';
-import { FaDeleteLeft } from "react-icons/fa6";
-import SummaryApi from '../common';
 import { toast } from 'react-toastify';
-import ProductSpecifications from './ProductSpecifications';
 
-const UploadProduct = ({ onClose, fetchData }) => {
-  const [data, setData] = useState({
-    productName: "",
-    brandName: "",
-    category: "",
-    subcategory: "",
-    productImage: [],
-    documentationLink: "",
-    description: "",
-    price: "",
-    sellingPrice: "",
-  });
+
+const UploadProduct = ({ onClose, fetchData, prefilledData = null }) => {
+  const [data, setData] = useState(prefilledData || {
+  productName: "",
+  brandName: "",
+  category: "",
+  subcategory: "",
+  productImage: [],
+  documentationLink: "",
+  description: "",
+  price: "",
+  sellingPrice: "",
+});
 
   const [loading, setLoading] = useState(false);
-  const [openFullScreenImage, setOpenFullScreenImage] = useState(false);
-  const [fullScreenImage, setFullScreenImage] = useState("");
+const [openFullScreenImage, setOpenFullScreenImage] = useState(false);
+const [fullScreenImage, setFullScreenImage] = useState("");
+  // Efecto para cargar datos prellenados
+useEffect(() => {
+  if (prefilledData) {
+    console.log('📝 Cargando datos prellenados:', prefilledData);
+    setData(prefilledData);
+  }
+}, [prefilledData]);
 
   const handleOnChange = (e) => {
     const { name, value, type } = e.target;

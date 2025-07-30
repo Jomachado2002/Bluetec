@@ -158,6 +158,25 @@
             url: `${backendDomain}/api/finanzas/actualizarprecios`,
             method: 'post'
         },
+         analyzeStock: {
+                url: `${backendDomain}/api/productos/analizar-stock`,
+                method: "post"
+            },
+        // Gestión de stock con mayoristas
+        stockManagement: {
+            analyzeStock: {
+                url: `${backendDomain}/api/productos/analizar-stock`,
+                method: "post"
+            },
+            updateBulkStock: {
+                url: `${backendDomain}/api/productos/actualizar-stock-masivo`,
+                method: 'post'
+            },
+            updatePricesFromMayoristas: {
+                url: `${backendDomain}/api/productos/actualizar-precios-mayoristas`,
+                method: 'post'
+            }
+        },
 
         // ===========================================
         // BANCARD - PAGOS ONLINE - ✅ COMPLETADO Y MEJORADO
