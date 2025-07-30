@@ -25,6 +25,11 @@
     const resetPassword = require('../controller/user/resetPassword');
     const getCategorySearch = require('../controller/product/getCategorySearch');
     const { deleteProductController } = require('../controller/product/deleteproductcontrolle');
+    const { 
+    analyzeStockController, 
+    updateBulkStockController, 
+    updatePricesFromMayoristasController 
+} = require('../controller/product/stockManagementController');
     const getProductBySlug = require('../controller/product/getProductBySlug');
 
     // ===== CONTROLADORES DE FINANZAS =====
@@ -810,6 +815,12 @@ router.post("/actualizar-producto", authToken, updateProductController);
     router.post("/restablecer-contrasena", resetPassword);
     router.get("/buscar-por-categoria", getCategorySearch);
     router.post("/eliminar-producto", authToken, deleteProductController);
+    // ===========================================
+    // RUTAS DE GESTIÓN DE STOCK CON MAYORISTAS
+    // ===========================================
+    router.post("/productos/analizar-stock", authToken, analyzeStockController);
+    router.post("/productos/actualizar-stock-masivo", authToken, updateBulkStockController);
+    router.post("/productos/actualizar-precios-mayoristas", authToken, updatePricesFromMayoristasController);
     router.get("/producto-por-slug/:slug", getProductBySlug);
     router.post("/finanzas/actualizarprecios", authToken, updateAllPricesController);
 
