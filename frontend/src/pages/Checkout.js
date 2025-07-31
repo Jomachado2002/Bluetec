@@ -280,6 +280,8 @@ const Checkout = () => {
     const [couponCode, setCouponCode] = useState('');
     const [couponApplied, setCouponApplied] = useState(false);
     const [needsInvoice, setNeedsInvoice] = useState(false);
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
     
     // Formulario mejorado con campos separados
     const [formData, setFormData] = useState({
@@ -367,9 +369,21 @@ const Checkout = () => {
         }
     }, [isLoggedIn]);
 
-    const totalPrice = cartItems.reduce((total, item) => 
-        total + (item.quantity * item.productId.sellingPrice), 0
-    );
+ // Calcular subtotal sin IVA (los precios incluyen IVA)
+const totalWithIVA = cartItems.reduce((total, item) => 
+    total + (item.quantity * item.productId.sellingPrice), 0
+);
+
+const originalSubtotal = Math.round(totalWithIVA / 1.1); // Subtotal sin IVA
+
+// Aplicar descuento al subtotal
+const subtotalAfterDiscount = originalSubtotal - discountAmount;
+
+// Calcular IVA sobre el subtotal ya con descuento
+const ivaAmount = Math.round(subtotalAfterDiscount * 0.1);
+
+// Total final
+const totalPrice = subtotalAfterDiscount + ivaAmount;
     
     const ivaBreakdown = formatIVABreakdown(totalPrice);
 
@@ -604,17 +618,31 @@ const hasValidLocation = () => {
     };
 
     const applyCoupon = () => {
-        if (!couponCode.trim()) {
-            toast.error('Ingresa un código promocional');
-            return;
-        }
-        setCouponApplied(true);
-        toast.success('Cupón aplicado correctamente');
+    if (!couponCode.trim()) {
+        toast.error('Ingresa un código promocional');
+        return;
+    }
+    
+       if (couponCode.toUpperCase() === 'ARA10') {
+    const discount = Math.round(originalSubtotal * 0.1); // 10% sobre el subtotal sin IVA
+    setDiscountAmount(discount);
+    setAppliedCoupon({
+        code: 'ARA10',
+        percentage: 10,
+        amount: discount
+    });
+    setCouponApplied(true);
+    toast.success('🎉 Cupón ARA10 aplicado! 10% de descuento');
+} else {
+    toast.error('Código promocional no válido');
+}
     };
 
-    const removeCoupon = () => {
+        const removeCoupon = () => {
         setCouponApplied(false);
         setCouponCode('');
+        setAppliedCoupon(null);
+        setDiscountAmount(0);
         toast.info('Cupón removido');
     };
 
@@ -1327,7 +1355,7 @@ const hasValidLocation = () => {
                                         <div className="flex justify-between items-center">
                                             <div className="flex items-center gap-2">
                                                 <FaCheckCircle className="text-green-600" />
-                                                <span className="text-green-800 font-medium">{couponCode}</span>
+                                                <span className="text-green-800 font-medium">{appliedCoupon?.code || couponCode}</span>
                                             </div>
                                             <button 
                                                 onClick={removeCoupon}
@@ -1362,35 +1390,33 @@ const hasValidLocation = () => {
                             
                             {/* Resumen de precios mejorado */}
                             <div className="p-6">
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-600 font-medium">Subtotal</span>
-                                        <span className="font-semibold">{ivaBreakdown.subtotalFormatted}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-600 font-medium">IVA (10%)</span>
-                                        <span className="font-semibold">{ivaBreakdown.ivaFormatted}</span>
-                                    </div>
-                                    {couponApplied && (
-                                        <div className="flex justify-between items-center text-green-600">
-                                            <span className="font-medium flex items-center gap-1">
-                                                <FaGift className="text-sm" />
-                                                Descuento
-                                            </span>
-                                            <span className="font-semibold">- {displayINRCurrency(totalPrice * 0.1)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-600 font-medium">Envío</span>
-                                        <span className="text-green-600 font-semibold">A calcular</span>
-                                    </div>
-                                </div>
-                                
+                              <div className="space-y-4">
+   <div className="flex justify-between items-center">
+        <span className="text-gray-600 font-medium">Subtotal</span>
+        <span className="font-semibold">{displayINRCurrency(originalSubtotal)}</span>
+    </div>
+    <div className="flex justify-between items-center">
+        <span className="text-gray-600 font-medium">IVA (10%)</span>
+        <span className="font-semibold">{displayINRCurrency(ivaAmount)}</span>
+    </div>
+    {appliedCoupon && (
+        <div className="flex justify-between items-center text-green-600">
+            <span className="font-medium flex items-center gap-1">
+                <FaGift className="text-sm" />
+                Descuento {appliedCoupon.code} ({appliedCoupon.percentage}%)
+            </span>
+            <span className="font-semibold">- {displayINRCurrency(appliedCoupon.amount)}</span>
+        </div>
+    )}
+    <div className="flex justify-between items-center">
+        <span className="text-gray-600 font-medium">Envío</span>
+        <span className="text-green-600 font-semibold">A calcular</span>
+    </div>
+</div>                                
                                 <div className="border-t border-gray-200 mt-6 pt-6">
                                     <div className="flex justify-between items-center">
                                         <span className="text-xl font-bold text-gray-900">Total</span>
-                                        <span className="text-2xl font-bold text-blue-600">{ivaBreakdown.totalFormatted}</span>
-                                    </div>
+                                        <span className="text-2xl font-bold text-blue-600">{displayINRCurrency(totalPrice)}</span>                                    </div>
                                 </div>
                             </div>
                             
