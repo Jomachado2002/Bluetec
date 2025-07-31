@@ -1,4 +1,4 @@
-// frontend/src/pages/PaymentSuccess.js - VERSIÓN MEJORADA
+/* global fbq */
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
@@ -7,11 +7,9 @@ import {
     FaShoppingCart, 
     FaReceipt, 
     FaCreditCard,
-    FaSpinner,
     FaExclamationTriangle,
     FaFileInvoice
 } from 'react-icons/fa';
-import { toast } from 'react-toastify';
 import displayPYGCurrency from '../helpers/displayCurrency';
 import { localCartHelper } from '../helpers/addToCart';
 
@@ -23,7 +21,7 @@ const PaymentSuccess = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ✅ OBTENER PARÁMETROS DE LA URL DE BANCARD
+    // Obtener parámetros de la URL Bancard
     const shop_process_id = searchParams.get('shop_process_id');
     const operation_id = searchParams.get('operation_id');
     const currency_id = searchParams.get('currency_id');
@@ -39,6 +37,12 @@ const PaymentSuccess = () => {
     const card_country = searchParams.get('card_country');
     const version = searchParams.get('version');
     const risk_index = searchParams.get('risk_index');
+
+    // Determinar si el pago fue exitoso
+    const isPaymentSuccessful = response_code === '00' || 
+                           (!response_code && shop_process_id) ||
+                           (authorization_number && ticket_number) ||
+                           searchParams.get('status') === 'payment_success';
 
     useEffect(() => {
         console.log("💳 === PÁGINA DE PAGO EXITOSO ===");
@@ -59,7 +63,7 @@ const PaymentSuccess = () => {
             risk_index
         });
 
-        // ✅ VERIFICAR SI HAY DATOS DEL PAGO EN SESSION STORAGE
+        // Verificar si hay datos del pago en sessionStorage
         const savedPaymentData = sessionStorage.getItem('bancard_payment');
         if (savedPaymentData) {
             try {
@@ -71,7 +75,7 @@ const PaymentSuccess = () => {
             }
         }
 
-        // ✅ SI TENEMOS shop_process_id, CONSULTAR DETALLES DE LA TRANSACCIÓN
+        // Consultar detalles de la transacción si hay ID
         if (shop_process_id) {
             fetchTransactionDetails(shop_process_id);
         } else {
@@ -79,15 +83,24 @@ const PaymentSuccess = () => {
             setError("No se recibió ID de transacción");
         }
 
-        // ✅ LIMPIAR CARRITO SI EL PAGO FUE EXITOSO
+        // Limpiar carrito si el pago fue exitoso
         if (isPaymentSuccessful) {
-            // Solo limpiar si el código de respuesta es exitoso o no está presente (asumimos éxito)
             setTimeout(() => {
                 localCartHelper.clearCart();
                 console.log("🛒 Carrito limpiado después del pago exitoso");
             }, 2000);
-        }
 
+            // Facebook Pixel Tracking, solo si fbq está definido
+            if (typeof fbq === 'function') {
+                fbq('track', 'Purchase', {
+                    content_ids: [shop_process_id || '123'],
+                    value: parseFloat(amount || 0),
+                    currency: currency_id === 'PYG' ? 'PYG' : 'USD',
+                    content_type: 'product'
+                });
+                console.log("🎯 Evento de compra enviado a Facebook Pixel");
+            }
+        }
     }, [shop_process_id, response_code]);
 
     const fetchTransactionDetails = async (transactionId) => {
@@ -124,15 +137,6 @@ const PaymentSuccess = () => {
         navigate('/');
     };
 
-    
-
-    // ✅ DETERMINAR SI EL PAGO FUE EXITOSO
-    const isPaymentSuccessful = response_code === '00' || 
-                           (!response_code && shop_process_id) ||
-                           (authorization_number && ticket_number) ||
-                           searchParams.get('status') === 'payment_success';
-    
-
     if (isLoading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center">
@@ -148,7 +152,6 @@ const PaymentSuccess = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 py-8 px-4">
             <div className="container mx-auto max-w-4xl">
-                
                 {/* Header de estado */}
                 <div className="text-center mb-8">
                     {isPaymentSuccessful ? (
@@ -160,11 +163,9 @@ const PaymentSuccess = () => {
                             <FaExclamationTriangle className="text-4xl" />
                         </div>
                     )}
-                    
                     <h1 className={`text-3xl font-bold mb-2 ${isPaymentSuccessful ? 'text-green-800' : 'text-red-800'}`}>
                         {isPaymentSuccessful ? '¡Pago Exitoso!' : 'Error en el Pago'}
                     </h1>
-                    
                     <p className={`text-lg ${isPaymentSuccessful ? 'text-green-600' : 'text-red-600'}`}>
                         {isPaymentSuccessful 
                             ? 'Tu pago ha sido procesado correctamente'
@@ -174,14 +175,12 @@ const PaymentSuccess = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    
                     {/* Detalles de la transacción */}
                     <div className="bg-white rounded-xl shadow-lg p-6">
                         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                             <FaReceipt className="mr-2 text-blue-600" />
                             Detalles de la Transacción
                         </h2>
-                        
                         <div className="space-y-4">
                             {shop_process_id && (
                                 <div className="flex justify-between py-2 border-b border-gray-100">
@@ -189,14 +188,12 @@ const PaymentSuccess = () => {
                                     <span className="font-medium text-gray-900">#{shop_process_id}</span>
                                 </div>
                             )}
-                            
                             {operation_id && (
                                 <div className="flex justify-between py-2 border-b border-gray-100">
                                     <span className="text-gray-600">ID de Operación:</span>
                                     <span className="font-medium text-gray-900">{operation_id}</span>
                                 </div>
                             )}
-                            
                             {displayAmount && (
                                 <div className="flex justify-between py-2 border-b border-gray-100">
                                     <span className="text-gray-600">Monto:</span>
@@ -205,21 +202,18 @@ const PaymentSuccess = () => {
                                     </span>
                                 </div>
                             )}
-                            
                             {authorization_number && (
                                 <div className="flex justify-between py-2 border-b border-gray-100">
                                     <span className="text-gray-600">Nº de Autorización:</span>
                                     <span className="font-medium text-gray-900">{authorization_number}</span>
                                 </div>
                             )}
-                            
                             {ticket_number && (
                                 <div className="flex justify-between py-2 border-b border-gray-100">
                                     <span className="text-gray-600">Nº de Ticket:</span>
                                     <span className="font-medium text-gray-900">{ticket_number}</span>
                                 </div>
                             )}
-                            
                             {response_description && (
                                 <div className="flex justify-between py-2 border-b border-gray-100">
                                     <span className="text-gray-600">Estado:</span>
@@ -228,7 +222,6 @@ const PaymentSuccess = () => {
                                     </span>
                                 </div>
                             )}
-                            
                             <div className="flex justify-between py-2 border-b border-gray-100">
                                 <span className="text-gray-600">Fecha:</span>
                                 <span className="font-medium text-gray-900">
@@ -246,7 +239,6 @@ const PaymentSuccess = () => {
 
                     {/* Información adicional y acciones */}
                     <div className="space-y-6">
-                        
                         {/* Información de seguridad */}
                         {(card_source || customer_ip || risk_index) && (
                             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -254,7 +246,6 @@ const PaymentSuccess = () => {
                                     <FaCreditCard className="mr-2 text-green-600" />
                                     Información de Seguridad
                                 </h3>
-                                
                                 <div className="space-y-3 text-sm">
                                     {card_source && (
                                         <div className="flex justify-between">
@@ -264,21 +255,18 @@ const PaymentSuccess = () => {
                                             </span>
                                         </div>
                                     )}
-                                    
                                     {card_country && (
                                         <div className="flex justify-between">
                                             <span className="text-gray-600">País de tarjeta:</span>
                                             <span className="font-medium">{card_country}</span>
                                         </div>
                                     )}
-                                    
                                     {customer_ip && (
                                         <div className="flex justify-between">
                                             <span className="text-gray-600">IP del cliente:</span>
                                             <span className="font-medium">{customer_ip}</span>
                                         </div>
                                     )}
-                                    
                                     {risk_index && (
                                         <div className="flex justify-between">
                                             <span className="text-gray-600">Índice de riesgo:</span>
@@ -295,7 +283,6 @@ const PaymentSuccess = () => {
                                 <h3 className="text-lg font-semibold text-gray-800 mb-4">
                                     Datos del Cliente
                                 </h3>
-                                
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Nombre:</span>
@@ -318,7 +305,6 @@ const PaymentSuccess = () => {
                             <h3 className="text-lg font-semibold text-gray-800 mb-4">
                                 ¿Qué deseas hacer ahora?
                             </h3>
-                            
                             <div className="space-y-3">
                                 <button
                                     onClick={handleContinueShopping}
@@ -327,7 +313,6 @@ const PaymentSuccess = () => {
                                     <FaShoppingCart />
                                     Continuar Comprando
                                 </button>
-                                
                                 <Link
                                     to="/"
                                     className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 font-medium"
@@ -335,7 +320,6 @@ const PaymentSuccess = () => {
                                     <FaHome />
                                     Ir al Inicio
                                 </Link>
-                                
                                 {isPaymentSuccessful && (
                                     <button
                                         onClick={() => window.print()}
@@ -355,7 +339,6 @@ const PaymentSuccess = () => {
                     <h3 className="text-lg font-semibold text-blue-800 mb-2">
                         Información Importante
                     </h3>
-                    
                     {isPaymentSuccessful ? (
                         <div className="text-blue-700 space-y-2 text-sm">
                             <p>• Recibirás un email de confirmación en los próximos minutos.</p>
