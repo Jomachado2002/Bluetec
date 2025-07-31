@@ -13,17 +13,45 @@ const SimpleLocationSelector = ({
   const mapRef = useRef(null);
   const searchInputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const markerRef = useRef(null); // ✅ Usar ref para mejor control del marcador
   
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState(initialLocation);
   const [address, setAddress] = useState('');
   const [saving, setSaving] = useState(false);
   const [map, setMap] = useState(null);
-  const [marker, setMarker] = useState(null);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [googleMapsShareUrl, setGoogleMapsShareUrl] = useState('');
+
+  // ✅ FUNCIÓN MEJORADA PARA LIMPIAR MARCADOR ANTERIOR
+  const clearPreviousMarker = () => {
+    if (markerRef.current) {
+      markerRef.current.setMap(null);
+      markerRef.current = null;
+    }
+  };
+
+  // ✅ FUNCIÓN MEJORADA PARA CREAR NUEVO MARCADOR
+  const createMarker = (location, mapInstance) => {
+    // Primero limpiar cualquier marcador existente
+    clearPreviousMarker();
+    
+    // Crear el nuevo marcador
+    const newMarker = new window.google.maps.Marker({
+      position: location,
+      map: mapInstance,
+      draggable: false,
+      animation: window.google.maps.Animation.DROP,
+      title: 'Tu ubicación de entrega'
+    });
+    
+    // Guardar referencia del nuevo marcador
+    markerRef.current = newMarker;
+    
+    return newMarker;
+  };
 
   useEffect(() => {
     if (window.google && window.google.maps) {
@@ -55,8 +83,9 @@ const SimpleLocationSelector = ({
     
     document.head.appendChild(script);
 
+    // ✅ CLEANUP MEJORADO
     return () => {
-      if (marker) marker.setMap(null);
+      clearPreviousMarker();
     };
   }, []);
 
@@ -68,7 +97,6 @@ const SimpleLocationSelector = ({
 
   // ✅ GENERAR URL DE GOOGLE MAPS COMPARTIBLE
   const generateGoogleMapsShareUrl = (lat, lng) => {
-    // Formato de URL compartible de Google Maps
     return `https://maps.app.goo.gl/?link=https://www.google.com/maps?q=${lat},${lng}&z=18&t=m`;
   };
 
@@ -81,7 +109,7 @@ const SimpleLocationSelector = ({
     if (!mapRef.current) return;
 
     try {
-      const center = selectedLocation || { lat: -25.2637, lng: -57.5759 }; // Asunción por defecto
+      const center = selectedLocation || { lat: -25.2637, lng: -57.5759 };
       
       const mapInstance = new window.google.maps.Map(mapRef.current, {
         center,
@@ -101,12 +129,16 @@ const SimpleLocationSelector = ({
       });
 
       setupAutocomplete();
-      mapInstance.addListener('click', handleMapClick);
       
+      // ✅ AGREGAR LISTENER PARA CLICS EN EL MAPA
+      mapInstance.addListener('click', (event) => {
+        handleMapClick(event, mapInstance);
+      });
+      
+      // ✅ CREAR MARCADOR INICIAL SI EXISTE UBICACIÓN
       if (selectedLocation) {
         createMarker(selectedLocation, mapInstance);
         reverseGeocode(selectedLocation);
-        // Generar URL de Google Maps al inicializar
         const shareUrl = generateGoogleMapsShareUrl(selectedLocation.lat, selectedLocation.lng);
         setGoogleMapsShareUrl(shareUrl);
       }
@@ -152,7 +184,6 @@ const SimpleLocationSelector = ({
         setSearchValue(place.formatted_address || place.name || '');
         setAddress(place.formatted_address || place.name || '');
         
-        // ✅ NO marcar automáticamente, solo centrar el mapa
         toast.info('📍 Ubicación encontrada. Haz clic en el mapa para marcar tu ubicación exacta');
       });
 
@@ -162,58 +193,27 @@ const SimpleLocationSelector = ({
     }
   };
 
-  const createMarker = (location, mapInstance = map) => {
-    if (marker) marker.setMap(null);
-    
-    const newMarker = new window.google.maps.Marker({
-      position: location,
-      map: mapInstance,
-      draggable: true,
-      title: 'Tu ubicación de entrega - Arrastra para ajustar',
-      animation: window.google.maps.Animation.DROP,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 12,
-        fillColor: '#2563eb',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 3
-      }
-    });
-
-    newMarker.addListener('dragend', (event) => {
-      const newLocation = {
-        lat: event.latLng.lat(),
-        lng: event.latLng.lng()
-      };
-      setSelectedLocation(newLocation);
-      reverseGeocode(newLocation);
-      
-      // ✅ Generar nueva URL de Google Maps
-      const shareUrl = generateGoogleMapsShareUrl(newLocation.lat, newLocation.lng);
-      setGoogleMapsShareUrl(shareUrl);
-      
-      toast.success('📍 Ubicación actualizada');
-    });
-
-    setMarker(newMarker);
-  };
-
-  const handleMapClick = (event) => {
+  // ✅ FUNCIÓN PRINCIPAL MEJORADA PARA MANEJAR CLICS EN EL MAPA
+  const handleMapClick = (event, mapInstance) => {
     const location = {
       lat: event.latLng.lat(),
       lng: event.latLng.lng()
     };
     
-    setSelectedLocation(location);
-    createMarker(location);
-    reverseGeocode(location);
+    console.log('🖱️ Clic en mapa:', location);
     
-    // ✅ Generar URL de Google Maps al hacer clic
+    // ✅ CREAR NUEVO MARCADOR (automáticamente limpia el anterior)
+    createMarker(location, mapInstance);
+    
+    // ✅ ACTUALIZAR ESTADOS
+    setSelectedLocation(location);
+    
+    // ✅ OBTENER DIRECCIÓN Y URL
+    reverseGeocode(location);
     const shareUrl = generateGoogleMapsShareUrl(location.lat, location.lng);
     setGoogleMapsShareUrl(shareUrl);
     
-    toast.success('📍 Ubicación marcada correctamente');
+    toast.success('📍 ¡Ubicación marcada correctamente!');
   };
 
   const reverseGeocode = async (location) => {
@@ -233,6 +233,7 @@ const SimpleLocationSelector = ({
     }
   };
 
+  // ✅ FUNCIÓN MEJORADA PARA OBTENER UBICACIÓN ACTUAL
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast.error('❌ Geolocalización no soportada en este navegador');
@@ -251,13 +252,14 @@ const SimpleLocationSelector = ({
         if (map) {
           map.setCenter(location);
           map.setZoom(18);
+          
+          // ✅ CREAR MARCADOR (automáticamente limpia el anterior)
+          createMarker(location, map);
         }
         
         setSelectedLocation(location);
-        createMarker(location);
         reverseGeocode(location);
         
-        // ✅ Generar URL de Google Maps para ubicación actual
         const shareUrl = generateGoogleMapsShareUrl(location.lat, location.lng);
         setGoogleMapsShareUrl(shareUrl);
         
@@ -292,7 +294,6 @@ const SimpleLocationSelector = ({
 
     setSaving(true);
     try {
-      // ✅ PAYLOAD MEJORADO CON URL DE GOOGLE MAPS
       const payload = {
         lat: selectedLocation.lat,
         lng: selectedLocation.lng,
@@ -322,7 +323,6 @@ const SimpleLocationSelector = ({
         toast.success('✅ Ubicación guardada exitosamente');
         
         if (onLocationSave) {
-          // ✅ ENVIAR DATOS COMPLETOS INCLUYENDO URL DE GOOGLE MAPS
           onLocationSave({
             lat: selectedLocation.lat,
             lng: selectedLocation.lng,
@@ -335,7 +335,6 @@ const SimpleLocationSelector = ({
           });
         }
         
-        // ✅ Cerrar el modal después de guardar
         if (onClose) {
           setTimeout(() => {
             onClose();
@@ -368,7 +367,7 @@ const SimpleLocationSelector = ({
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-200 max-w-6xl mx-auto overflow-hidden">
-      {/* ✅ HEADER SIMPLIFICADO */}
+      {/* HEADER */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -392,7 +391,7 @@ const SimpleLocationSelector = ({
         </div>
       </div>
 
-      {/* ✅ BUSCADOR EN LA PARTE SUPERIOR */}
+      {/* BUSCADOR */}
       <div className="p-6 bg-gray-50 border-b border-gray-200">
         <div className="flex gap-4 items-center">
           <div className="flex-1 relative">
@@ -436,13 +435,13 @@ const SimpleLocationSelector = ({
       </div>
 
       <div className="relative">
-        {/* ✅ MAPA A PANTALLA COMPLETA */}
+        {/* MAPA */}
         <div 
           ref={mapRef}
           className="w-full h-96"
         />
         
-        {/* ✅ OVERLAY DE INSTRUCCIONES SI NO HAY UBICACIÓN */}
+        {/* OVERLAY DE INSTRUCCIONES */}
         {!selectedLocation && (
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mx-auto max-w-md">
@@ -455,7 +454,7 @@ const SimpleLocationSelector = ({
           </div>
         )}
 
-        {/* ✅ BOTÓN DE MI UBICACIÓN EN EL MAPA */}
+        {/* BOTÓN MI UBICACIÓN */}
         <button
           onClick={getCurrentLocation}
           disabled={gettingLocation}
@@ -470,7 +469,7 @@ const SimpleLocationSelector = ({
         </button>
       </div>
 
-      {/* ✅ INFORMACIÓN DE UBICACIÓN SELECCIONADA */}
+      {/* INFORMACIÓN DE UBICACIÓN SELECCIONADA */}
       {selectedLocation && (
         <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-t border-green-200">
           <div className="flex items-start gap-4">
@@ -521,16 +520,16 @@ const SimpleLocationSelector = ({
         </div>
       )}
 
-      {/* ✅ FOOTER INFORMATIVO */}
+      {/* FOOTER */}
       <div className="bg-gray-50 border-t border-gray-200 p-4">
         <div className="flex items-center justify-center gap-6 text-sm text-gray-600">
           <div className="flex items-center gap-1">
-            <FaMapMarkerAlt className="text-blue-500" />
-            <span>Marcador azul = Tu ubicación</span>
+            <FaMapMarkerAlt className="text-red-500" />
+            <span>Pin rojo = Tu ubicación</span>
           </div>
           <div className="flex items-center gap-1">
-            <FaCrosshairs className="text-green-500" />
-            <span>Arrastra el marcador para ajustar</span>
+            <FaCrosshairs className="text-blue-500" />
+            <span>Haz clic para cambiar ubicación</span>
           </div>
           <div className="flex items-center gap-1">
             <FaCheckCircle className="text-green-500" />

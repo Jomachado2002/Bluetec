@@ -547,8 +547,8 @@ ${selectedLocation.google_maps_url || 'No disponible'}
 const hasValidLocation = () => {
     return selectedLocation && 
            selectedLocation.lat && 
-           selectedLocation.lng && 
-           selectedLocation.google_maps_url;
+           selectedLocation.lng;
+    // ✅ QUITAR LA VALIDACIÓN DE google_maps_url QUE CAUSA EL PROBLEMA
 };
 
     // ✅ REEMPLAZAR tu función prepareBancardData actual con esta:

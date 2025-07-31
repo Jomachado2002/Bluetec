@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import Context from '../context';
 import displayINRCurrency from '../helpers/displayCurrency';
 import { MdDelete, MdShoppingCart, MdDownload, MdWhatsapp } from "react-icons/md";
-import { FaArrowLeft, FaTrash, FaCreditCard, FaUser, FaLock, FaShieldAlt, FaPlus } from "react-icons/fa";
+import { FaArrowLeft, FaTrash, FaCreditCard, FaUser, FaLock, FaShieldAlt, FaPlus, FaCheckCircle, FaMapMarkerAlt } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import logo from '../helpers/logo.png';
@@ -12,6 +12,7 @@ import { toast } from 'react-toastify';
 import { localCartHelper } from '../helpers/addToCart';
 import { trackWhatsAppContact, trackPDFDownload } from '../components/MetaPixelTracker';
 import BancardPayButton from '../components/BancardPayButton';
+import SummaryApi from '../common';
 
 const Cart = () => {
     const [data, setData] = useState([]);
@@ -163,6 +164,27 @@ const Cart = () => {
     }, [totalQty, totalPrice, customerData.address]);
 
     // Cargar datos al montar el componente
+    // ✅ FUNCIÓN PARA CARGAR UBICACIÓN GUARDADA DEL USUARIO
+    const loadUserSavedLocation = async () => {
+        if (!isLoggedIn) return;
+        
+        try {
+            const response = await fetch(SummaryApi.location.getUserLocation.url, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            const result = await response.json();
+            if (result.success && result.data) {
+                // ✅ GUARDAR EN EL ESTADO DEL USUARIO PARA FÁCIL ACCESO
+                user.savedLocation = result.data;
+                console.log('📍 Ubicación del usuario cargada:', result.data);
+            }
+        } catch (error) {
+            console.warn('Error cargando ubicación del usuario:', error);
+        }
+    };
+
     useEffect(() => {
         console.log('🚀 Iniciando carga de datos del carrito...');
         fetchData();
@@ -170,6 +192,7 @@ const Cart = () => {
         if (isLoggedIn && user?.bancardUserId) {
             console.log('👤 Usuario logueado detectado, cargando tarjetas...');
             fetchUserCards();
+            loadUserSavedLocation(); // ✅ CARGAR UBICACIÓN GUARDADA
             // Pre-llenar datos del usuario si está logueado
             setCustomerData({
                 name: user.name || '',
@@ -425,8 +448,19 @@ const Cart = () => {
     };
 
     // Función para verificar si hay datos de cliente válidos para el pago
+    // Función para verificar si hay datos de cliente válidos para el pago
     const hasValidCustomerDataForPayment = () => {
-        return customerData.name.trim() && customerData.email.trim() && customerData.phone.trim();
+        const hasBasicData = customerData.name.trim() && customerData.email.trim() && customerData.phone.trim();
+        const hasLocation = !!user?.savedLocation; // ✅ VERIFICAR SI TIENE UBICACIÓN GUARDADA
+        
+        console.log('🔍 Validación de datos para pago:', {
+            hasBasicData,
+            hasLocation,
+            user: user?._id,
+            savedLocation: user?.savedLocation
+        });
+        
+        return hasBasicData && (hasLocation || !isLoggedIn); // ✅ Solo requerir ubicación para usuarios logueados
     };
 
     // Función para verificar si hay datos mínimos para presupuesto
@@ -895,11 +929,50 @@ const Cart = () => {
                                         <span className="font-medium text-gray-900">{displayINRCurrency(totalPrice)}</span>
                                     </div>
                                     <div className="flex justify-between py-3 bg-blue-50 px-3 rounded-lg">
-                                        <span className="text-lg font-medium text-[#2A3190]">Total</span>
-                                        <span className="text-xl font-bold text-[#2A3190]">{displayINRCurrency(totalPrice)}</span>
-                                    </div>
+                                    <span className="text-lg font-medium text-[#2A3190]">Total</span>
+                                    <span className="text-xl font-bold text-[#2A3190]">{displayINRCurrency(totalPrice)}</span>
                                 </div>
+                            </div>
 
+                            {/* ✅ MOSTRAR ESTADO DE UBICACIÓN PARA USUARIOS LOGUEADOS */}
+                            {isLoggedIn && (
+                                <div className="mt-4 p-4 rounded-lg border-2 border-dashed border-gray-200">
+                                    {user?.savedLocation ? (
+                                        <div className="text-center">
+                                            <div className="flex items-center justify-center gap-2 text-green-600 mb-2">
+                                                <FaCheckCircle />
+                                                <span className="font-medium">Ubicación confirmada</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 mb-3">
+                                                {user.savedLocation.address}
+                                            </p>
+                                            <Link
+                                                to="/mi-perfil?tab=profile"
+                                                className="text-xs text-blue-600 hover:underline"
+                                            >
+                                                Ver/cambiar ubicación
+                                            </Link>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center">
+                                            <div className="flex items-center justify-center gap-2 text-amber-600 mb-2">
+                                                <FaMapMarkerAlt />
+                                                <span className="font-medium">Ubicación requerida</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 mb-3">
+                                                Agrega tu ubicación para continuar
+                                            </p>
+                                            <Link
+                                                to="/mi-perfil?tab=profile"
+                                                className="text-xs bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700 transition-colors"
+                                            >
+                                                Agregar ubicación
+                                            </Link>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                                
                               <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-gray-800 mb-4">¿Qué deseas hacer?</h3>
                                     
