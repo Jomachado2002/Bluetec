@@ -1,4 +1,4 @@
-// frontend/src/pages/UserProfilePage.js - VERSIÓN CORREGIDA
+// frontend/src/pages/UserProfilePage.js - VERSIÓN CORREGIDA (IGUAL QUE ADMIN PANEL)
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -22,162 +22,93 @@ import {
 } from 'react-icons/fa';
 
 const UserProfilePage = () => {
-  const user = useSelector(state => state?.user?.user);
+  const user = useSelector(state => state?.user?.user); // ✅ IGUAL QUE ADMIN PANEL
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('profile');
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  // ✅ LEER TAB DESDE URL PARAMS
-  useEffect(() => {
-    const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['profile', 'cards', 'favorites', 'settings'].includes(tabFromUrl)) {
-      setActiveTab(tabFromUrl);
-    }
-  }, [searchParams]);
-
-  // Verificar autenticación
+  // ✅ VERIFICACIÓN SIMPLE IGUAL QUE ADMIN PANEL
   useEffect(() => {
     if (!user) {
       toast.info('Debes iniciar sesión para acceder a tu perfil');
       navigate('/iniciar-sesion');
-      return;
     }
-    fetchUserProfile();
   }, [user, navigate]);
 
-  const fetchUserProfile = async () => {
+  // ✅ LEER TAB DESDE URL PARAMS
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && ['profile', 'cards', 'favorites', 'settings', 'purchases'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
+  // ✅ FUNCIONES DE MANEJO (SIN CAMBIOS)
+  const handleRegisterCard = async (cardData) => {
     try {
-      console.log('🔄 Obteniendo perfil del usuario...');
-      const response = await fetch(SummaryApi.current_user.url, {
-        method: SummaryApi.current_user.method,
-        credentials: 'include'
-      });
-      console.log('📱 DEBUG MÓVIL - Request details:', {
-        url: SummaryApi.current_user.url,
-        method: SummaryApi.current_user.method,
-        userAgent: navigator.userAgent,
-        cookies: document.cookie
+      console.log('🆔 === INICIANDO REGISTRO DE TARJETA ===');
+      console.log('📤 Datos enviados:', cardData);
+      
+      const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(cardData)
       });
 
-      const result = await response.json();
-      if (result.success) {
-        console.log('✅ Perfil obtenido:', result.data);
-        setUserData(result.data);
-      } else {
-        console.error('❌ Error en respuesta:', result);
-        toast.error(`Error: ${result.message || 'Error desconocido'} - Status: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Response no OK:', response.status, errorText);
+        toast.error(`Error del servidor: ${response.status}`);
+        return { success: false, message: `Error ${response.status}` };
       }
+      
+      const responseText = await response.text();
+      let result;
+      
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ Error parseando JSON:', parseError);
+        toast.error('Error: Respuesta inválida del servidor');
+        return { success: false, message: 'Respuesta inválida del servidor' };
+      }
+      
+      if (result.success) {
+        console.log('✅ Catastro exitoso!');
+        if (result.data?.process_id) {
+          toast.success('✅ Proceso de catastro iniciado');
+          return result;
+        } else {
+          console.error('❌ No se recibió process_id válido');
+          toast.error('Error: No se recibió process_id');
+          return { success: false, message: 'No se recibió process_id' };
+        }
+      } else {
+        toast.error(result.message || 'Error al iniciar catastro');
+        return { success: false, message: result.message };
+      }
+      
     } catch (error) {
-      console.error('❌ Error:', error);
-      toast.error('Error de conexión');
-    } finally {
-      setLoading(false);
+      console.error('❌ Error crítico en handleRegisterCard:', error);
+      toast.error('Error de conexión crítico');
+      return { success: false, message: 'Error de conexión crítico' };
     }
   };
-
- // ✅ FUNCIÓN CORREGIDA - Reemplazar en UserProfilePage.js línea 76-102
-
-const handleRegisterCard = async (cardData) => {
-  try {
-    console.log('🆔 === INICIANDO REGISTRO DE TARJETA ===');
-    console.log('📤 Datos enviados:', cardData);
-    console.log('👤 Usuario actual:', userData);
-    
-    const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      credentials: 'include',
-      body: JSON.stringify(cardData)
-    });
-
-    console.log('📥 Response status:', response.status);
-    console.log('📥 Response ok:', response.ok);
-    console.log('📥 Response headers:', response.headers);
-    
-    // ✅ VERIFICAR SI LA RESPUESTA ES VÁLIDA
-    if (!response.ok) {
-      console.error('❌ Response no OK:', response.status, response.statusText);
-      const errorText = await response.text();
-      console.error('❌ Error text completo:', errorText);
-      
-      toast.error(`Error del servidor: ${response.status}`);
-      return { success: false, message: `Error ${response.status}` };
-    }
-    
-    // ✅ OBTENER TEXTO CRUDO PRIMERO
-    const responseText = await response.text();
-    console.log('📥 Response text crudo:', responseText);
-    
-    // ✅ INTENTAR PARSEAR JSON
-    let result;
-    try {
-      result = JSON.parse(responseText);
-      console.log('📥 JSON parseado exitosamente:', result);
-    } catch (parseError) {
-      console.error('❌ Error parseando JSON:', parseError);
-      console.error('❌ Texto que no se pudo parsear:', responseText);
-      toast.error('Error: Respuesta inválida del servidor');
-      return { success: false, message: 'Respuesta inválida del servidor' };
-    }
-    
-    // ✅ VERIFICAR ESTRUCTURA DE LA RESPUESTA
-    console.log('🔍 Verificando respuesta:', {
-      success: result.success,
-      hasData: !!result.data,
-      processId: result.data?.process_id,
-      message: result.message
-    });
-    
-    if (result.success) {
-      console.log('✅ Catastro exitoso desde frontend!');
-      console.log('🎯 Process ID recibido:', result.data?.process_id);
-      
-      if (result.data?.process_id) {
-        console.log('✅ Process ID válido, devolviendo resultado');
-        toast.success('✅ Proceso de catastro iniciado');
-        return result;
-      } else {
-        console.error('❌ No se recibió process_id válido');
-        toast.error('Error: No se recibió process_id');
-        return { success: false, message: 'No se recibió process_id' };
-      }
-    } else {
-      console.error('❌ Backend reportó error:', result);
-      toast.error(result.message || 'Error al iniciar catastro');
-      return { success: false, message: result.message };
-    }
-    
-  } catch (error) {
-    console.error('❌ Error crítico en handleRegisterCard:', error);
-    console.error('❌ Stack trace:', error.stack);
-    toast.error('Error de conexión crítico');
-    return { success: false, message: 'Error de conexión crítico' };
-  }
-};
 
   const handleFetchCards = async (userId) => {
     try {
       console.log('📋 === OBTENIENDO TARJETAS ===');
-      console.log('👤 User ID solicitado:', userId);
-      console.log('👤 Usuario actual:', userData);
-      
-      // ✅ USAR 'me' SI NO SE PROPORCIONA userId O USAR EL userId ACTUAL
-      const targetUserId = userId || userData?.bancardUserId || 'me';
-      console.log('🎯 Target User ID:', targetUserId);
+      const targetUserId = userId || user?.bancardUserId || 'me';
       
       const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas/${targetUserId}`, {
         method: 'GET',
         credentials: 'include'
       });
 
-      console.log('📥 Response status:', response.status);
-      
       const result = await response.json();
-      console.log('📥 Response data:', result);
       
       if (result.success) {
         console.log('✅ Tarjetas obtenidas:', result.data);
@@ -197,10 +128,7 @@ const handleRegisterCard = async (cardData) => {
   const handleDeleteCard = async (userId, aliasToken) => {
     try {
       console.log('🗑️ === ELIMINANDO TARJETA ===');
-      console.log('👤 User ID:', userId);
-      console.log('🎫 Alias Token:', aliasToken?.substring(0, 20) + '...');
-      
-      const targetUserId = userId || userData?.bancardUserId || 'me';
+      const targetUserId = userId || user?.bancardUserId || 'me';
       
       const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas/${targetUserId}`, {
         method: 'DELETE',
@@ -211,10 +139,7 @@ const handleRegisterCard = async (cardData) => {
         body: JSON.stringify({ alias_token: aliasToken })
       });
 
-      console.log('📥 Response status:', response.status);
-      
       const result = await response.json();
-      console.log('📥 Response data:', result);
       
       if (result.success) {
         toast.success('✅ Tarjeta eliminada exitosamente');
@@ -231,51 +156,8 @@ const handleRegisterCard = async (cardData) => {
     }
   };
 
-  // ✅ IMPLEMENTAR PAGO CON ALIAS TOKEN
-  const handlePayWithToken = async (paymentData) => {
-    try {
-      console.log('💳 === PAGANDO CON TOKEN ===');
-      console.log('📤 Datos de pago:', paymentData);
-      
-      const response = await fetch(`${SummaryApi.baseURL}/api/bancard/pago-con-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify(paymentData)
-      });
-
-      console.log('📥 Response status:', response.status);
-      
-      const result = await response.json();
-      console.log('📥 Response data:', result);
-      
-      if (result.success) {
-        // Verificar si necesita 3DS
-        if (result.data?.operation?.process_id) {
-          toast.info('🔐 Verificación 3DS requerida');
-          return { ...result, requires3DS: true };
-        } else {
-          toast.success('✅ Pago procesado exitosamente');
-          return result;
-        }
-      } else {
-        console.error('❌ Error en pago:', result);
-        toast.error(result.message || 'Error en el pago');
-        return { success: false, message: result.message };
-      }
-    } catch (error) {
-      console.error('❌ Error en pago con token:', error);
-      toast.error('Error de conexión');
-      return { success: false, message: 'Error de conexión' };
-    }
-  };
-
   const handleUpdateProfile = async (profileData) => {
     try {
-      setLoading(true);
-      
       const response = await fetch(`${SummaryApi.baseURL}/api/perfil`, {
         method: 'PUT',
         headers: {
@@ -288,7 +170,6 @@ const handleRegisterCard = async (cardData) => {
       const result = await response.json();
       
       if (result.success) {
-        setUserData(result.data);
         toast.success('✅ Perfil actualizado exitosamente');
       } else {
         toast.error(result.message || 'Error al actualizar perfil');
@@ -296,8 +177,6 @@ const handleRegisterCard = async (cardData) => {
     } catch (error) {
       console.error('Error:', error);
       toast.error('Error de conexión');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -354,9 +233,8 @@ const handleRegisterCard = async (cardData) => {
 
   const handleUpdateSettings = async (settings) => {
     try {
-      // Simular guardado de configuración
       await new Promise(resolve => setTimeout(resolve, 1000));
-      localStorage.setItem(`user_settings_${userData._id}`, JSON.stringify(settings));
+      localStorage.setItem(`user_settings_${user._id}`, JSON.stringify(settings));
       toast.success('✅ Configuración guardada');
     } catch (error) {
       console.error('Error:', error);
@@ -390,27 +268,17 @@ const handleRegisterCard = async (cardData) => {
     { id: 'settings', label: 'Configuración', icon: FaCog }
   ];
 
-  if (loading) {
+  // ✅ VERIFICACIÓN SIMPLE IGUAL QUE ADMIN PANEL
+  if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-[#2A3190] mx-auto mb-4" />
-          <p className="text-gray-600">Cargando perfil...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!userData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Error al cargar perfil del usuario</p>
+          <p className="text-gray-600 mb-4">Debes iniciar sesión para acceder a tu perfil</p>
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/iniciar-sesion')}
             className="bg-[#2A3190] text-white px-4 py-2 rounded-lg"
           >
-            Volver al inicio
+            Iniciar Sesión
           </button>
         </div>
       </div>
@@ -441,11 +309,10 @@ const handleRegisterCard = async (cardData) => {
             {/* Usuario y logout */}
             <div className="flex items-center gap-4">
               <div className="text-right hidden md:block">
-                <p className="font-medium text-gray-800">{userData.name}</p>
-                <p className="text-sm text-gray-500">{userData.email}</p>
-                {/* ✅ MOSTRAR INFO DE BANCARD PARA DEBUG */}
-                {userData.bancardUserId && (
-                  <p className="text-xs text-blue-600">ID Bancard: {userData.bancardUserId}</p>
+                <p className="font-medium text-gray-800">{user.name}</p>
+                <p className="text-sm text-gray-500">{user.email}</p>
+                {user.bancardUserId && (
+                  <p className="text-xs text-blue-600">ID Bancard: {user.bancardUserId}</p>
                 )}
               </div>
               
@@ -468,7 +335,6 @@ const handleRegisterCard = async (cardData) => {
                   key={tab.id}
                   onClick={() => {
                     setActiveTab(tab.id);
-                    // ✅ ACTUALIZAR URL SIN RECARGAR
                     const newUrl = `/mi-perfil?tab=${tab.id}`;
                     window.history.pushState(null, '', newUrl);
                   }}
@@ -491,7 +357,7 @@ const handleRegisterCard = async (cardData) => {
       <div className="container mx-auto px-4 py-6">
         {activeTab === 'profile' && (
           <UserProfile
-            user={userData}
+            user={user} // ✅ USAR USER DIRECTO DESDE REDUX (IGUAL QUE ADMIN PANEL)
             onUpdateProfile={handleUpdateProfile}
             onUploadImage={handleUploadImage}
           />
@@ -500,62 +366,47 @@ const handleRegisterCard = async (cardData) => {
         {activeTab === 'cards' && (
           <CardManagementPage
             user={{
-              // ✅ USAR bancardUserId COMO ID PRINCIPAL
-              id: userData.bancardUserId || userData._id,
-              name: userData.name,
-              email: userData.email,
-              phone: userData.phone,
-              // ✅ PASAR DATOS ADICIONALES PARA DEBUG
-              _id: userData._id,
-              role: userData.role
+              id: user.bancardUserId || user._id,
+              name: user.name,
+              email: user.email,
+              phone: user.phone,
+              _id: user._id,
+              role: user.role
             }}
             onRegisterCard={handleRegisterCard}
             onDeleteCard={handleDeleteCard}
             onFetchCards={handleFetchCards}
-            onPayWithToken={handlePayWithToken}
           />
         )}
 
         {activeTab === 'purchases' && (
           <UserPurchases
             user={{
-              // ✅ PASAR DATOS COMPLETOS DEL USUARIO
-              _id: userData._id,
-              bancardUserId: userData.bancardUserId,
-              name: userData.name,
-              email: userData.email,
-              phone: userData.phone,
-              role: userData.role
+              _id: user._id,
+              bancardUserId: user.bancardUserId,
+              name: user.name,
+              email: user.email,
+              phone: user.phone,
+              role: user.role
             }}
           />
         )}
         
         {activeTab === 'favorites' && (
           <FavoritesPage
-            user={userData}
+            user={user} // ✅ USER DIRECTO
             onNavigate={navigate}
           />
         )}
 
         {activeTab === 'settings' && (
           <SettingsPage
-            user={userData}
+            user={user} // ✅ USER DIRECTO
             onChangePassword={handleChangePassword}
             onUpdateSettings={handleUpdateSettings}
           />
         )}
       </div>
-
-      {/* ✅ INFORMACIÓN DE DEBUG PARA DESARROLLO */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black text-white p-3 rounded-lg text-xs max-w-sm">
-          <p><strong>Debug Info:</strong></p>
-          <p>User ID: {userData._id}</p>
-          <p>Bancard ID: {userData.bancardUserId || 'No asignado'}</p>
-          <p>Role: {userData.role}</p>
-          <p>Environment: {process.env.REACT_APP_BANCARD_ENVIRONMENT || 'staging'}</p>
-        </div>
-      )}
 
       {/* Footer informativo */}
       <div className="bg-white border-t mt-12">
