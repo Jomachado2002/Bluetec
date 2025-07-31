@@ -1,8 +1,9 @@
-// frontend/src/pages/UserProfilePage.js - VERSIÓN CORREGIDA (IGUAL QUE ADMIN PANEL)
+// frontend/src/pages/UserProfilePage.js - VERSIÓN MEJORADA COMPATIBLE CON IOS
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { setUserDetails } from '../store/userSlice';
 import UserProfile from '../components/user/UserProfile';
 import CardManagementPage from '../components/user/CardManagementPage';
 import FavoritesPage from '../components/user/FavoritesPage';
@@ -18,22 +19,77 @@ import {
   FaCog, 
   FaSignOutAlt,
   FaHome,
-  FaSpinner
+  FaSpinner,
+  FaExclamationTriangle
 } from 'react-icons/fa';
 
 const UserProfilePage = () => {
   const user = useSelector(state => state?.user?.user); // ✅ IGUAL QUE ADMIN PANEL
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('profile');
+  const [loading, setLoading] = useState(false);
+  const [userDataReady, setUserDataReady] = useState(false);
 
-  // ✅ VERIFICACIÓN SIMPLE IGUAL QUE ADMIN PANEL
+  // ✅ VERIFICACIÓN Y CARGA DE DATOS COMO ADMIN PANEL
   useEffect(() => {
-    if (!user) {
-      toast.info('Debes iniciar sesión para acceder a tu perfil');
-      navigate('/iniciar-sesion');
-    }
+    const initializeUserData = async () => {
+      if (!user) {
+        toast.info('Debes iniciar sesión para acceder a tu perfil');
+        navigate('/iniciar-sesion');
+        return;
+      }
+
+      // ✅ VERIFICAR QUE EL USUARIO TENGA DATOS COMPLETOS
+      if (!user._id) {
+        console.warn('⚠️ Usuario sin _id, recargando datos...');
+        await fetchUserDetails();
+      } else {
+        setUserDataReady(true);
+      }
+    };
+
+    initializeUserData();
   }, [user, navigate]);
+
+  // ✅ FUNCIÓN PARA RECARGAR DATOS DEL USUARIO (COMO ADMIN PANEL)
+  const fetchUserDetails = async () => {
+    setLoading(true);
+    try {
+      console.log('🔄 Recargando datos del usuario...');
+      
+      const response = await fetch(SummaryApi.current_user.url, {
+        method: SummaryApi.current_user.method,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache' // ✅ IMPORTANTE PARA iOS
+        }
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        console.log('✅ Datos del usuario actualizados:', result.data);
+        dispatch(setUserDetails(result.data));
+        setUserDataReady(true);
+      } else {
+        console.error('❌ Error obteniendo datos del usuario:', result);
+        if (response.status === 401) {
+          toast.error('Sesión expirada, redirigiendo...');
+          navigate('/iniciar-sesion');
+        } else {
+          toast.error('Error al cargar datos del usuario');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error crítico al cargar usuario:', error);
+      toast.error('Error de conexión');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ✅ LEER TAB DESDE URL PARAMS
   useEffect(() => {
@@ -43,69 +99,96 @@ const UserProfilePage = () => {
     }
   }, [searchParams]);
 
-  // ✅ FUNCIONES DE MANEJO (SIN CAMBIOS)
+  // ✅ FUNCIÓN MEJORADA PARA REGISTRO DE TARJETAS CON VALIDACIONES
   const handleRegisterCard = async (cardData) => {
     try {
       console.log('🆔 === INICIANDO REGISTRO DE TARJETA ===');
-      console.log('📤 Datos enviados:', cardData);
       
-      const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas`, {
+      // ✅ VALIDAR USUARIO ANTES DE PROCEDER
+      if (!user?._id) {
+        toast.error('❌ Error: Usuario no válido. Recarga la página.');
+        return { success: false, message: 'Usuario no válido' };
+      }
+
+      // ✅ GENERAR bancardUserId SI NO EXISTE
+      const bancardUserId = user.bancardUserId || user._id;
+      
+      const enrichedCardData = {
+        ...cardData,
+        //user_id: bancardUserId, // ✅ USAR bancardUserId O _id como fallback
+        user_cell_phone: user.phone || '12345678',
+        user_mail: user.email
+      };
+      
+      console.log('📤 Datos enviados (enriquecidos):', enrichedCardData);
+      
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/tarjetas`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache' // ✅ IMPORTANTE PARA iOS
         },
         credentials: 'include',
-        body: JSON.stringify(cardData)
+        body: JSON.stringify(enrichedCardData)
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Response no OK:', response.status, errorText);
-        toast.error(`Error del servidor: ${response.status}`);
+        
+        // ✅ MANEJO ESPECÍFICO DE ERRORES DE IOS
+        if (response.status === 401) {
+          toast.error('❌ Sesión expirada. Recargando datos...');
+          await fetchUserDetails();
+          return { success: false, message: 'Sesión expirada' };
+        }
+        
+        toast.error(`❌ Error del servidor: ${response.status}`);
         return { success: false, message: `Error ${response.status}` };
       }
       
-      const responseText = await response.text();
-      let result;
+      const result = await response.json();
       
-      try {
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('❌ Error parseando JSON:', parseError);
-        toast.error('Error: Respuesta inválida del servidor');
-        return { success: false, message: 'Respuesta inválida del servidor' };
-      }
-      
-      if (result.success) {
-        console.log('✅ Catastro exitoso!');
-        if (result.data?.process_id) {
-          toast.success('✅ Proceso de catastro iniciado');
-          return result;
-        } else {
-          console.error('❌ No se recibió process_id válido');
-          toast.error('Error: No se recibió process_id');
-          return { success: false, message: 'No se recibió process_id' };
-        }
+      if (result.success && result.data?.process_id) {
+        console.log('✅ Catastro exitoso! Process ID:', result.data.process_id);
+        toast.success('✅ Proceso de catastro iniciado');
+        return result;
       } else {
-        toast.error(result.message || 'Error al iniciar catastro');
+        console.error('❌ Error en catastro:', result);
+        toast.error(result.message || '❌ Error al iniciar catastro');
         return { success: false, message: result.message };
       }
       
     } catch (error) {
       console.error('❌ Error crítico en handleRegisterCard:', error);
-      toast.error('Error de conexión crítico');
+      toast.error('❌ Error de conexión crítico');
       return { success: false, message: 'Error de conexión crítico' };
     }
   };
 
+  // ✅ FUNCIÓN MEJORADA PARA OBTENER TARJETAS CON VALIDACIONES
   const handleFetchCards = async (userId) => {
     try {
       console.log('📋 === OBTENIENDO TARJETAS ===');
-      const targetUserId = userId || user?.bancardUserId || 'me';
       
-      const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas/${targetUserId}`, {
+      // ✅ VALIDAR USUARIO
+      if (!user?._id) {
+        console.error('❌ Usuario no válido para obtener tarjetas');
+        toast.error('❌ Error: Usuario no válido');
+        return [];
+      }
+
+      // ✅ USAR bancardUserId O _id COMO FALLBACK
+      const targetUserId = user.bancardUserId || user._id;
+      console.log('🎯 Target User ID:', targetUserId);
+      
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/tarjetas/${targetUserId}`, {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache' // ✅ IMPORTANTE PARA iOS
+        }
       });
 
       const result = await response.json();
@@ -115,25 +198,41 @@ const UserProfilePage = () => {
         return result.data.cards || [];
       } else {
         console.warn('⚠️ Error obteniendo tarjetas:', result.message);
-        toast.warn(result.message || 'No se pudieron cargar las tarjetas');
+        
+        // ✅ MANEJO ESPECÍFICO PARA USUARIOS SIN BANCARD ID
+        if (result.message?.includes('bancardUserId')) {
+          toast.info('ℹ️ Aún no tienes tarjetas registradas. Puedes registrar tu primera tarjeta.');
+          return [];
+        }
+        
+        toast.warn(result.message || '⚠️ No se pudieron cargar las tarjetas');
         return [];
       }
     } catch (error) {
       console.error('❌ Error obteniendo tarjetas:', error);
-      toast.error('Error al cargar tarjetas');
-      throw error;
+      toast.error('❌ Error al cargar tarjetas');
+      return [];
     }
   };
 
+  // ✅ FUNCIÓN MEJORADA PARA ELIMINAR TARJETAS
   const handleDeleteCard = async (userId, aliasToken) => {
     try {
       console.log('🗑️ === ELIMINANDO TARJETA ===');
-      const targetUserId = userId || user?.bancardUserId || 'me';
       
-      const response = await fetch(`${SummaryApi.baseURL}/api/bancard/tarjetas/${targetUserId}`, {
+      // ✅ VALIDAR USUARIO
+      if (!user?._id) {
+        toast.error('❌ Error: Usuario no válido');
+        return { success: false, message: 'Usuario no válido' };
+      }
+
+      const targetUserId = user.bancardUserId || user._id;
+      
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/bancard/tarjetas/${targetUserId}`, {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache' // ✅ IMPORTANTE PARA iOS
         },
         credentials: 'include',
         body: JSON.stringify({ alias_token: aliasToken })
@@ -146,22 +245,24 @@ const UserProfilePage = () => {
         return result;
       } else {
         console.error('❌ Error eliminando tarjeta:', result);
-        toast.error(result.message || 'Error al eliminar tarjeta');
+        toast.error(result.message || '❌ Error al eliminar tarjeta');
         return { success: false, message: result.message };
       }
     } catch (error) {
       console.error('❌ Error eliminando tarjeta:', error);
-      toast.error('Error de conexión');
+      toast.error('❌ Error de conexión');
       return { success: false, message: 'Error de conexión' };
     }
   };
 
+  // ✅ RESTO DE FUNCIONES SIN CAMBIOS PERO CON MEJOR MANEJO DE ERRORES
   const handleUpdateProfile = async (profileData) => {
     try {
-      const response = await fetch(`${SummaryApi.baseURL}/api/perfil`, {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/perfil`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         },
         credentials: 'include',
         body: JSON.stringify(profileData)
@@ -171,12 +272,15 @@ const UserProfilePage = () => {
       
       if (result.success) {
         toast.success('✅ Perfil actualizado exitosamente');
+        
+        // ✅ ACTUALIZAR REDUX CON NUEVOS DATOS
+        dispatch(setUserDetails({ ...user, ...profileData }));
       } else {
-        toast.error(result.message || 'Error al actualizar perfil');
+        toast.error(result.message || '❌ Error al actualizar perfil');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error de conexión');
+      console.error('❌ Error:', error);
+      toast.error('❌ Error de conexión');
     }
   };
 
@@ -185,7 +289,7 @@ const UserProfilePage = () => {
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch(`${SummaryApi.baseURL}/api/perfil/imagen`, {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/perfil/imagen`, {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -195,23 +299,28 @@ const UserProfilePage = () => {
       
       if (result.success) {
         toast.success('✅ Imagen subida exitosamente');
+        
+        // ✅ ACTUALIZAR REDUX
+        dispatch(setUserDetails({ ...user, profilePic: result.data.profilePic }));
+        
         return result.data.profilePic;
       } else {
-        toast.error(result.message || 'Error al subir imagen');
+        toast.error(result.message || '❌ Error al subir imagen');
         throw new Error(result.message);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Error:', error);
       throw error;
     }
   };
 
   const handleChangePassword = async (passwordData) => {
     try {
-      const response = await fetch(`${SummaryApi.baseURL}/api/perfil/cambiar-contrasena`, {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/perfil/cambiar-contrasena`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         },
         credentials: 'include',
         body: JSON.stringify(passwordData)
@@ -222,11 +331,11 @@ const UserProfilePage = () => {
       if (result.success) {
         toast.success('✅ Contraseña cambiada exitosamente');
       } else {
-        toast.error(result.message || 'Error al cambiar contraseña');
+        toast.error(result.message || '❌ Error al cambiar contraseña');
         throw new Error(result.message);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Error:', error);
       throw error;
     }
   };
@@ -237,7 +346,7 @@ const UserProfilePage = () => {
       localStorage.setItem(`user_settings_${user._id}`, JSON.stringify(settings));
       toast.success('✅ Configuración guardada');
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Error:', error);
       throw error;
     }
   };
@@ -252,11 +361,12 @@ const UserProfilePage = () => {
       const result = await response.json();
       if (result.success) {
         toast.success('👋 Sesión cerrada');
+        dispatch(setUserDetails(null)); // ✅ LIMPIAR REDUX
         navigate('/');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cerrar sesión');
+      console.error('❌ Error:', error);
+      toast.error('❌ Error al cerrar sesión');
     }
   };
 
@@ -268,11 +378,32 @@ const UserProfilePage = () => {
     { id: 'settings', label: 'Configuración', icon: FaCog }
   ];
 
+  // ✅ PANTALLA DE CARGA MIENTRAS SE VERIFICAN DATOS
+  if (loading || !userDataReady) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-4xl text-[#2A3190] mx-auto mb-4" />
+          <p className="text-gray-600 mb-4">Cargando tu perfil...</p>
+          {loading && (
+            <button 
+              onClick={() => window.location.reload()}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Si tarda mucho, haz clic aquí para recargar
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ✅ VERIFICACIÓN SIMPLE IGUAL QUE ADMIN PANEL
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
+          <FaExclamationTriangle className="text-4xl text-red-500 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Debes iniciar sesión para acceder a tu perfil</p>
           <button 
             onClick={() => navigate('/iniciar-sesion')}
@@ -365,14 +496,7 @@ const UserProfilePage = () => {
 
         {activeTab === 'cards' && (
           <CardManagementPage
-            user={{
-              id: user.bancardUserId || user._id,
-              name: user.name,
-              email: user.email,
-              phone: user.phone,
-              _id: user._id,
-              role: user.role
-            }}
+            user={user} // ✅ PASAR USER COMPLETO, NO OBJETO RECONSTRUIDO
             onRegisterCard={handleRegisterCard}
             onDeleteCard={handleDeleteCard}
             onFetchCards={handleFetchCards}
@@ -381,14 +505,7 @@ const UserProfilePage = () => {
 
         {activeTab === 'purchases' && (
           <UserPurchases
-            user={{
-              _id: user._id,
-              bancardUserId: user.bancardUserId,
-              name: user.name,
-              email: user.email,
-              phone: user.phone,
-              role: user.role
-            }}
+            user={user} // ✅ PASAR USER COMPLETO, NO OBJETO RECONSTRUIDO
           />
         )}
         
