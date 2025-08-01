@@ -101,7 +101,7 @@ function generateProductURL(slug) {
 }
 
 function formatPrice(priceInCents) {
-    return (priceInCents / 100).toFixed(0);
+    return (priceInCents).toFixed(0); // ✅ QUITAR LA DIVISIÓN POR 100
 }
 
 function getAvailability(stockStatus, stock) {
@@ -228,7 +228,7 @@ const channableFeedController = async (req, res) => {
             const title = escapeXML(product.productName);
             const description = escapeXML(product.description || product.productName);
             const brand = escapeXML(product.brandName || '');
-            const price = formatPrice(product.sellingPrice);
+            const price = (product.sellingPrice).toFixed(0);
             const availability = getAvailability(product.stockStatus, product.stock);
             const productUrl = generateProductURL(product.slug);
             const googleCategory = getGoogleCategory(product.category, product.subcategory);
@@ -239,7 +239,7 @@ const channableFeedController = async (req, res) => {
             const additionalImages = product.productImage.slice(1) || [];
             
             // Envío
-            const shippingCost = formatPrice(product.deliveryCost || XML_CONFIG.SHIPPING_COST);
+            const shippingCost = ((product.deliveryCost || XML_CONFIG.SHIPPING_COST) / 100).toFixed(0);
             
             // Labels personalizados
             const customLabels = buildCustomLabels(product);
