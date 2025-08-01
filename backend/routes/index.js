@@ -19,6 +19,7 @@
     const getCategoryWiseProduct = require('../controller/product/getCategoryWiseProduct');
     const getProductDetails = require('../controller/product/getProductDetails');
     const { updateAllPricesController } = require('../controller/product/updateAllPrices');
+    const channableFeedController = require('../controller/product/channableFeedController');
     const searchProduct = require('../controller/product/searchProduct');
     const filterProductController = require('../controller/product/filterProduct');
     const requestPasswordReset = require('../controller/user/requestPasswordReset');
@@ -823,6 +824,8 @@ router.post("/actualizar-producto", authToken, updateProductController);
     router.post("/productos/actualizar-precios-mayoristas", authToken, updatePricesFromMayoristasController);
     router.get("/producto-por-slug/:slug", getProductBySlug);
     router.post("/finanzas/actualizarprecios", authToken, updateAllPricesController);
+    router.get("/channable/feed.xml", channableFeedController);
+
 
     // ===========================================
     // RUTAS DE GESTIÓN FINANCIERA DE PRODUCTOS
