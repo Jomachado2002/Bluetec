@@ -42,7 +42,7 @@ export const trackWhatsAppContact = (productData = null) => {
     window.fbq('track', 'Contact', {
       content_name: productData?.productName || 'Consulta General',
       content_category: productData?.category || 'General',
-      content_ids: productData?._id ? [productData._id] : [],
+      content_ids: productData?.slug ? [productData.slug] : [],
       value: productData?.sellingPrice || 0,
       currency: 'PYG'
     });
@@ -86,7 +86,7 @@ export const trackAddToCart = (product) => {
      
   if (typeof window.fbq !== 'undefined') {
     window.fbq('track', 'AddToCart', {
-      content_ids: [product._id],
+      content_ids: [product.slug],
       content_name: product.productName,
       content_category: product.category,
       value: product.sellingPrice,
@@ -98,14 +98,31 @@ export const trackAddToCart = (product) => {
 };
 
 // Función para trackear interés en producto
-export const trackProductInterest = (productId, interestLevel, score) => {
+// ✅ CORREGIDO: usar productId (que debería ser el slug)
+export const trackProductInterest = (productSlug, interestLevel, score) => {
   if (typeof window.fbq !== 'undefined') {
     window.fbq('trackCustom', 'ProductInterest', {
-      content_ids: [productId],
+      content_ids: [productSlug], // ✅ Ahora coincide con el parámetro
       interest_level: interestLevel,
       score: score,
       timestamp: Date.now()
     });
+  }
+};
+// ✅ AGREGAR ESTA FUNCIÓN
+export const trackViewContent = (product) => {
+  console.log('🟢 Tracking View Content:', product?.productName);
+  
+  if (typeof window.fbq !== 'undefined') {
+    window.fbq('track', 'ViewContent', {
+      content_ids: [product.slug], // ✅ USAR SLUG
+      content_name: product.productName,
+      content_category: product.category,
+      value: product.sellingPrice,
+      currency: 'PYG'
+    });
+    
+    console.log('✅ View Content enviado a Meta');
   }
 };
 

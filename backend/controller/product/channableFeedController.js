@@ -251,7 +251,7 @@ const channableFeedController = async (req, res) => {
             const priceInfo = getPriceInfo(product);
             
             // Datos básicos con mayúsculas
-            const id = product._id.toString();
+            const id = product.slug; // ✅ USAR SLUG PARA MEJOR COMPATIBILIDAD
             const title = escapeXML(toUpperCasePreserving(product.productName));
             const description = escapeXML(toUpperCasePreserving(product.description || product.productName));
             const brand = escapeXML(toUpperCasePreserving(product.brandName || ''));
