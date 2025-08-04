@@ -90,18 +90,25 @@ function escapeXML(text) {
         .trim();
 }
 
+// ✅ Función para convertir texto a mayúsculas manteniendo formato
+function toUpperCasePreserving(text) {
+    if (typeof text !== 'string') text = String(text || '');
+    return text.toUpperCase();
+}
+
 function getGoogleCategory(category, subcategory) {
     const categoryMap = GOOGLE_CATEGORY_MAPPING[category];
     if (!categoryMap) return 'Electronics';
     return categoryMap[subcategory] || categoryMap.default || 'Electronics';
 }
 
+// ✅ CAMBIO DE URL: productos -> producto
 function generateProductURL(slug) {
-    return `${XML_CONFIG.STORE_URL}/productos/${slug}`;
+    return `${XML_CONFIG.STORE_URL}/producto/${slug}`;
 }
 
 function formatPrice(priceInCents) {
-    return (priceInCents).toFixed(0); // ✅ QUITAR LA DIVISIÓN POR 100
+    return (priceInCents).toFixed(0);
 }
 
 function getAvailability(stockStatus, stock) {
@@ -113,11 +120,11 @@ function getAvailability(stockStatus, stock) {
 
 function buildCustomLabels(product) {
     return {
-        custom_label_0: product.category || '',
-        custom_label_1: product.subcategory || '',
-        custom_label_2: product.isVipOffer ? 'VIP' : 'Regular',
-        custom_label_3: `Margin_${product.profitMargin || 0}%`,
-        custom_label_4: product.brandName || ''
+        custom_label_0: toUpperCasePreserving(product.category || ''),
+        custom_label_1: toUpperCasePreserving(product.subcategory || ''),
+        custom_label_2: product.isVipOffer ? 'VIP' : 'REGULAR',
+        custom_label_3: `MARGIN_${product.profitMargin || 0}%`,
+        custom_label_4: toUpperCasePreserving(product.brandName || '')
     };
 }
 
@@ -125,21 +132,35 @@ function buildProductAttributes(product) {
     const attributes = [];
     
     if (product.category === 'informatica') {
-        if (product.processor) attributes.push(`Procesador: ${product.processor}`);
-        if (product.memory) attributes.push(`Memoria: ${product.memory}`);
-        if (product.storage) attributes.push(`Almacenamiento: ${product.storage}`);
-        if (product.graphicsCard) attributes.push(`Gráficos: ${product.graphicsCard}`);
-        if (product.notebookScreen) attributes.push(`Pantalla: ${product.notebookScreen}`);
+        if (product.processor) attributes.push(`PROCESADOR: ${toUpperCasePreserving(product.processor)}`);
+        if (product.memory) attributes.push(`MEMORIA: ${toUpperCasePreserving(product.memory)}`);
+        if (product.storage) attributes.push(`ALMACENAMIENTO: ${toUpperCasePreserving(product.storage)}`);
+        if (product.graphicsCard) attributes.push(`GRÁFICOS: ${toUpperCasePreserving(product.graphicsCard)}`);
+        if (product.notebookScreen) attributes.push(`PANTALLA: ${toUpperCasePreserving(product.notebookScreen)}`);
     }
     
     if (product.category === 'perifericos') {
-        if (product.monitorSize) attributes.push(`Tamaño: ${product.monitorSize}`);
-        if (product.monitorResolution) attributes.push(`Resolución: ${product.monitorResolution}`);
-        if (product.keyboardSwitches) attributes.push(`Switches: ${product.keyboardSwitches}`);
-        if (product.mouseDPI) attributes.push(`DPI: ${product.mouseDPI}`);
+        if (product.monitorSize) attributes.push(`TAMAÑO: ${toUpperCasePreserving(product.monitorSize)}`);
+        if (product.monitorResolution) attributes.push(`RESOLUCIÓN: ${toUpperCasePreserving(product.monitorResolution)}`);
+        if (product.keyboardSwitches) attributes.push(`SWITCHES: ${toUpperCasePreserving(product.keyboardSwitches)}`);
+        if (product.mouseDPI) attributes.push(`DPI: ${toUpperCasePreserving(product.mouseDPI)}`);
     }
     
     return attributes.join(' | ');
+}
+
+// ✅ Función para determinar si hay descuento y calcular precios
+function getPriceInfo(product) {
+    const sellingPrice = formatPrice(product.sellingPrice);
+    const originalPrice = product.price ? formatPrice(product.price) : null;
+    const hasDiscount = originalPrice && product.price > product.sellingPrice;
+    
+    return {
+        sellingPrice,
+        originalPrice,
+        hasDiscount,
+        discountPercentage: hasDiscount ? Math.round(((product.price - product.sellingPrice) / product.price) * 100) : 0
+    };
 }
 
 // ===== CONTROLADOR PRINCIPAL =====
@@ -157,9 +178,12 @@ const channableFeedController = async (req, res) => {
         
         // Si no incluir productos sin stock
         if (!XML_CONFIG.INCLUDE_OUT_OF_STOCK) {
-            query.$or = [
-                { stock: { $gt: 0 } },
-                { stockStatus: 'in_stock' }
+            query.$and = [
+                { $or: [
+                    { stock: { $gt: 0 } },
+                    { stockStatus: 'in_stock' }
+                ]},
+                { stockStatus: { $ne: 'out_of_stock' } }
             ];
         }
         
@@ -223,16 +247,18 @@ const channableFeedController = async (req, res) => {
             
             includedCount++;
             
-            // Datos básicos
+            // ✅ Obtener información de precios
+            const priceInfo = getPriceInfo(product);
+            
+            // Datos básicos con mayúsculas
             const id = product._id.toString();
-            const title = escapeXML(product.productName);
-            const description = escapeXML(product.description || product.productName);
-            const brand = escapeXML(product.brandName || '');
-            const price = (product.sellingPrice).toFixed(0);
+            const title = escapeXML(toUpperCasePreserving(product.productName));
+            const description = escapeXML(toUpperCasePreserving(product.description || product.productName));
+            const brand = escapeXML(toUpperCasePreserving(product.brandName || ''));
             const availability = getAvailability(product.stockStatus, product.stock);
             const productUrl = generateProductURL(product.slug);
             const googleCategory = getGoogleCategory(product.category, product.subcategory);
-            const productType = `${escapeXML(product.category)} > ${escapeXML(product.subcategory)}`;
+            const productType = `${escapeXML(toUpperCasePreserving(product.category))} > ${escapeXML(toUpperCasePreserving(product.subcategory))}`;
             
             // Imágenes
             const mainImage = product.productImage[0] || '';
@@ -265,7 +291,22 @@ const channableFeedController = async (req, res) => {
             xml += `
             <g:condition>new</g:condition>
             <g:availability>${availability}</g:availability>
-            <g:price>${price} ${XML_CONFIG.BASE_CURRENCY}</g:price>
+            <g:price>${priceInfo.sellingPrice} ${XML_CONFIG.BASE_CURRENCY}</g:price>`;
+
+            // ✅ AGREGAR PRECIO ORIGINAL SI HAY DESCUENTO
+            if (priceInfo.hasDiscount) {
+                xml += `
+            <g:sale_price>${priceInfo.sellingPrice} ${XML_CONFIG.BASE_CURRENCY}</g:sale_price>
+            <g:sale_price_effective_date>${new Date().toISOString().split('T')[0]}/${new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]}</g:sale_price_effective_date>`;
+                
+                // Cambiar el precio principal al precio original
+                xml = xml.replace(
+                    `<g:price>${priceInfo.sellingPrice} ${XML_CONFIG.BASE_CURRENCY}</g:price>`,
+                    `<g:price>${priceInfo.originalPrice} ${XML_CONFIG.BASE_CURRENCY}</g:price>`
+                );
+            }
+
+            xml += `
             <g:brand>${brand}</g:brand>
             <g:gtin>${escapeXML(id)}</g:gtin>
             <g:mpn>${escapeXML(id)}</g:mpn>
@@ -285,8 +326,8 @@ const channableFeedController = async (req, res) => {
             if (productAttributes) {
                 xml += `
             <g:product_detail>
-                <g:section_name>Especificaciones</g:section_name>
-                <g:attribute_name>Características</g:attribute_name>
+                <g:section_name>ESPECIFICACIONES</g:section_name>
+                <g:attribute_name>CARACTERÍSTICAS</g:attribute_name>
                 <g:attribute_value>${escapeXML(productAttributes)}</g:attribute_value>
             </g:product_detail>`;
             }
@@ -299,25 +340,31 @@ const channableFeedController = async (req, res) => {
                 }
             });
 
-            // Especificaciones técnicas específicas
+            // ✅ INFORMACIÓN DE DESCUENTO COMO LABEL PERSONALIZADO
+            if (priceInfo.hasDiscount) {
+                xml += `
+            <g:custom_label_5>DESCUENTO_${priceInfo.discountPercentage}%</g:custom_label_5>`;
+            }
+
+            // Especificaciones técnicas específicas (en mayúsculas)
             if (product.category === 'informatica') {
                 if (product.processor) xml += `
-            <g:processor>${escapeXML(product.processor)}</g:processor>`;
+            <g:processor>${escapeXML(toUpperCasePreserving(product.processor))}</g:processor>`;
                 if (product.memory) xml += `
-            <g:memory>${escapeXML(product.memory)}</g:memory>`;
+            <g:memory>${escapeXML(toUpperCasePreserving(product.memory))}</g:memory>`;
                 if (product.storage) xml += `
-            <g:storage>${escapeXML(product.storage)}</g:storage>`;
+            <g:storage>${escapeXML(toUpperCasePreserving(product.storage))}</g:storage>`;
                 if (product.graphicsCard) xml += `
-            <g:graphics_card>${escapeXML(product.graphicsCard)}</g:graphics_card>`;
+            <g:graphics_card>${escapeXML(toUpperCasePreserving(product.graphicsCard))}</g:graphics_card>`;
             }
 
             if (product.category === 'perifericos' && product.subcategory === 'monitores') {
                 if (product.monitorSize) xml += `
-            <g:screen_size>${escapeXML(product.monitorSize)}</g:screen_size>`;
+            <g:screen_size>${escapeXML(toUpperCasePreserving(product.monitorSize))}</g:screen_size>`;
                 if (product.monitorResolution) xml += `
-            <g:resolution>${escapeXML(product.monitorResolution)}</g:resolution>`;
+            <g:resolution>${escapeXML(toUpperCasePreserving(product.monitorResolution))}</g:resolution>`;
                 if (product.monitorRefreshRate) xml += `
-            <g:refresh_rate>${escapeXML(product.monitorRefreshRate)}</g:refresh_rate>`;
+            <g:refresh_rate>${escapeXML(toUpperCasePreserving(product.monitorRefreshRate))}</g:refresh_rate>`;
             }
 
             // Stock quantity
@@ -334,6 +381,7 @@ const channableFeedController = async (req, res) => {
 </rss>`;
 
         console.log(`✅ XML generado con ${includedCount} productos`);
+        console.log(`📊 Productos con descuento detectados automáticamente`);
         
         // Configurar headers para XML
         res.set({
