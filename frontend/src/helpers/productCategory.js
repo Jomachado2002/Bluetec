@@ -1,4 +1,4 @@
-// src/helpers/productCategory.js
+// src/helpers/productCategory.js - CÓDIGO COMPLETO CORREGIDO
 
 // Función para generar títulos de página
 export const generatePageTitle = (selectedCategory, selectedSubcategory) => {
@@ -136,6 +136,7 @@ export const generatePageTitle = (selectedCategory, selectedSubcategory) => {
     return 'Equipos de tecnología al mejor precio en Paraguay';
   };
 
+// ✅ ARRAY PRINCIPAL COMPLETO CON TODAS LAS CATEGORÍAS Y SUBCATEGORÍAS
 const productCategory = [
   {
     id: 1,
@@ -176,6 +177,16 @@ const productCategory = [
       { id: 301, label: "Cámaras de Seguridad", value: "camaras_seguridad" },
       { id: 302, label: "Grabadores DVR", value: "dvr" },
       { id: 303, label: "NAS", value: "nas" }
+    ]
+  },
+  {
+    id: 4,
+    label: "Impresoras",
+    value: "impresoras",
+    subcategories: [
+      { id: 401, label: "Impresoras Láser", value: "impresoras_laser" },
+      { id: 402, label: "Impresoras Multifunción", value: "impresoras_multifuncion" },
+      { id: 403, label: "Cartuchos y toner", value: "cartuchostoner" }
     ]
   },
   {
@@ -226,7 +237,13 @@ const productCategory = [
       { id: 902, label: "Drones", value: "drones" },
       { id: 903, label: "Televisores", value: "televisores" },
       { id: 904, label: "Parlantes", value: "parlantes" },
-      { id: 905, label: "Relojes Inteligentes", value: "relojes_inteligentes" }
+      { id: 905, label: "Relojes Inteligentes", value: "relojes_inteligentes" },
+      // ✅ NUEVAS SUBCATEGORÍAS AGREGADAS CORRECTAMENTE
+      { id: 906, label: "Scooters Eléctricos", value: "scooters" },
+      { id: 907, label: "Consolas", value: "consolas" },
+      { id: 908, label: "Monopatines Eléctricos", value: "monopatines" },
+      { id: 909, label: "Controles de Consola", value: "controles_consola" },
+      { id: 910, label: "Juegos de Consola", value: "juegos_consola" }
     ]
   }
 ];
