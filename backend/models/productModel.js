@@ -310,7 +310,49 @@ smartwatchSensors: { type: String },
 smartwatchResistance: { type: String },
 smartwatchConnectivity: { type: String },
 smartwatchSportsFeatures: { type: String },
+// Scooters Eléctricos
+scooterMaxSpeed: { type: String },
+scooterRange: { type: String },
+scooterBatteryCapacity: { type: String },
+scooterWeight: { type: String },
+scooterMaxLoad: { type: String },
+scooterWheelSize: { type: String },
+scooterChargingTime: { type: String },
 
+// Consolas
+consoleGeneration: { type: String },
+consoleStorage: { type: String },
+consoleType: { type: String },
+consoleResolution: { type: String },
+consoleConnectivity: { type: String },
+consoleIncludedGames: { type: String },
+consoleControllers: { type: String },
+
+// Monopatines Eléctricos
+monopatinMaxSpeed: { type: String },
+monopatinRange: { type: String },
+monopatinBatteryLife: { type: String },
+monopatinWeight: { type: String },
+monopatinMaxLoad: { type: String },
+monopatinWheelType: { type: String },
+monopatinWaterResistance: { type: String },
+
+// Controles de Consola
+controllerCompatibility: { type: String },
+controllerConnectionType: { type: String },
+controllerBatteryLife: { type: String },
+controllerSpecialFeatures: { type: String },
+controllerVibration: { type: String },
+controllerWireless: { type: String },
+
+// Juegos de Consola
+gameGenre: { type: String },
+gamePlatform: { type: String },
+gameAgeRating: { type: String },
+gameMultiplayer: { type: String },
+gameLanguage: { type: String },
+gameReleaseYear: { type: String },
+gamePhysicalDigital: { type: String },
 
 purchasePriceUSD: { type: Number, default: 0 },  // Precio de compra en USD
 exchangeRate: { type: Number, default: 7300 },   // Tipo de cambio usado en la última actualización

@@ -103,7 +103,12 @@ export const generatePageTitle = (selectedCategory, selectedSubcategory) => {
           { id: 902, label: "Drones", value: "drones" },
           { id: 903, label: "Televisores", value: "televisores" },
           { id: 904, label: "Parlantes", value: "parlantes" },
-          { id: 905, label: "Relojes Inteligentes", value: "relojes_inteligentes" }
+          { id: 905, label: "Relojes Inteligentes", value: "relojes_inteligentes" },
+          { id: 906, label: "Scooters Eléctricos", value: "scooters" },
+          { id: 907, label: "Consolas", value: "consolas" },
+          { id: 908, label: "Monopatines Eléctricos", value: "monopatines" },
+          { id: 909, label: "Controles de Consola", value: "controles_consola" },
+          { id: 910, label: "Juegos de Consola", value: "juegos_consola" }
         ]
       }
     ];

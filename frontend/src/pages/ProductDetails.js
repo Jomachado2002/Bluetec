@@ -66,8 +66,19 @@ const specificationsByCategory = {
     'droneType', 'droneFlightTime', 'droneRange', 'droneCamera', 'droneStabilization', 'droneSmartFeatures', 'droneWeight',
     'tvScreenSize', 'tvResolution', 'tvPanelType', 'tvSmartFeatures', 'tvHDR', 'tvConnectivity', 'tvRefreshRate',
     'speakerType', 'speakerPower', 'speakerConnectivity', 'speakerBatteryLife', 'speakerResistance', 'speakerFrequencyResponse', 'speakerSpecialFeatures',
-    'smartwatchCompatibility', 'smartwatchDisplay', 'smartwatchBatteryLife', 'smartwatchSensors', 'smartwatchResistance', 'smartwatchConnectivity', 'smartwatchSportsFeatures'
+    'smartwatchCompatibility', 'smartwatchDisplay', 'smartwatchBatteryLife', 'smartwatchSensors', 'smartwatchResistance', 'smartwatchConnectivity', 'smartwatchSportsFeatures',
+    'scooterMaxSpeed', 'scooterRange', 'scooterBatteryCapacity', 'scooterWeight', 
+    'scooterMaxLoad', 'scooterWheelSize', 'scooterChargingTime',
+    'consoleGeneration', 'consoleStorage', 'consoleType', 'consoleResolution', 
+    'consoleConnectivity', 'consoleIncludedGames', 'consoleControllers',
+    'monopatinMaxSpeed', 'monopatinRange', 'monopatinBatteryLife', 'monopatinWeight', 
+    'monopatinMaxLoad', 'monopatinWheelType', 'monopatinWaterResistance',
+    'controllerCompatibility', 'controllerConnectionType', 'controllerBatteryLife', 
+    'controllerSpecialFeatures', 'controllerVibration', 'controllerWireless',
+    'gameGenre', 'gamePlatform', 'gameAgeRating', 'gameMultiplayer', 
+    'gameLanguage', 'gameReleaseYear', 'gamePhysicalDigital'
   ],
+
   redes: [
     'switchType', 'switchPorts', 'switchPortSpeed', 'switchNetworkLayer', 'switchCapacity',
     'serverType', 'serverProcessor', 'serverProcessorCount', 'serverRAM', 
@@ -335,7 +346,51 @@ const fieldNameMapping = {
   smartwatchSensors: "Sensores",
   smartwatchResistance: "Resistencia",
   smartwatchConnectivity: "Conectividad",
-  smartwatchSportsFeatures: "Funciones Deportivas"
+  smartwatchSportsFeatures: "Funciones Deportivas",
+  
+  // Scooters Eléctricos
+scooterMaxSpeed: "Velocidad Máxima",
+scooterRange: "Autonomía",
+scooterBatteryCapacity: "Capacidad de Batería",
+scooterWeight: "Peso",
+scooterMaxLoad: "Carga Máxima",
+scooterWheelSize: "Tamaño de Rueda",
+scooterChargingTime: "Tiempo de Carga",
+
+// Consolas
+consoleGeneration: "Generación",
+consoleStorage: "Almacenamiento",
+consoleType: "Tipo",
+consoleResolution: "Resolución",
+consoleConnectivity: "Conectividad",
+consoleIncludedGames: "Juegos Incluidos",
+consoleControllers: "Controles Incluidos",
+
+// Monopatines Eléctricos
+monopatinMaxSpeed: "Velocidad Máxima",
+monopatinRange: "Autonomía",
+monopatinBatteryLife: "Duración de Batería",
+monopatinWeight: "Peso",
+monopatinMaxLoad: "Carga Máxima",
+monopatinWheelType: "Tipo de Rueda",
+monopatinWaterResistance: "Resistencia al Agua",
+
+// Controles de Consola
+controllerCompatibility: "Compatibilidad",
+controllerConnectionType: "Tipo de Conexión",
+controllerBatteryLife: "Duración de Batería",
+controllerSpecialFeatures: "Características Especiales",
+controllerVibration: "Vibración",
+controllerWireless: "Tecnología Inalámbrica",
+
+// Juegos de Consola
+gameGenre: "Género",
+gamePlatform: "Plataforma",
+gameAgeRating: "Clasificación de Edad",
+gameMultiplayer: "Multijugador",
+gameLanguage: "Idioma",
+gameReleaseYear: "Año de Lanzamiento",
+gamePhysicalDigital: "Formato",
 };
 
 
