@@ -274,13 +274,20 @@ function getDiscountInfo(product) {
 function buildCustomLabels(product, categoryInfo) {
     const discountInfo = getDiscountInfo(product);
     
-    return {
+    const labels = {
         custom_label_0: categoryInfo.categoryLabel,
         custom_label_1: categoryInfo.subcategoryLabel,
         custom_label_2: product.isVipOffer ? 'VIP' : 'REGULAR',
         custom_label_3: discountInfo.hasDiscount ? `OFERTA ${discountInfo.discountPercentage}%` : 'PRECIO_REGULAR',
         custom_label_4: (product.brandName || XML_CONFIG.DEFAULT_BRAND).toUpperCase()
     };
+    
+    // Agregar custom_label_5 si hay descuento
+    if (discountInfo.hasDiscount) {
+        labels.custom_label_5 = `${discountInfo.discountPercentage}% OFF`;
+    }
+    
+    return labels;
 }
 
 // ===== CONTROLADOR PRINCIPAL =====
@@ -362,11 +369,17 @@ const channableFeedController = async (req, res) => {
             <link>${productUrl}</link>
             <g:image_link>${escapeXML(mainImage)}</g:image_link>`;
 
-                // Imágenes adicionales
-                additionalImages.forEach(img => {
-                    xml += `
+                // Imágenes adicionales (asegurar que siempre haya al menos un campo)
+                if (additionalImages.length > 0) {
+                    additionalImages.forEach(img => {
+                        xml += `
             <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
-                });
+                    });
+                } else {
+                    // Campo vacío para evitar warnings
+                    xml += `
+            <g:additional_image_link></g:additional_image_link>`;
+                }
 
                 xml += `
             <g:condition>new</g:condition>
@@ -407,13 +420,41 @@ const channableFeedController = async (req, res) => {
                 xml += `
             <precio_original>${escapeXML(price)}</precio_original>
             <categoria_es>${escapeXML(categoryInfo.categoryLabel)}</categoria_es>
-            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>`;
+            <subcategoria_es>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria_es>
+            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>
+            <precio_original_formateado>${escapeXML(price)}</precio_original_formateado>
+            <precio_pys_formateado>${escapeXML(price)}</precio_pys_formateado>`;
                 
-                // Solo agregar specs si existen
-                if (productSpecs.memory) xml += `\n            <memory>${escapeXML(productSpecs.memory)}</memory>`;
-                if (productSpecs.graphicsCard) xml += `\n            <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>`;
-                if (productSpecs.refreshRate) xml += `\n            <refresh_rate>${escapeXML(productSpecs.refreshRate)}</refresh_rate>`;
-                if (productSpecs.resolution) xml += `\n            <resolution>${escapeXML(productSpecs.resolution)}</resolution>`;
+                // Calcular precio en USD
+                const priceUSD = Math.round(discountInfo.sellingPrice / 7300);
+                xml += `
+            <precio_usd>${priceUSD}</precio_usd>`;
+                
+                // Agregar specs (siempre con valor, aunque sea vacío)
+                xml += `
+            <memory>${escapeXML(productSpecs.memory)}</memory>
+            <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>
+            <refresh_rate>${escapeXML(productSpecs.refreshRate)}</refresh_rate>
+            <resolution>${escapeXML(productSpecs.resolution)}</resolution>
+            <processor>${escapeXML(productSpecs.processor)}</processor>
+            <storage>${escapeXML(productSpecs.storage)}</storage>
+            <screen_size>${escapeXML(productSpecs.screenSize)}</screen_size>`;
+                
+                // Campos de producto detallado
+                xml += `
+            <g:product_detail>
+                <g:section_name>ESPECIFICACIONES</g:section_name>
+                <g:attribute_name>CARACTERÍSTICAS</g:attribute_name>
+                <g:attribute_value>${escapeXML(productSpecs.memory || productSpecs.processor || productSpecs.storage || 'Consultar especificaciones')}</g:attribute_value>
+            </g:product_detail>`;
+                
+                // Campo de cantidad
+                xml += `
+            <g:quantity>${product.stock > 0 ? product.stock : 1}</g:quantity>`;
+                
+                // Campo de imagen sin fondo (obligatorio para algunos canales)
+                xml += `
+            <image_link_nobg></image_link_nobg>`;
                 
                 xml += `
             <gtin></gtin>`;
@@ -421,11 +462,13 @@ const channableFeedController = async (req, res) => {
                 if (discountInfo.hasDiscount) {
                     xml += `
             <precio_oferta>${escapeXML(salePrice)}</precio_oferta>
-            <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>`;
+            <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>
+            <descuento>${discountInfo.discountPercentage}</descuento>`;
                 } else {
                     xml += `
             <precio_oferta></precio_oferta>
-            <descuento_porcentaje></descuento_porcentaje>`;
+            <descuento_porcentaje></descuento_porcentaje>
+            <descuento></descuento>`;
                 }
                 
                 xml += `
