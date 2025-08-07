@@ -1056,7 +1056,7 @@ const Nosotros = () => {
                       </div>
                       <div>
                         <h4 className="text-lg font-medium text-gray-800">Teléfono</h4>
-                        <p className="text-gray-600">+595 984 133733</p>
+                        <p className="text-gray-600">+595 981 150393</p>
                       </div>
                     </div>
                     
@@ -1080,7 +1080,7 @@ const Nosotros = () => {
                       </div>
                       <div>
                         <h4 className="text-lg font-medium text-gray-800">WhatsApp</h4>
-                        <p className="text-gray-600">+595 984 133733</p>
+                        <p className="text-gray-600">+595 981 150393</p>
                       </div>
                     </div>
                   </div>
@@ -1113,16 +1113,17 @@ const Nosotros = () => {
                   {/* Contenedor del mapa con efectos tech */}
                   <div className="map-container h-full">
                     {/* Google Maps iframe */}
-                    <iframe 
-                      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d67695.23063226297!2d-57.529639424448426!3d-25.314952781028982!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x945da9831c090b5b%3A0x448b0dc581658acb!2sBluetec!5e0!3m2!1ses-419!2spy!4v1748808634875!5m2!1ses-419!2spy" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" 
-                      width="100%" 
-                      height="100%" 
-                      style={{border: 0, filter: 'contrast(1.1) saturate(1.2)'}} 
-                      allowFullScreen 
-                      loading="lazy" 
-                      referrerPolicy="no-referrer-when-downgrade"
-                      className="absolute inset-0"
-                    ></iframe>
+                   <iframe 
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d67695.23063226297!2d-57.529639424448426!3d-25.314952781028982!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x945da9831c090b5b%3A0x448b0dc581658acb!2sBluetec!5e0!3m2!1ses-419!2spy!4v1748808634875!5m2!1ses-419!2spy"
+                    width="100%" 
+                    height="100%" 
+                    style={{border: 0, filter: 'contrast(1.1) saturate(1.2)'}} 
+                    allowFullScreen 
+                    loading="lazy" 
+                    referrerPolicy="no-referrer-when-downgrade"
+                    className="absolute inset-0"
+                    title="Ubicación de BlueTec"
+                  ></iframe>
                     
                     {/* Overlay de estilo tech */}
                     <div className="map-overlay"></div>
