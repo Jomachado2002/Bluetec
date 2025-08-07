@@ -1106,7 +1106,51 @@ const ProductSpecifications = ({
       { label: "Resistencia", name: "smartwatchResistance", placeholder: "Ingresa resistencia al agua (ATM, IP)" },
       { label: "Conectividad", name: "smartwatchConnectivity", placeholder: "Ingresa opciones de conectividad (WiFi, Cellular)" },
       { label: "Funciones Deportivas", name: "smartwatchSportsFeatures", placeholder: "Ingresa funciones deportivas y de salud" }
-    ]
+    ],
+    scooters: [
+      { label: "Velocidad Máxima", name: "scooterMaxSpeed", placeholder: "Ingresa la velocidad máxima (Ej: 25 km/h)" },
+      { label: "Autonomía", name: "scooterRange", placeholder: "Ingresa la autonomía (Ej: 30 km)" },
+      { label: "Capacidad de Batería", name: "scooterBatteryCapacity", placeholder: "Ingresa la capacidad de batería (Ej: 7.8 Ah)" },
+      { label: "Peso", name: "scooterWeight", placeholder: "Ingresa el peso del scooter (Ej: 12 kg)" },
+      { label: "Carga Máxima", name: "scooterMaxLoad", placeholder: "Ingresa la carga máxima (Ej: 100 kg)" },
+      { label: "Tamaño de Rueda", name: "scooterWheelSize", placeholder: "Ingresa el tamaño de rueda (Ej: 8.5 pulgadas)" },
+      { label: "Tiempo de Carga", name: "scooterChargingTime", placeholder: "Ingresa el tiempo de carga (Ej: 4-6 horas)" }
+    ],
+    consolas: [
+      { label: "Generación", name: "consoleGeneration", placeholder: "Ingresa la generación (Ej: PS5, Xbox Series X)" },
+      { label: "Almacenamiento", name: "consoleStorage", placeholder: "Ingresa el almacenamiento (Ej: 825GB SSD)" },
+      { label: "Tipo", name: "consoleType", placeholder: "Ingresa el tipo (Sobremesa, Portátil, Híbrida)" },
+      { label: "Resolución", name: "consoleResolution", placeholder: "Ingresa la resolución máxima (Ej: 4K, 1080p)" },
+      { label: "Conectividad", name: "consoleConnectivity", placeholder: "Ingresa opciones de conectividad (WiFi, Ethernet, Bluetooth)" },
+      { label: "Juegos Incluidos", name: "consoleIncludedGames", placeholder: "Ingresa juegos incluidos (si aplica)" },
+      { label: "Controles Incluidos", name: "consoleControllers", placeholder: "Ingresa número y tipo de controles incluidos" }
+    ],
+    monopatines: [
+      { label: "Velocidad Máxima", name: "monopatinMaxSpeed", placeholder: "Ingresa la velocidad máxima (Ej: 20 km/h)" },
+      { label: "Autonomía", name: "monopatinRange", placeholder: "Ingresa la autonomía (Ej: 25 km)" },
+      { label: "Duración de Batería", name: "monopatinBatteryLife", placeholder: "Ingresa la duración de batería (Ej: 3-4 horas)" },
+      { label: "Peso", name: "monopatinWeight", placeholder: "Ingresa el peso (Ej: 3.5 kg)" },
+      { label: "Carga Máxima", name: "monopatinMaxLoad", placeholder: "Ingresa la carga máxima (Ej: 80 kg)" },
+      { label: "Tipo de Rueda", name: "monopatinWheelType", placeholder: "Ingresa el tipo de rueda (PU, Neumático, etc.)" },
+      { label: "Resistencia al Agua", name: "monopatinWaterResistance", placeholder: "Ingresa nivel de resistencia (IP54, IPX4, etc.)" }
+    ],
+    controles_consola: [
+      { label: "Compatibilidad", name: "controllerCompatibility", placeholder: "Ingresa compatibilidad (PS5, Xbox, PC, Switch)" },
+      { label: "Tipo de Conexión", name: "controllerConnectionType", placeholder: "Ingresa tipo de conexión (Inalámbrico, USB, Bluetooth)" },
+      { label: "Duración de Batería", name: "controllerBatteryLife", placeholder: "Ingresa duración de batería (Ej: 12 horas)" },
+      { label: "Características Especiales", name: "controllerSpecialFeatures", placeholder: "Ingresa características especiales (RGB, triggers adaptativos)" },
+      { label: "Vibración", name: "controllerVibration", placeholder: "Ingresa tipo de vibración (Dual, Háptica, etc.)" },
+      { label: "Tecnología Inalámbrica", name: "controllerWireless", placeholder: "Ingresa tecnología inalámbrica (Bluetooth 5.0, 2.4GHz)" }
+    ],
+    juegos_consola: [
+      { label: "Género", name: "gameGenre", placeholder: "Ingresa el género (Acción, RPG, Deportes, etc.)" },
+      { label: "Plataforma", name: "gamePlatform", placeholder: "Ingresa la plataforma (PS5, Xbox Series, Switch, PC)" },
+      { label: "Clasificación de Edad", name: "gameAgeRating", placeholder: "Ingresa clasificación (E, T, M, PEGI 3, 7, 12, 16, 18)" },
+      { label: "Multijugador", name: "gameMultiplayer", placeholder: "Ingresa opciones multijugador (Local, Online, Co-op)" },
+      { label: "Idioma", name: "gameLanguage", placeholder: "Ingresa idiomas disponibles (Español, Inglés, etc.)" },
+      { label: "Año de Lanzamiento", name: "gameReleaseYear", placeholder: "Ingresa el año de lanzamiento (Ej: 2024)" },
+      { label: "Formato", name: "gamePhysicalDigital", placeholder: "Ingresa el formato (Físico, Digital, Ambos)" }
+    ],
   };
 
   // Obtener las especificaciones para la subcategoría actual

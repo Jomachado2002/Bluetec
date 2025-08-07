@@ -196,7 +196,27 @@ const filterProductController = async (req, res) => {
       relojes_inteligentes: [
         'smartwatchCompatibility', 'smartwatchDisplay', 'smartwatchBatteryLife', 
         'smartwatchSensors', 'smartwatchResistance', 'smartwatchConnectivity', 'smartwatchSportsFeatures'
-      ]
+      ],
+      scooters: [
+  'scooterMaxSpeed', 'scooterRange', 'scooterBatteryCapacity', 'scooterWeight', 
+  'scooterMaxLoad', 'scooterWheelSize', 'scooterChargingTime'
+],
+consolas: [
+  'consoleGeneration', 'consoleStorage', 'consoleType', 'consoleResolution', 
+  'consoleConnectivity', 'consoleIncludedGames', 'consoleControllers'
+],
+monopatines: [
+  'monopatinMaxSpeed', 'monopatinRange', 'monopatinBatteryLife', 'monopatinWeight', 
+  'monopatinMaxLoad', 'monopatinWheelType', 'monopatinWaterResistance'
+],
+controles_consola: [
+  'controllerCompatibility', 'controllerConnectionType', 'controllerBatteryLife', 
+  'controllerSpecialFeatures', 'controllerVibration', 'controllerWireless'
+],
+juegos_consola: [
+  'gameGenre', 'gamePlatform', 'gameAgeRating', 'gameMultiplayer', 
+  'gameLanguage', 'gameReleaseYear', 'gamePhysicalDigital'
+],
   };
 
     // Filtros por especificaciones
