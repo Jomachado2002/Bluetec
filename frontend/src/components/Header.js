@@ -493,7 +493,7 @@ const Header = () => {
                     {/* Contacto */}
                     <div className="pt-3 mt-4 border-t border-gray-200">
                       <a 
-                        href="https://wa.me/595984133733?text=Hola,%20estoy%20interesado%20en%20obtener%20información%20sobre%20insumos%20de%20tecnología." 
+                        href="https://wa.me/595981150393?text=Hola,%20estoy%20interesado%20en%20obtener%20información%20sobre%20insumos%20de%20tecnología." 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="flex items-center px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
@@ -504,13 +504,13 @@ const Header = () => {
                         <span className="font-medium">Contactar</span>
                       </a>
                       <a 
-                        href="tel:+595984133733" 
+                        href="tel:+595981150393" 
                         className="flex items-center px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                       >
                         <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/10 mr-3 flex-shrink-0">
                           <FaPhone className="text-blue-500 text-sm" />
                         </div>
-                        <span className="font-medium">+595 984133733</span>
+                        <span className="font-medium">+595 981150393</span>
                       </a>
                     </div>
                   </nav>
@@ -722,7 +722,7 @@ const Header = () => {
     <span className="text-xs">Carrito</span>
   </Link>
   <a 
-    href="https://wa.me/595984133733?text=Hola,%20estoy%20interesado%20en%20obtener%20información%20sobre%20insumos%20de%20tecnología." 
+    href="https://wa.me/595981150393?text=Hola,%20estoy%20interesado%20en%20obtener%20información%20sobre%20insumos%20de%20tecnología." 
     target="_blank" 
     rel="noopener noreferrer"
     className="flex flex-col items-center text-gray-600 hover:text-blue-600"
