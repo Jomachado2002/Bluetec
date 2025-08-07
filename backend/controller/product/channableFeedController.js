@@ -16,6 +16,19 @@ const XML_CONFIG = {
     DEFAULT_BRAND: 'Bluetec'
 };
 
+// ===== FUNCIÓN PARA EXTRAER ESPECIFICACIONES =====
+function extractProductSpecs(product) {
+    return {
+        memory: product.memory || product.phoneRAM || product.tabletRAM || '',
+        processor: product.processor || product.phoneProcessor || product.tabletProcessor || '',
+        storage: product.storage || product.phoneStorage || product.tabletStorage || '',
+        graphicsCard: product.graphicsCard || product.graphicCardModel || '',
+        screenSize: product.notebookScreen || product.phoneScreenSize || product.tabletScreenSize || product.monitorSize || '',
+        refreshRate: product.monitorRefreshRate || '',
+        resolution: product.monitorResolution || product.tabletScreenResolution || product.cameraResolution || ''
+    };
+}
+
 // ===== MAPEO COMPLETO DE CATEGORÍAS =====
 const CATEGORY_MAPPING = {
     'informatica': {
@@ -155,14 +168,13 @@ function formatPrice(priceInGuaranis) {
 }
 
 function generateCleanId(product) {
-    // ID único más robusto para evitar duplicados
+    // ID único más simple y seguro
     const id = product._id.toString();
     const brand = (product.brandName || 'prod').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
     const category = (product.subcategory || 'item').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
     
-    // Usar timestamp o hash para garantizar unicidad
-    const uniqueSuffix = Date.now().toString().slice(-4);
-    return `${brand}${category}${id}${uniqueSuffix}`.substring(0, 50);
+    // Usar solo el ID del producto para garantizar unicidad
+    return `${brand}${category}${id}`.substring(0, 50);
 }
 
 function generateOptimizedTitle(product) {
@@ -350,17 +362,11 @@ const channableFeedController = async (req, res) => {
             <link>${productUrl}</link>
             <g:image_link>${escapeXML(mainImage)}</g:image_link>`;
 
-                // Imágenes adicionales (con valores por defecto)
-                if (additionalImages.length > 0) {
-                    additionalImages.forEach(img => {
-                        xml += `
-            <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
-                    });
-                } else {
-                    // Campos vacíos para evitar warnings
+                // Imágenes adicionales
+                additionalImages.forEach(img => {
                     xml += `
-            <additional_image_link></additional_image_link>`;
-                }
+            <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
+                });
 
                 xml += `
             <g:condition>new</g:condition>
@@ -401,11 +407,15 @@ const channableFeedController = async (req, res) => {
                 xml += `
             <precio_original>${escapeXML(price)}</precio_original>
             <categoria_es>${escapeXML(categoryInfo.categoryLabel)}</categoria_es>
-            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>
-            <memory>${escapeXML(productSpecs.memory)}</memory>
-            <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>
-            <refresh_rate>${escapeXML(productSpecs.refreshRate)}</refresh_rate>
-            <resolution>${escapeXML(productSpecs.resolution)}</resolution>
+            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>`;
+                
+                // Solo agregar specs si existen
+                if (productSpecs.memory) xml += `\n            <memory>${escapeXML(productSpecs.memory)}</memory>`;
+                if (productSpecs.graphicsCard) xml += `\n            <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>`;
+                if (productSpecs.refreshRate) xml += `\n            <refresh_rate>${escapeXML(productSpecs.refreshRate)}</refresh_rate>`;
+                if (productSpecs.resolution) xml += `\n            <resolution>${escapeXML(productSpecs.resolution)}</resolution>`;
+                
+                xml += `
             <gtin></gtin>`;
                 
                 if (discountInfo.hasDiscount) {
