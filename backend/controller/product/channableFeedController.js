@@ -1,203 +1,136 @@
-// backend/controller/product/channableFeedController.js
+// backend/controller/product/channableFeedController.js - VERSIÓN OPTIMIZADA PARA META
 const ProductModel = require('../../models/productModel');
 
-// ===== CONFIGURACIÓN =====
+// ===== CONFIGURACIÓN OPTIMIZADA PARA META =====
 const XML_CONFIG = {
     STORE_NAME: 'Bluetec',
     STORE_URL: 'https://www.bluetec.com.py',
     STORE_DESCRIPTION: 'Tienda especializada en tecnología e informática',
-    BASE_CURRENCY_PYG: 'PYG',
-    BASE_CURRENCY_USD: 'USD',
+    BASE_CURRENCY: 'PYG',
     SHIPPING_COST: 30000,
     COUNTRY: 'PY',
     LANGUAGE: 'es',
-    INCLUDE_OUT_OF_STOCK: false,
+    INCLUDE_OUT_OF_STOCK: true, // Cambiado a true para incluir más productos
     MIN_PRICE: 1000,
-    MAX_ID_LENGTH: 50, // Límite para g:id
-    MAX_TITLE_LENGTH: 150, // Límite para g:title
-    MAX_MPN_LENGTH: 70 // Límite para g:mpn
+    MAX_TITLE_LENGTH: 60, // Reducido para Meta
+    DEFAULT_BRAND: 'Bluetec'
 };
 
-// ===== MAPEO COMPLETO DE CATEGORÍAS BASADO EN TU BASE DE DATOS =====
-const CATEGORY_LABELS = {
-    'informatica': 'INFORMÁTICA',
-    'perifericos': 'PERIFÉRICOS',
-    'cctv': 'CCTV',
-    'redes': 'REDES',
-    'telefonia': 'TELEFONÍA',
-    'energia': 'ENERGÍA',
-    'electronicos': 'ELECTRÓNICOS',
-    'software': 'SOFTWARE',
-    'gaming': 'GAMING'
-};
-
-const SUBCATEGORY_LABELS = {
-    // Informática
-    'notebooks': 'NOTEBOOKS',
-    'computadoras_ensambladas': 'COMPUTADORAS ENSAMBLADAS',
-    'placas_madre': 'PLACAS MADRE',
-    'tarjeta_grafica': 'TARJETAS GRÁFICAS',
-    'memorias_ram': 'MEMORIAS RAM',
-    'discos_duros': 'DISCOS DUROS',
-    'procesador': 'PROCESADORES',
-    'fuentes_alimentacion': 'FUENTES DE ALIMENTACIÓN',
-    'gabinetes': 'GABINETES',
-    'impresoras': 'IMPRESORAS',
-    'cartuchos_toners': 'CARTUCHOS Y TONERS',
-    'escaneres': 'ESCÁNERES',
-    'servidores': 'SERVIDORES',
-    
-    // Periféricos
-    'monitores': 'MONITORES',
-    'teclados': 'TECLADOS',
-    'mouses': 'MOUSES',
-    'auriculares': 'AURICULARES',
-    'microfonos': 'MICRÓFONOS',
-    'adaptadores': 'ADAPTADORES',
-    'parlantes': 'PARLANTES',
-    'webcam': 'WEBCAMS',
-    
-    // CCTV
-    'camaras_seguridad': 'CÁMARAS DE SEGURIDAD',
-    'dvr': 'DVR',
-    'nvr': 'NVR',
-    'nas': 'NAS',
-    'cables_cctv': 'CABLES CCTV',
-    
-    // Redes
-    'switch': 'SWITCHES',
-    'router': 'ROUTERS',
-    'ap': 'ACCESS POINTS',
-    'cablesred': 'CABLES DE RED',
-    'racks': 'RACKS',
-    'patch_panel': 'PATCH PANELS',
-    'modem': 'MODEMS',
-    
-    // Telefonía
-    'telefonos_moviles': 'TELÉFONOS MÓVILES',
-    'telefonos_fijos': 'TELÉFONOS FIJOS',
-    'tablets': 'TABLETS',
-    'smartwatch': 'SMARTWATCHES',
-    'accesorios_moviles': 'ACCESORIOS MÓVILES',
-    
-    // Energía
-    'ups': 'UPS',
-    'estabilizadores': 'ESTABILIZADORES',
-    'baterias': 'BATERÍAS',
-    'cargadores': 'CARGADORES',
-    
-    // Electrónicos
-    'camaras_fotografia': 'CÁMARAS DE FOTOGRAFÍA',
-    'drones': 'DRONES',
-    'televisores': 'TELEVISORES',
-    'parlantes': 'PARLANTES',
-    'relojes_inteligentes': 'RELOJES INTELIGENTES',
-    'proyectores': 'PROYECTORES',
-    'consolas': 'CONSOLAS',
-    'scooters': 'SCOOTERS ELÉCTRICOS',
-    'monopatines': 'MONOPATINES ELÉCTRICOS',
-    'controles_consola': 'CONTROLES DE CONSOLA',
-    'juegos_consola': 'JUEGOS DE CONSOLA',
-    
-    // Software
-    'licencias': 'LICENCIAS',
-    'antivirus': 'ANTIVIRUS',
-    'oficina': 'SOFTWARE DE OFICINA',
-    
-    // Gaming
-    'sillas': 'SILLAS GAMING',
-    'teclados_gaming': 'TECLADOS GAMING',
-    'mouse_gaming': 'MOUSE GAMING',
-    'auriculares_gaming': 'AURICULARES GAMING'
-};
-
-const GOOGLE_CATEGORY_MAPPING = {
+// ===== MAPEO COMPLETO DE CATEGORÍAS =====
+const CATEGORY_MAPPING = {
     'informatica': {
-        'notebooks': 'Electronics > Computers > Laptops',
-        'computadoras_ensambladas': 'Electronics > Computers > Desktop Computers',
-        'placas_madre': 'Electronics > Computer Components > Motherboards',
-        'tarjeta_grafica': 'Electronics > Computer Components > Video Cards',
-        'memorias_ram': 'Electronics > Computer Components > Computer Memory',
-        'discos_duros': 'Electronics > Computer Components > Storage Devices',
-        'procesador': 'Electronics > Computer Components > Computer Processors',
-        'fuentes_alimentacion': 'Electronics > Computer Components > Power Supplies',
-        'gabinetes': 'Electronics > Computer Components > Computer Cases',
-        'impresoras': 'Electronics > Print, Copy, Scan & Fax > Printers',
-        'cartuchos_toners': 'Electronics > Print, Copy, Scan & Fax > Printer Ink & Toner',
-        'escaneres': 'Electronics > Print, Copy, Scan & Fax > Scanners',
-        'servidores': 'Electronics > Computers > Computer Servers',
-        'default': 'Electronics > Computers'
+        label: 'Informática',
+        googleCategory: 'Electronics > Computers',
+        subcategories: {
+            'notebooks': { label: 'Notebooks', google: 'Electronics > Computers > Laptops' },
+            'computadoras_ensambladas': { label: 'PCs Ensambladas', google: 'Electronics > Computers > Desktop Computers' },
+            'placas_madre': { label: 'Placas Madre', google: 'Electronics > Computer Components > Motherboards' },
+            'tarjeta_grafica': { label: 'Tarjetas Gráficas', google: 'Electronics > Computer Components > Video Cards' },
+            'memorias_ram': { label: 'Memorias RAM', google: 'Electronics > Computer Components > Computer Memory' },
+            'discos_duros': { label: 'Discos Duros', google: 'Electronics > Computer Components > Storage Devices' },
+            'procesador': { label: 'Procesadores', google: 'Electronics > Computer Components > Computer Processors' },
+            'fuentes_alimentacion': { label: 'Fuentes de Poder', google: 'Electronics > Computer Components > Power Supplies' },
+            'gabinetes': { label: 'Gabinetes', google: 'Electronics > Computer Components > Computer Cases' },
+            'impresoras': { label: 'Impresoras', google: 'Electronics > Print, Copy, Scan & Fax > Printers' },
+            'cartuchos_toners': { label: 'Cartuchos y Toners', google: 'Electronics > Print, Copy, Scan & Fax > Printer Ink & Toner' },
+            'escaneres': { label: 'Escáneres', google: 'Electronics > Print, Copy, Scan & Fax > Scanners' },
+            'servidores': { label: 'Servidores', google: 'Electronics > Computers > Computer Servers' }
+        }
     },
     'perifericos': {
-        'monitores': 'Electronics > Computers > Monitors',
-        'teclados': 'Electronics > Computer Accessories > Input Devices > Computer Keyboards',
-        'mouses': 'Electronics > Computer Accessories > Input Devices > Computer Mice',
-        'auriculares': 'Electronics > Audio > Headphones',
-        'microfonos': 'Electronics > Audio > Audio Components > Microphones',
-        'adaptadores': 'Electronics > Computer Accessories > Cables & Interconnects',
-        'parlantes': 'Electronics > Audio > Audio Players & Recorders > Speakers',
-        'webcam': 'Electronics > Cameras & Optics > Cameras > Webcams',
-        'default': 'Electronics > Computer Accessories'
+        label: 'Periféricos',
+        googleCategory: 'Electronics > Computer Accessories',
+        subcategories: {
+            'monitores': { label: 'Monitores', google: 'Electronics > Computers > Monitors' },
+            'teclados': { label: 'Teclados', google: 'Electronics > Computer Accessories > Input Devices > Computer Keyboards' },
+            'mouses': { label: 'Mouses', google: 'Electronics > Computer Accessories > Input Devices > Computer Mice' },
+            'auriculares': { label: 'Auriculares', google: 'Electronics > Audio > Headphones' },
+            'microfonos': { label: 'Micrófonos', google: 'Electronics > Audio > Audio Components > Microphones' },
+            'adaptadores': { label: 'Adaptadores', google: 'Electronics > Computer Accessories > Cables & Interconnects' },
+            'parlantes': { label: 'Parlantes', google: 'Electronics > Audio > Audio Players & Recorders > Speakers' },
+            'webcam': { label: 'Webcams', google: 'Electronics > Cameras & Optics > Cameras > Webcams' }
+        }
     },
     'cctv': {
-        'camaras_seguridad': 'Electronics > Electronics Accessories > Security Accessories > Surveillance Camera Systems',
-        'dvr': 'Electronics > Electronics Accessories > Security Accessories',
-        'nvr': 'Electronics > Electronics Accessories > Security Accessories',
-        'nas': 'Electronics > Computer Components > Storage Devices > Network Attached Storage',
-        'cables_cctv': 'Electronics > Electronics Accessories > Security Accessories',
-        'default': 'Electronics > Electronics Accessories > Security Accessories'
+        label: 'CCTV',
+        googleCategory: 'Electronics > Electronics Accessories > Security Accessories',
+        subcategories: {
+            'camaras_seguridad': { label: 'Cámaras de Seguridad', google: 'Electronics > Electronics Accessories > Security Accessories > Surveillance Camera Systems' },
+            'dvr': { label: 'DVR', google: 'Electronics > Electronics Accessories > Security Accessories' },
+            'nvr': { label: 'NVR', google: 'Electronics > Electronics Accessories > Security Accessories' },
+            'nas': { label: 'NAS', google: 'Electronics > Computer Components > Storage Devices > Network Attached Storage' },
+            'cables_cctv': { label: 'Cables CCTV', google: 'Electronics > Electronics Accessories > Security Accessories' }
+        }
     },
     'redes': {
-        'switch': 'Electronics > Networking > Network Switches',
-        'router': 'Electronics > Networking > Routers',
-        'ap': 'Electronics > Networking > Wireless Access Points',
-        'cablesred': 'Electronics > Computer Accessories > Cables & Interconnects > Network Cables',
-        'racks': 'Electronics > Networking > Network Rack & Enclosures',
-        'patch_panel': 'Electronics > Networking',
-        'modem': 'Electronics > Networking > Modems',
-        'default': 'Electronics > Networking'
+        label: 'Redes',
+        googleCategory: 'Electronics > Networking',
+        subcategories: {
+            'switch': { label: 'Switches', google: 'Electronics > Networking > Network Switches' },
+            'router': { label: 'Routers', google: 'Electronics > Networking > Routers' },
+            'ap': { label: 'Access Points', google: 'Electronics > Networking > Wireless Access Points' },
+            'cablesred': { label: 'Cables de Red', google: 'Electronics > Computer Accessories > Cables & Interconnects > Network Cables' },
+            'racks': { label: 'Racks', google: 'Electronics > Networking > Network Rack & Enclosures' },
+            'patch_panel': { label: 'Patch Panels', google: 'Electronics > Networking' },
+            'modem': { label: 'Modems', google: 'Electronics > Networking > Modems' }
+        }
     },
     'telefonia': {
-        'telefonos_moviles': 'Electronics > Communications > Telephony > Mobile Phones',
-        'telefonos_fijos': 'Electronics > Communications > Telephony > Corded Phones',
-        'tablets': 'Electronics > Computers > Tablet Computers',
-        'smartwatch': 'Electronics > Electronics Accessories > Wearable Technology > Smartwatches',
-        'accesorios_moviles': 'Electronics > Electronics Accessories > Communication Accessories',
-        'default': 'Electronics > Communications > Telephony'
+        label: 'Telefonía',
+        googleCategory: 'Electronics > Communications > Telephony',
+        subcategories: {
+            'telefonos_moviles': { label: 'Teléfonos Móviles', google: 'Electronics > Communications > Telephony > Mobile Phones' },
+            'telefonos_fijos': { label: 'Teléfonos Fijos', google: 'Electronics > Communications > Telephony > Corded Phones' },
+            'tablets': { label: 'Tablets', google: 'Electronics > Computers > Tablet Computers' },
+            'smartwatch': { label: 'Smartwatches', google: 'Electronics > Electronics Accessories > Wearable Technology > Smartwatches' },
+            'accesorios_moviles': { label: 'Accesorios Móviles', google: 'Electronics > Electronics Accessories > Communication Accessories' }
+        }
     },
     'energia': {
-        'ups': 'Electronics > Computer Components > Uninterruptible Power Supplies',
-        'estabilizadores': 'Electronics > Computer Components > Uninterruptible Power Supplies',
-        'baterias': 'Electronics > Power > Batteries',
-        'cargadores': 'Electronics > Electronics Accessories > Power',
-        'default': 'Electronics > Computer Components'
+        label: 'Energía',
+        googleCategory: 'Electronics > Computer Components',
+        subcategories: {
+            'ups': { label: 'UPS', google: 'Electronics > Computer Components > Uninterruptible Power Supplies' },
+            'estabilizadores': { label: 'Estabilizadores', google: 'Electronics > Computer Components > Uninterruptible Power Supplies' },
+            'baterias': { label: 'Baterías', google: 'Electronics > Power > Batteries' },
+            'cargadores': { label: 'Cargadores', google: 'Electronics > Electronics Accessories > Power' }
+        }
     },
     'electronicos': {
-        'camaras_fotografia': 'Electronics > Cameras & Optics > Cameras > Digital Cameras',
-        'drones': 'Electronics > Remote Control & Play Vehicles > Drones',
-        'televisores': 'Electronics > Electronics Accessories > Audio & Video Accessories > Televisions',
-        'parlantes': 'Electronics > Audio > Audio Players & Recorders > Speakers',
-        'relojes_inteligentes': 'Electronics > Electronics Accessories > Wearable Technology > Smartwatches',
-        'proyectores': 'Electronics > Electronics Accessories > Audio & Video Accessories > Projectors',
-        'consolas': 'Electronics > Video Game Console Accessories',
-        'scooters': 'Sporting Goods > Outdoor Recreation > Scooters',
-        'monopatines': 'Sporting Goods > Outdoor Recreation > Skateboards & Longboards',
-        'controles_consola': 'Electronics > Video Game Console Accessories',
-        'juegos_consola': 'Media > Video Games',
-        'default': 'Electronics'
+        label: 'Electrónicos',
+        googleCategory: 'Electronics',
+        subcategories: {
+            'camaras_fotografia': { label: 'Cámaras de Fotografía', google: 'Electronics > Cameras & Optics > Cameras > Digital Cameras' },
+            'drones': { label: 'Drones', google: 'Electronics > Remote Control & Play Vehicles > Drones' },
+            'televisores': { label: 'Televisores', google: 'Electronics > Electronics Accessories > Audio & Video Accessories > Televisions' },
+            'parlantes': { label: 'Parlantes', google: 'Electronics > Audio > Audio Players & Recorders > Speakers' },
+            'relojes_inteligentes': { label: 'Relojes Inteligentes', google: 'Electronics > Electronics Accessories > Wearable Technology > Smartwatches' },
+            'proyectores': { label: 'Proyectores', google: 'Electronics > Electronics Accessories > Audio & Video Accessories > Projectors' },
+            'consolas': { label: 'Consolas', google: 'Electronics > Video Game Console Accessories' },
+            'scooters': { label: 'Scooters Eléctricos', google: 'Sporting Goods > Outdoor Recreation > Scooters' },
+            'monopatines': { label: 'Monopatines Eléctricos', google: 'Sporting Goods > Outdoor Recreation > Skateboards & Longboards' },
+            'controles_consola': { label: 'Controles de Consola', google: 'Electronics > Video Game Console Accessories' },
+            'juegos_consola': { label: 'Juegos de Consola', google: 'Media > Video Games' }
+        }
     },
     'software': {
-        'licencias': 'Software > Computer Software',
-        'antivirus': 'Software > Computer Software > System & Security Software',
-        'oficina': 'Software > Computer Software > Business & Productivity Software',
-        'default': 'Software'
+        label: 'Software',
+        googleCategory: 'Software',
+        subcategories: {
+            'licencias': { label: 'Licencias', google: 'Software > Computer Software' },
+            'antivirus': { label: 'Antivirus', google: 'Software > Computer Software > System & Security Software' },
+            'oficina': { label: 'Software de Oficina', google: 'Software > Computer Software > Business & Productivity Software' }
+        }
     },
     'gaming': {
-        'sillas': 'Furniture > Chairs > Office Chairs',
-        'teclados_gaming': 'Electronics > Computer Accessories > Input Devices > Computer Keyboards',
-        'mouse_gaming': 'Electronics > Computer Accessories > Input Devices > Computer Mice',
-        'auriculares_gaming': 'Electronics > Audio > Headphones',
-        'default': 'Electronics > Computer Accessories'
+        label: 'Gaming',
+        googleCategory: 'Electronics > Computer Accessories',
+        subcategories: {
+            'sillas': { label: 'Sillas Gaming', google: 'Furniture > Chairs > Office Chairs' },
+            'teclados_gaming': { label: 'Teclados Gaming', google: 'Electronics > Computer Accessories > Input Devices > Computer Keyboards' },
+            'mouse_gaming': { label: 'Mouse Gaming', google: 'Electronics > Computer Accessories > Input Devices > Computer Mice' },
+            'auriculares_gaming': { label: 'Auriculares Gaming', google: 'Electronics > Audio > Headphones' }
+        }
     }
 };
 
@@ -213,217 +146,138 @@ function escapeXML(text) {
         .trim();
 }
 
-// Función para formatear números con separadores de miles
 function formatNumber(number) {
-    return Number(number).toLocaleString('es-PY');
+    return Number(number).toLocaleString('es-PY', { maximumFractionDigits: 0 });
 }
 
-// Función para formatear precios con moneda
-function formatPrice(priceInGuaranis, currency = 'PYG') {
-    if (currency === 'USD') {
-        const priceInUSD = Math.round(priceInGuaranis / 8200); // Tipo de cambio aproximado
-        return `${formatNumber(priceInUSD)} USD`;
-    }
-    return `${formatNumber(priceInGuaranis)} Gs`;
+function formatPrice(priceInGuaranis) {
+    return `₲${formatNumber(priceInGuaranis)}`;
 }
 
-// Función para generar ID corto y único
-function generateShortId(product) {
-    const brand = (product.brandName || '').substring(0, 4).toLowerCase().replace(/\s/g, '');
-    const category = (product.subcategory || '').substring(0, 4).toLowerCase().replace(/\s/g, '');
+function generateCleanId(product) {
+    // ID más limpio sin caracteres especiales
+    const brand = (product.brandName || 'prod').substring(0, 4).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const category = (product.subcategory || 'item').substring(0, 4).toLowerCase().replace(/[^a-z0-9]/g, '');
     const id = product._id.toString().substring(0, 8);
-    return `${brand}-${category}-${id}`.substring(0, XML_CONFIG.MAX_ID_LENGTH);
+    return `${brand}${category}${id}`;
 }
 
-// Función para generar MPN corto
-function generateShortMPN(product) {
-    const brand = (product.brandName || '').substring(0, 6).toUpperCase().replace(/\s/g, '');
-    const model = (product.productName || '').split(' ').slice(0, 2).join('').substring(0, 12).toUpperCase().replace(/\s/g, '');
-    return `${brand}-${model}`.substring(0, XML_CONFIG.MAX_MPN_LENGTH);
-}
-
-// Función para acortar título manteniendo información importante
-function generateShortTitle(product) {
+function generateOptimizedTitle(product) {
     let title = product.productName || '';
     
-    // Limpiar y mantener información importante
-    const cleanTitle = title
+    // Limpiar título de caracteres problemáticos
+    title = title
+        .replace(/[^\w\s\-().]/g, ' ') // Solo letras, números, espacios, guiones y paréntesis
         .replace(/\s+/g, ' ')
         .trim();
     
-    if (cleanTitle.length <= XML_CONFIG.MAX_TITLE_LENGTH) {
-        return cleanTitle.toUpperCase();
-    }
-    
-    // Si es muy largo, crear versión abreviada con información clave
-    const words = cleanTitle.split(' ');
-    const important = [];
-    
-    // Siempre incluir marca si existe
-    if (product.brandName) {
-        important.push(product.brandName.toUpperCase());
-    }
-    
-    // Agregar palabras clave técnicas
-    words.forEach(word => {
-        if (word.match(/i[35579]|ryzen|gtx|rtx|\d+gb|\d+tb|ssd|hdd|\d+"|core|intel|amd/i) && important.length < 8) {
-            important.push(word.toUpperCase());
+    // Si es muy largo, acortar manteniendo información importante
+    if (title.length > XML_CONFIG.MAX_TITLE_LENGTH) {
+        const words = title.split(' ');
+        let shortTitle = '';
+        let i = 0;
+        
+        while (i < words.length && (shortTitle + words[i]).length <= XML_CONFIG.MAX_TITLE_LENGTH) {
+            shortTitle += (shortTitle ? ' ' : '') + words[i];
+            i++;
         }
-    });
+        
+        title = shortTitle || title.substring(0, XML_CONFIG.MAX_TITLE_LENGTH);
+    }
     
-    // Si tenemos especificaciones, agregarlas
-    if (product.processor && important.length < 6) important.push(product.processor.toUpperCase());
-    if (product.memory && important.length < 7) important.push(product.memory.toUpperCase());
-    if (product.storage && important.length < 8) important.push(product.storage.toUpperCase());
+    return title;
+}
+
+function getCategoryInfo(category, subcategory) {
+    const categoryData = CATEGORY_MAPPING[category];
+    if (!categoryData) {
+        return {
+            categoryLabel: category,
+            subcategoryLabel: subcategory,
+            googleCategory: 'Electronics',
+            productType: `${category} > ${subcategory}`
+        };
+    }
     
-    const shortTitle = important.join(' ').substring(0, XML_CONFIG.MAX_TITLE_LENGTH);
-    return shortTitle || cleanTitle.substring(0, XML_CONFIG.MAX_TITLE_LENGTH).toUpperCase();
+    const subcategoryData = categoryData.subcategories[subcategory];
+    
+    return {
+        categoryLabel: categoryData.label,
+        subcategoryLabel: subcategoryData ? subcategoryData.label : subcategory,
+        googleCategory: subcategoryData ? subcategoryData.google : categoryData.googleCategory,
+        productType: `${categoryData.label} > ${subcategoryData ? subcategoryData.label : subcategory}`
+    };
 }
 
-function getCategoryLabel(category) {
-    return CATEGORY_LABELS[category] || category.toUpperCase();
-}
-
-function getSubcategoryLabel(subcategory) {
-    return SUBCATEGORY_LABELS[subcategory] || subcategory.replace(/_/g, ' ').toUpperCase();
-}
-
-function getGoogleCategory(category, subcategory) {
-    const categoryMap = GOOGLE_CATEGORY_MAPPING[category];
-    if (!categoryMap) return 'Electronics';
-    return categoryMap[subcategory] || categoryMap.default || 'Electronics';
+function getAvailability(product) {
+    // Más flexible para incluir más productos
+    if (XML_CONFIG.INCLUDE_OUT_OF_STOCK) {
+        return 'in stock'; // Para Meta, mejor mostrar como disponible
+    }
+    
+    if (product.stockStatus === 'in_stock' || (product.stock && product.stock > 0)) {
+        return 'in stock';
+    } else if (product.stockStatus === 'low_stock') {
+        return 'limited availability';
+    } else {
+        return 'out of stock';
+    }
 }
 
 function generateProductURL(slug) {
     return `${XML_CONFIG.STORE_URL}/producto/${slug}`;
 }
 
-function getAvailability(stockStatus, stock) {
-    if (stockStatus === 'in_stock' && stock > 0) return 'in stock';
-    if (stockStatus === 'out_of_stock' || stock === 0) return 'out of stock';
-    if (stockStatus === 'low_stock') return 'limited availability';
-    return 'out of stock';
-}
-
-// Función para calcular descuento
 function getDiscountInfo(product) {
-    const sellingPrice = product.sellingPrice;
-    const originalPrice = product.price;
-    const hasDiscount = originalPrice && originalPrice > sellingPrice;
+    const sellingPrice = Number(product.sellingPrice) || 0;
+    const originalPrice = Number(product.price) || sellingPrice;
     
-    if (hasDiscount) {
-        const discountPercentage = Math.round(((originalPrice - sellingPrice) / originalPrice) * 100);
+    if (originalPrice > sellingPrice && sellingPrice > 0) {
+        const discountAmount = originalPrice - sellingPrice;
+        const discountPercentage = Math.round((discountAmount / originalPrice) * 100);
+        
         return {
             hasDiscount: true,
-            discountPercentage: discountPercentage,
             originalPrice: originalPrice,
-            sellingPrice: sellingPrice
+            sellingPrice: sellingPrice,
+            discountAmount: discountAmount,
+            discountPercentage: discountPercentage
         };
     }
     
     return {
         hasDiscount: false,
-        discountPercentage: 0,
         originalPrice: sellingPrice,
-        sellingPrice: sellingPrice
+        sellingPrice: sellingPrice,
+        discountAmount: 0,
+        discountPercentage: 0
     };
 }
 
-function buildCustomLabels(product) {
+function buildCustomLabels(product, categoryInfo) {
     const discountInfo = getDiscountInfo(product);
     
     return {
-        custom_label_0: getCategoryLabel(product.category),
-        custom_label_1: getSubcategoryLabel(product.subcategory),
+        custom_label_0: categoryInfo.categoryLabel,
+        custom_label_1: categoryInfo.subcategoryLabel,
         custom_label_2: product.isVipOffer ? 'VIP' : 'REGULAR',
-        custom_label_3: `MARGEN ${product.profitMargin || 0}%`,
-        custom_label_4: (product.brandName || '').toUpperCase(),
-        // Etiqueta de descuento solo si hay descuento
-        ...(discountInfo.hasDiscount && { custom_label_5: discountInfo.discountPercentage.toString() })
+        custom_label_3: discountInfo.hasDiscount ? `OFERTA ${discountInfo.discountPercentage}%` : 'PRECIO_REGULAR',
+        custom_label_4: (product.brandName || XML_CONFIG.DEFAULT_BRAND).toUpperCase()
     };
-}
-
-function buildProductAttributes(product) {
-    const attributes = [];
-    
-    // Informática - Notebooks
-    if (product.category === 'informatica' && product.subcategory === 'notebooks') {
-        if (product.processor) attributes.push(`PROCESADOR: ${product.processor.toUpperCase()}`);
-        if (product.memory) attributes.push(`MEMORIA: ${product.memory.toUpperCase()}`);
-        if (product.storage) attributes.push(`ALMACENAMIENTO: ${product.storage.toUpperCase()}`);
-        if (product.graphicsCard) attributes.push(`GRÁFICOS: ${product.graphicsCard.toUpperCase()}`);
-        if (product.notebookScreen) attributes.push(`PANTALLA: ${product.notebookScreen.toUpperCase()}`);
-    }
-    
-    // Periféricos - Monitores
-    if (product.category === 'perifericos' && product.subcategory === 'monitores') {
-        if (product.monitorSize) attributes.push(`TAMAÑO: ${product.monitorSize.toUpperCase()}`);
-        if (product.monitorResolution) attributes.push(`RESOLUCIÓN: ${product.monitorResolution.toUpperCase()}`);
-        if (product.monitorRefreshRate) attributes.push(`REFRESH RATE: ${product.monitorRefreshRate.toUpperCase()}`);
-    }
-    
-    // Periféricos - Teclados
-    if (product.category === 'perifericos' && product.subcategory === 'teclados') {
-        if (product.keyboardSwitches) attributes.push(`SWITCHES: ${product.keyboardSwitches.toUpperCase()}`);
-        if (product.keyboardLayout) attributes.push(`LAYOUT: ${product.keyboardLayout.toUpperCase()}`);
-        if (product.keyboardBacklight) attributes.push(`BACKLIGHT: ${product.keyboardBacklight.toUpperCase()}`);
-    }
-    
-    // Periféricos - Mouses
-    if (product.category === 'perifericos' && product.subcategory === 'mouses') {
-        if (product.mouseDPI) attributes.push(`DPI: ${product.mouseDPI.toUpperCase()}`);
-        if (product.mouseSensor) attributes.push(`SENSOR: ${product.mouseSensor.toUpperCase()}`);
-        if (product.mouseButtons) attributes.push(`BOTONES: ${product.mouseButtons.toUpperCase()}`);
-    }
-    
-    // Telefonía - Teléfonos Móviles
-    if (product.category === 'telefonia' && product.subcategory === 'telefonos_moviles') {
-        if (product.phoneRAM) attributes.push(`RAM: ${product.phoneRAM.toUpperCase()}`);
-        if (product.phoneStorage) attributes.push(`ALMACENAMIENTO: ${product.phoneStorage.toUpperCase()}`);
-        if (product.phoneScreenSize) attributes.push(`PANTALLA: ${product.phoneScreenSize.toUpperCase()}`);
-        if (product.phoneProcessor) attributes.push(`PROCESADOR: ${product.phoneProcessor.toUpperCase()}`);
-    }
-    
-    // Tablets
-    if (product.category === 'telefonia' && product.subcategory === 'tablets') {
-        if (product.tabletRAM) attributes.push(`RAM: ${product.tabletRAM.toUpperCase()}`);
-        if (product.tabletStorage) attributes.push(`ALMACENAMIENTO: ${product.tabletStorage.toUpperCase()}`);
-        if (product.tabletScreenSize) attributes.push(`PANTALLA: ${product.tabletScreenSize.toUpperCase()}`);
-    }
-    
-    // Electrónicos - Televisores
-    if (product.category === 'electronicos' && product.subcategory === 'televisores') {
-        if (product.tvScreenSize) attributes.push(`TAMAÑO: ${product.tvScreenSize.toUpperCase()}`);
-        if (product.tvResolution) attributes.push(`RESOLUCIÓN: ${product.tvResolution.toUpperCase()}`);
-        if (product.tvSmartFeatures) attributes.push(`SMART TV: ${product.tvSmartFeatures.toUpperCase()}`);
-    }
-    
-    return attributes.join(' | ');
 }
 
 // ===== CONTROLADOR PRINCIPAL =====
 const channableFeedController = async (req, res) => {
     try {
-        console.log('🔄 Generando feed XML mejorado para Channable...');
+        console.log('🔄 Generando feed XML optimizado para Meta/Channable...');
         
-        // Query optimizada para obtener productos activos
+        // Query optimizada para incluir más productos
         const query = {
             productImage: { $exists: true, $ne: [], $not: { $size: 0 } },
             productName: { $exists: true, $ne: '' },
             sellingPrice: { $gte: XML_CONFIG.MIN_PRICE },
             slug: { $exists: true, $ne: '' }
         };
-        
-        // Si no incluir productos sin stock
-        if (!XML_CONFIG.INCLUDE_OUT_OF_STOCK) {
-            query.$and = [
-                { $or: [
-                    { stock: { $gt: 0 } },
-                    { stockStatus: 'in_stock' }
-                ]},
-                { stockStatus: { $ne: 'out_of_stock' } }
-            ];
-        }
         
         const products = await ProductModel
             .find(query)
@@ -436,160 +290,149 @@ const channableFeedController = async (req, res) => {
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
     <channel>
-        <title>${escapeXML(XML_CONFIG.STORE_NAME)} - Feed de Productos</title>
+        <title>${escapeXML(XML_CONFIG.STORE_NAME)} - Catálogo de Productos</title>
         <link>${XML_CONFIG.STORE_URL}</link>
         <description>${escapeXML(XML_CONFIG.STORE_DESCRIPTION)}</description>
         <language>${XML_CONFIG.LANGUAGE}</language>
         <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-        <generator>Bluetec XML Generator v2.0</generator>\n`;
+        <generator>Bluetec Meta Feed Generator v3.0</generator>\n`;
 
         let includedCount = 0;
+        let skippedCount = 0;
 
         products.forEach(product => {
-            // Verificar datos mínimos
-            if (!product.productName || !product.productImage || product.productImage.length === 0) {
-                return;
-            }
-            
-            includedCount++;
-            
-            // Obtener información de descuento
-            const discountInfo = getDiscountInfo(product);
-            
-            // Datos básicos
-            const id = generateShortId(product);
-            const title = escapeXML(generateShortTitle(product));
-            const description = escapeXML(product.description?.toUpperCase() || product.productName.toUpperCase());
-            const brand = escapeXML((product.brandName || '').toUpperCase());
-            const availability = getAvailability(product.stockStatus, product.stock);
-            const productUrl = generateProductURL(product.slug);
-            const googleCategory = getGoogleCategory(product.category, product.subcategory);
-            const productType = `${getCategoryLabel(product.category)} > ${getSubcategoryLabel(product.subcategory)}`;
-            const mpn = generateShortMPN(product);
-            
-            // Imágenes
-            const mainImage = product.productImage[0] || '';
-            const additionalImages = product.productImage.slice(1) || [];
-            
-            // Precios formateados
-            const priceFormatted = formatPrice(discountInfo.originalPrice);
-            const salePriceFormatted = discountInfo.hasDiscount ? formatPrice(discountInfo.sellingPrice) : null;
-            
-            // Envío
-            const shippingCost = formatNumber(Math.round((product.deliveryCost || XML_CONFIG.SHIPPING_COST)));
-            
-            // Labels personalizados
-            const customLabels = buildCustomLabels(product);
-            
-            // Atributos del producto
-            const productAttributes = buildProductAttributes(product);
-            
-            xml += `        <item>
+            try {
+                // Validaciones básicas
+                if (!product.productName || !product.productImage || product.productImage.length === 0) {
+                    skippedCount++;
+                    return;
+                }
+                
+                const sellingPrice = Number(product.sellingPrice);
+                if (!sellingPrice || sellingPrice < XML_CONFIG.MIN_PRICE) {
+                    skippedCount++;
+                    return;
+                }
+                
+                includedCount++;
+                
+                // Generar datos del producto
+                const id = generateCleanId(product);
+                const title = escapeXML(generateOptimizedTitle(product));
+                const description = escapeXML((product.description || product.productName || '').substring(0, 500));
+                const brand = escapeXML(product.brandName || XML_CONFIG.DEFAULT_BRAND);
+                const categoryInfo = getCategoryInfo(product.category, product.subcategory);
+                const availability = getAvailability(product);
+                const productUrl = generateProductURL(product.slug);
+                const discountInfo = getDiscountInfo(product);
+                const customLabels = buildCustomLabels(product, categoryInfo);
+                
+                // Imagen principal
+                const mainImage = product.productImage[0] || '';
+                const additionalImages = product.productImage.slice(1, 11) || []; // Máximo 10 adicionales
+                
+                // Formatear precios
+                const price = formatPrice(discountInfo.originalPrice);
+                const salePrice = discountInfo.hasDiscount ? formatPrice(discountInfo.sellingPrice) : null;
+                
+                xml += `        <item>
             <g:id>${escapeXML(id)}</g:id>
             <title>${title}</title>
             <description>${description}</description>
-            <g:google_product_category>${googleCategory}</g:google_product_category>
-            <g:product_type>${productType}</g:product_type>
+            <g:google_product_category>${categoryInfo.googleCategory}</g:google_product_category>
+            <g:product_type>${escapeXML(categoryInfo.productType)}</g:product_type>
             <link>${productUrl}</link>
             <g:image_link>${escapeXML(mainImage)}</g:image_link>`;
 
-            // Imágenes adicionales (máximo 10)
-            additionalImages.slice(0, 10).forEach(img => {
-                xml += `
+                // Imágenes adicionales
+                additionalImages.forEach(img => {
+                    xml += `
             <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
-            });
+                });
 
-            xml += `
+                xml += `
             <g:condition>new</g:condition>
             <g:availability>${availability}</g:availability>
-            <g:price>${escapeXML(priceFormatted)}</g:price>`;
+            <g:price>${escapeXML(price)}</g:price>`;
 
-            // Precio de oferta si hay descuento
-            if (discountInfo.hasDiscount && salePriceFormatted) {
-                xml += `
-            <g:sale_price>${escapeXML(salePriceFormatted)}</g:sale_price>
+                // Precio de oferta si hay descuento
+                if (discountInfo.hasDiscount && salePrice) {
+                    xml += `
+            <g:sale_price>${escapeXML(salePrice)}</g:sale_price>
             <g:sale_price_effective_date>${new Date().toISOString().split('T')[0]}/${new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]}</g:sale_price_effective_date>`;
-            }
+                }
 
-            xml += `
+                xml += `
             <g:brand>${brand}</g:brand>
-            <g:mpn>${escapeXML(mpn)}</g:mpn>
-            <g:identifier_exists>true</g:identifier_exists>
+            <g:mpn>${escapeXML(id)}</g:mpn>
+            <g:identifier_exists>false</g:identifier_exists>
             <g:age_group>adult</g:age_group>
             <g:gender>unisex</g:gender>`;
 
-            // Información de envío
-            xml += `
+                // Información de envío
+                xml += `
             <g:shipping>
                 <g:country>${XML_CONFIG.COUNTRY}</g:country>
                 <g:service>Standard</g:service>
-                <g:price>${shippingCost} ${XML_CONFIG.BASE_CURRENCY_PYG}</g:price>
+                <g:price>${formatPrice(XML_CONFIG.SHIPPING_COST)}</g:price>
             </g:shipping>`;
 
-            // Atributos específicos del producto
-            if (productAttributes) {
-                xml += `
-            <g:product_detail>
-                <g:section_name>ESPECIFICACIONES</g:section_name>
-                <g:attribute_name>CARACTERÍSTICAS</g:attribute_name>
-                <g:attribute_value>${escapeXML(productAttributes)}</g:attribute_value>
-            </g:product_detail>`;
-            }
-
-            // Labels personalizados
-            Object.entries(customLabels).forEach(([key, value]) => {
-                if (value) {
-                    xml += `
+                // Labels personalizados
+                Object.entries(customLabels).forEach(([key, value]) => {
+                    if (value) {
+                        xml += `
             <g:${key}>${escapeXML(value)}</g:${key}>`;
+                    }
+                });
+
+                // Campos adicionales para debugging en Channable
+                xml += `
+            <precio_original>${escapeXML(price)}</precio_original>`;
+                
+                if (discountInfo.hasDiscount) {
+                    xml += `
+            <precio_oferta>${escapeXML(salePrice)}</precio_oferta>
+            <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>`;
                 }
-            });
-
-            // Campos adicionales útiles para marketing
-            if (product.stock > 0) {
+                
                 xml += `
-            <g:quantity>${product.stock}</g:quantity>`;
-            }
+            <categoria_principal>${escapeXML(categoryInfo.categoryLabel)}</categoria_principal>
+            <subcategoria>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria>
+            <stock_disponible>${product.stock || 0}</stock_disponible>
+            <fecha_actualizacion>${new Date().toISOString()}</fecha_actualizacion>`;
 
-            // Precio en USD como campo personalizado
-            const priceUSD = Math.round(discountInfo.sellingPrice / (product.exchangeRate || 8200));
-            xml += `
-            <precio_usd>${priceUSD}</precio_usd>
-            <precio_pys_formateado>${formatPrice(discountInfo.sellingPrice)}</precio_pys_formateado>
-            <categoria_es>${getCategoryLabel(product.category)}</categoria_es>
-            <subcategoria_es>${getSubcategoryLabel(product.subcategory)}</subcategoria_es>
-            <marca_mayuscula>${brand}</marca_mayuscula>`;
-
-            // Campo de descuento solo si hay descuento
-            if (discountInfo.hasDiscount) {
                 xml += `
-            <descuento>${discountInfo.discountPercentage}</descuento>
-            <precio_original_formateado>${formatPrice(discountInfo.originalPrice)}</precio_original_formateado>`;
-            }
-
-            xml += `
         </item>\n`;
+                
+            } catch (itemError) {
+                console.error('❌ Error procesando producto:', product._id, itemError.message);
+                skippedCount++;
+            }
         });
 
         xml += `    </channel>
 </rss>`;
 
-        console.log(`✅ XML generado con ${includedCount} productos`);
-        console.log(`📊 Feed optimizado para Channable con todos los campos necesarios`);
+        console.log(`✅ Feed XML generado exitosamente:`);
+        console.log(`   - Productos incluidos: ${includedCount}`);
+        console.log(`   - Productos omitidos: ${skippedCount}`);
+        console.log(`   - Total procesados: ${products.length}`);
         
-        // Configurar headers para XML
+        // Headers optimizados para Meta
         res.set({
             'Content-Type': 'application/xml; charset=utf-8',
-            'Cache-Control': 'public, max-age=3600',
+            'Cache-Control': 'public, max-age=1800', // 30 minutos
             'Last-Modified': new Date().toUTCString(),
-            'Content-Length': Buffer.byteLength(xml, 'utf8')
+            'Content-Length': Buffer.byteLength(xml, 'utf8'),
+            'X-Robots-Tag': 'noindex, nofollow'
         });
         
         res.send(xml);
         
     } catch (error) {
-        console.error('❌ Error generando feed Channable:', error);
+        console.error('❌ Error crítico generando feed:', error);
         res.status(500).json({
-            message: 'Error generando feed XML para Channable',
+            message: 'Error generando feed XML para Meta/Channable',
             error: true,
             success: false,
             details: error.message
