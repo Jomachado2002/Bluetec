@@ -167,6 +167,16 @@ function formatPrice(priceInGuaranis) {
     return `₲${formatNumber(priceInGuaranis)}`;
 }
 
+function formatPriceForFacebook(priceInGuaranis) {
+    // Precio para Facebook: solo números sin formato
+    return Math.round(Number(priceInGuaranis)).toString();
+}
+
+function formatPriceForDisplay(priceInGuaranis) {
+    // Precio para templates de imagen: Gs. 4.000.000
+    return `Gs. ${formatNumber(priceInGuaranis)}`;
+}
+
 function generateCleanId(product) {
     // ID único más simple y seguro
     const id = product._id.toString();
@@ -360,6 +370,12 @@ const channableFeedController = async (req, res) => {
                 const price = formatPrice(discountInfo.originalPrice);
                 const salePrice = discountInfo.hasDiscount ? formatPrice(discountInfo.sellingPrice) : null;
                 
+                // Precios específicos para Facebook y templates
+                const fbPrice = formatPriceForFacebook(discountInfo.sellingPrice);
+                const fbSalePrice = discountInfo.hasDiscount ? formatPriceForFacebook(discountInfo.sellingPrice) : null;
+                const displayPrice = formatPriceForDisplay(discountInfo.sellingPrice);
+                const displayOriginalPrice = formatPriceForDisplay(discountInfo.originalPrice);
+                
                 xml += `        <item>
             <g:id>${escapeXML(id)}</g:id>
             <title>${title}</title>
@@ -425,12 +441,19 @@ const channableFeedController = async (req, res) => {
             <precio_original_formateado>${escapeXML(price)}</precio_original_formateado>
             <precio_pys_formateado>${escapeXML(price)}</precio_pys_formateado>`;
                 
+                // NUEVOS CAMPOS PARA FACEBOOK Y TEMPLATES
+                xml += `
+            <fb_price>${fbPrice}</fb_price>
+            <fb_sale_price>${fbSalePrice || fbPrice}</fb_sale_price>
+            <display_price>${escapeXML(displayPrice)}</display_price>
+            <display_original_price>${escapeXML(displayOriginalPrice)}</display_original_price>`;
+                
                 // Calcular precio en USD
                 const priceUSD = Math.round(discountInfo.sellingPrice / 7300);
                 xml += `
             <precio_usd>${priceUSD}</precio_usd>`;
                 
-                // Agregar specs (siempre con valor, aunque sea vacío)
+                // Agregar specs y campos específicos para templates
                 xml += `
             <memory>${escapeXML(productSpecs.memory)}</memory>
             <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>
@@ -438,7 +461,10 @@ const channableFeedController = async (req, res) => {
             <resolution>${escapeXML(productSpecs.resolution)}</resolution>
             <processor>${escapeXML(productSpecs.processor)}</processor>
             <storage>${escapeXML(productSpecs.storage)}</storage>
-            <screen_size>${escapeXML(productSpecs.screenSize)}</screen_size>`;
+            <screen_size>${escapeXML(productSpecs.screenSize)}</screen_size>
+            <model>${escapeXML(product.productName.split(' ').slice(0, 3).join(' '))}</model>
+            <operating_system>${escapeXML(productSpecs.processor)}</operating_system>
+            <storage_capacity>${escapeXML(productSpecs.storage)}</storage_capacity>`;
                 
                 // Campos de producto detallado
                 xml += `
