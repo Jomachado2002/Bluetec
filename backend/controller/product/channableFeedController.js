@@ -155,11 +155,14 @@ function formatPrice(priceInGuaranis) {
 }
 
 function generateCleanId(product) {
-    // ID más limpio sin caracteres especiales
-    const brand = (product.brandName || 'prod').substring(0, 4).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const category = (product.subcategory || 'item').substring(0, 4).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const id = product._id.toString().substring(0, 8);
-    return `${brand}${category}${id}`;
+    // ID único más robusto para evitar duplicados
+    const id = product._id.toString();
+    const brand = (product.brandName || 'prod').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const category = (product.subcategory || 'item').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // Usar timestamp o hash para garantizar unicidad
+    const uniqueSuffix = Date.now().toString().slice(-4);
+    return `${brand}${category}${id}${uniqueSuffix}`.substring(0, 50);
 }
 
 function generateOptimizedTitle(product) {
@@ -195,7 +198,8 @@ function getCategoryInfo(category, subcategory) {
             categoryLabel: category,
             subcategoryLabel: subcategory,
             googleCategory: 'Electronics',
-            productType: `${category} > ${subcategory}`
+            productType: `${category} > ${subcategory}`,
+            channableCategory: 'Electronics'
         };
     }
     
@@ -205,7 +209,8 @@ function getCategoryInfo(category, subcategory) {
         categoryLabel: categoryData.label,
         subcategoryLabel: subcategoryData ? subcategoryData.label : subcategory,
         googleCategory: subcategoryData ? subcategoryData.google : categoryData.googleCategory,
-        productType: `${categoryData.label} > ${subcategoryData ? subcategoryData.label : subcategory}`
+        productType: `${categoryData.label} > ${subcategoryData ? subcategoryData.label : subcategory}`,
+        channableCategory: subcategoryData ? subcategoryData.google : categoryData.googleCategory
     };
 }
 
@@ -317,6 +322,7 @@ const channableFeedController = async (req, res) => {
                 includedCount++;
                 
                 // Generar datos del producto
+                const productSpecs = extractProductSpecs(product);
                 const id = generateCleanId(product);
                 const title = escapeXML(generateOptimizedTitle(product));
                 const description = escapeXML((product.description || product.productName || '').substring(0, 500));
@@ -344,11 +350,17 @@ const channableFeedController = async (req, res) => {
             <link>${productUrl}</link>
             <g:image_link>${escapeXML(mainImage)}</g:image_link>`;
 
-                // Imágenes adicionales
-                additionalImages.forEach(img => {
-                    xml += `
+                // Imágenes adicionales (con valores por defecto)
+                if (additionalImages.length > 0) {
+                    additionalImages.forEach(img => {
+                        xml += `
             <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
-                });
+                    });
+                } else {
+                    // Campos vacíos para evitar warnings
+                    xml += `
+            <additional_image_link></additional_image_link>`;
+                }
 
                 xml += `
             <g:condition>new</g:condition>
@@ -387,12 +399,23 @@ const channableFeedController = async (req, res) => {
 
                 // Campos adicionales para debugging en Channable
                 xml += `
-            <precio_original>${escapeXML(price)}</precio_original>`;
+            <precio_original>${escapeXML(price)}</precio_original>
+            <categoria_es>${escapeXML(categoryInfo.categoryLabel)}</categoria_es>
+            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>
+            <memory>${escapeXML(productSpecs.memory)}</memory>
+            <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>
+            <refresh_rate>${escapeXML(productSpecs.refreshRate)}</refresh_rate>
+            <resolution>${escapeXML(productSpecs.resolution)}</resolution>
+            <gtin></gtin>`;
                 
                 if (discountInfo.hasDiscount) {
                     xml += `
             <precio_oferta>${escapeXML(salePrice)}</precio_oferta>
             <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>`;
+                } else {
+                    xml += `
+            <precio_oferta></precio_oferta>
+            <descuento_porcentaje></descuento_porcentaje>`;
                 }
                 
                 xml += `
