@@ -10,9 +10,10 @@ import "jspdf-autotable";
 import logo from '../helpers/logo.png';
 import { toast } from 'react-toastify';
 import { localCartHelper } from '../helpers/addToCart';
-import { trackWhatsAppContact, trackPDFDownload } from '../components/MetaPixelTracker';
 import BancardPayButton from '../components/BancardPayButton';
 import SummaryApi from '../common';
+import { trackWhatsAppContact, trackPDFDownload, trackInitiateCheckout } from '../components/MetaPixelTracker';
+
 
 const Cart = () => {
     const [data, setData] = useState([]);
@@ -702,7 +703,7 @@ const Cart = () => {
         toast.success("Presupuesto generado exitosamente");
 
         // Tracking del PDF
-        trackPDFDownload(customerData, totalPrice);
+        trackPDFDownload(customerData, totalPrice, validProducts);
     };
 
     // Función para enviar presupuesto por WhatsApp
@@ -740,10 +741,10 @@ const Cart = () => {
         const encodedMessage = encodeURIComponent(message);
         
         trackWhatsAppContact({
-            productName: 'Presupuesto de carrito',
+            _id: 'cart-budget',
+            productName: `Presupuesto de carrito (${validProducts.length} productos)`,
             category: 'presupuesto',
-            sellingPrice: totalPrice,
-            _id: 'cart-budget'
+            sellingPrice: totalPrice
         });
         
         window.open(`https://wa.me/+595981150393?text=${encodedMessage}`, '_blank');
@@ -978,7 +979,10 @@ const Cart = () => {
                                     
                                     {/* Botón Finalizar Compra - Principal */}
                                     <button
-                                        onClick={() => navigate('/finalizar-compra')}
+                                        onClick={() => {
+                                                trackInitiateCheckout(validProducts, totalPrice);
+                                                navigate('/finalizar-compra');
+                                            }}
                                         disabled={validProducts.length === 0}
                                         className="w-full bg-[#2A3190] text-white py-4 px-4 rounded-lg hover:bg-[#1e236b] transition-all duration-300 flex items-center justify-between group shadow-md disabled:opacity-50"
                                     >

@@ -263,7 +263,7 @@ const BannerProduct = () => {
       const today = new Date().toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' });
       doc.setFontSize(10);
       doc.text(`Generado el: ${today}`, 14, 42);
-      doc.text(`Tel: +595 981 150393`, 14, 48);
+      doc.text(`Tel: +595 984 133733`, 14, 48);
       doc.text(`Email: ventas@bluetec.com.py`, 14, 54);
       
       // Descripción
@@ -365,7 +365,7 @@ const BannerProduct = () => {
       doc.text("¿Interesado en algún producto?", 14, yPosition);
       doc.setFontSize(8);
       doc.setTextColor(80, 80, 80);
-      doc.text("Contáctenos por WhatsApp: +595 981 150393", 14, yPosition + 6);
+      doc.text("Contáctenos por WhatsApp: +595 984 133733", 14, yPosition + 6);
       
       
       // Agregar pie de página

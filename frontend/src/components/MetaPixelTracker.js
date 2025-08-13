@@ -1,4 +1,4 @@
-// frontend/src/components/MetaPixelTracker.js
+// frontend/src/components/MetaPixelTracker.js - VERSIÓN CORREGIDA
 import { useEffect } from 'react';
 
 const MetaPixelTracker = () => {
@@ -34,20 +34,56 @@ const MetaPixelTracker = () => {
   return null;
 };
 
-// Función para trackear contacto por WhatsApp
+// ✅ FUNCIÓN HELPER PARA NORMALIZAR CONTENT_IDS
+const normalizeContentId = (productData) => {
+  if (!productData) return [];
+  
+  // Si es un producto individual
+  if (productData._id) {
+    return [productData._id]; // Usar el ID del producto de MongoDB
+  }
+  
+  // Si es un slug
+  if (productData.slug) {
+    return [productData.slug];
+  }
+  
+  // Si ya es un array
+  if (Array.isArray(productData)) {
+    return productData.filter(Boolean);
+  }
+  
+  return [];
+};
+
+// ✅ FUNCIÓN HELPER PARA OBTENER CATEGORY CORRECTA
+const getProductCategory = (product) => {
+  if (!product) return 'Sin categoría';
+  
+  // Verificar diferentes posibles ubicaciones de la categoría
+  return product.category || 
+         product.productId?.category || 
+         product.categoryName || 
+         'Sin categoría';
+};
+
+// ✅ FUNCIÓN PARA TRACKEAR CONTACTO POR WHATSAPP
 export const trackWhatsAppContact = (productData = null) => {
   console.log('🟢 Tracking WhatsApp contact:', productData?.productName || 'Consulta General');
      
   if (typeof window.fbq !== 'undefined') {
+    const contentIds = normalizeContentId(productData);
+    
     window.fbq('track', 'Contact', {
+      content_ids: contentIds, // ✅ Usar IDs normalizados
       content_name: productData?.productName || 'Consulta General',
-      content_category: productData?.category || 'General',
-      content_ids: productData?.slug ? [productData.slug] : [],
+      content_category: getProductCategory(productData),
       value: productData?.sellingPrice || 0,
       currency: 'PYG'
     });
          
     window.fbq('trackCustom', 'WhatsAppContact', {
+      content_ids: contentIds, // ✅ También aquí
       product_name: productData?.productName || 'Consulta General',
       source: 'website_button',
       timestamp: Date.now()
@@ -59,12 +95,19 @@ export const trackWhatsAppContact = (productData = null) => {
   }
 };
 
-// Función para trackear descarga de PDF
-export const trackPDFDownload = (customerData, cartTotal) => {
+// ✅ FUNCIÓN PARA TRACKEAR DESCARGA DE PDF
+export const trackPDFDownload = (customerData, cartTotal, cartItems = []) => {
   console.log('🟢 Tracking PDF download');
      
   if (typeof window.fbq !== 'undefined') {
+    // ✅ Extraer IDs de todos los productos en el carrito
+    const contentIds = cartItems
+      .filter(item => item && (item.productId || item._id))
+      .map(item => item.productId?._id || item._id)
+      .filter(Boolean);
+    
     window.fbq('track', 'Lead', {
+      content_ids: contentIds, // ✅ IDs de productos del carrito
       content_name: 'PDF_Presupuesto',
       value: cartTotal,
       currency: 'PYG',
@@ -72,57 +115,130 @@ export const trackPDFDownload = (customerData, cartTotal) => {
     });
          
     window.fbq('trackCustom', 'PDFDownload', {
+      content_ids: contentIds, // ✅ También aquí
       lead_type: 'budget_request',
-      customer_provided_info: Boolean(customerData.name)
+      customer_provided_info: Boolean(customerData.name),
+      cart_items_count: cartItems.length
     });
          
-    console.log('✅ PDF Download enviado a Meta');
+    console.log('✅ PDF Download enviado a Meta con IDs:', contentIds);
   }
 };
 
-// Función para trackear agregar al carrito
+// ✅ FUNCIÓN PARA TRACKEAR AGREGAR AL CARRITO
 export const trackAddToCart = (product) => {
   console.log('🟢 Tracking Add to Cart:', product?.productName);
      
   if (typeof window.fbq !== 'undefined') {
+    const contentIds = normalizeContentId(product);
+    
     window.fbq('track', 'AddToCart', {
-      content_ids: [product.slug],
+      content_ids: contentIds, // ✅ IDs normalizados
       content_name: product.productName,
-      content_category: product.category,
+      content_category: getProductCategory(product),
       value: product.sellingPrice,
       currency: 'PYG'
     });
          
-    console.log('✅ Add to Cart enviado a Meta');
+    console.log('✅ Add to Cart enviado a Meta con IDs:', contentIds);
   }
 };
 
-// Función para trackear interés en producto
-// ✅ CORREGIDO: usar productId (que debería ser el slug)
-export const trackProductInterest = (productSlug, interestLevel, score) => {
+// ✅ FUNCIÓN PARA TRACKEAR INTERÉS EN PRODUCTO
+export const trackProductInterest = (product, interestLevel, score) => {
   if (typeof window.fbq !== 'undefined') {
+    const contentIds = normalizeContentId(product);
+    
     window.fbq('trackCustom', 'ProductInterest', {
-      content_ids: [productSlug], // ✅ Ahora coincide con el parámetro
+      content_ids: contentIds, // ✅ IDs normalizados
+      content_name: product?.productName || 'Producto',
+      content_category: getProductCategory(product),
       interest_level: interestLevel,
       score: score,
       timestamp: Date.now()
     });
+    
+    console.log('✅ Product Interest enviado con IDs:', contentIds);
   }
 };
-// ✅ AGREGAR ESTA FUNCIÓN
+
+// ✅ FUNCIÓN PARA TRACKEAR VIEW CONTENT
 export const trackViewContent = (product) => {
   console.log('🟢 Tracking View Content:', product?.productName);
   
   if (typeof window.fbq !== 'undefined') {
+    const contentIds = normalizeContentId(product);
+    
     window.fbq('track', 'ViewContent', {
-      content_ids: [product.slug], // ✅ USAR SLUG
+      content_ids: contentIds, // ✅ IDs normalizados
       content_name: product.productName,
-      content_category: product.category,
+      content_category: getProductCategory(product),
       value: product.sellingPrice,
       currency: 'PYG'
     });
     
-    console.log('✅ View Content enviado a Meta');
+    console.log('✅ View Content enviado a Meta con IDs:', contentIds);
+  }
+};
+
+// ✅ NUEVA FUNCIÓN PARA TRACKEAR INICIO DE CHECKOUT
+export const trackInitiateCheckout = (cartItems, totalValue) => {
+  console.log('🟢 Tracking Initiate Checkout');
+  
+  if (typeof window.fbq !== 'undefined') {
+    // ✅ Extraer todos los IDs de productos válidos
+    const contentIds = cartItems
+      .filter(item => item && item.productId && item.productId._id)
+      .map(item => item.productId._id);
+    
+    window.fbq('track', 'InitiateCheckout', {
+      content_ids: contentIds,
+      value: totalValue,
+      currency: 'PYG',
+      num_items: cartItems.length
+    });
+    
+    console.log('✅ Initiate Checkout enviado con IDs:', contentIds);
+  }
+};
+
+// ✅ NUEVA FUNCIÓN PARA TRACKEAR COMPRA COMPLETADA
+export const trackPurchase = (transactionData, cartItems) => {
+  console.log('🟢 Tracking Purchase');
+  
+  if (typeof window.fbq !== 'undefined') {
+    const contentIds = cartItems
+      .filter(item => item && item.productId && item.productId._id)
+      .map(item => item.productId._id);
+    
+    window.fbq('track', 'Purchase', {
+      content_ids: contentIds,
+      value: transactionData.amount,
+      currency: 'PYG',
+      transaction_id: transactionData.shop_process_id || transactionData.transaction_id,
+      num_items: cartItems.length
+    });
+    
+    console.log('✅ Purchase enviado con IDs:', contentIds);
+  }
+};
+
+// ✅ FUNCIÓN PARA TRACKEAR PAGEVIEW CON CONTEXTO
+export const trackPageView = (pageData = {}) => {
+  if (typeof window.fbq !== 'undefined') {
+    // PageView básico
+    window.fbq('track', 'PageView');
+    
+    // PageView personalizado con contexto si es necesario
+    if (pageData.content_ids && pageData.content_ids.length > 0) {
+      window.fbq('trackCustom', 'PageViewWithContent', {
+        content_ids: pageData.content_ids,
+        page_type: pageData.page_type || 'general',
+        content_category: pageData.content_category || 'general'
+      });
+    }
+    
+    console.log('✅ PageView enviado');
   }
 };
 

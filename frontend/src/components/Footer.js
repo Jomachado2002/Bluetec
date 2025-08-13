@@ -14,7 +14,7 @@ const Footer = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-center md:justify-start space-x-3">
                 <FontAwesomeIcon icon={faPhone} className="text-blue-300" />
-                <span>+595 981 150393</span>
+                <span>+595 984 133733</span>
               </div>
               <div className="flex items-center justify-center md:justify-start space-x-3">
                 <FontAwesomeIcon icon={faEnvelope} className="text-blue-300" />
