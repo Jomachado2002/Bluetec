@@ -6,7 +6,7 @@ import displayINRCurrency from '../helpers/displayCurrency';
 import CategoryWiseProductDisplay from '../components/CategoryWiseProductDisplay';
 import addToCart from '../helpers/addToCart';
 import Context from '../context';
-import { trackWhatsAppContact, trackAddToCart } from '../components/MetaPixelTracker';
+import { trackWhatsAppContact, trackAddToCart, trackViewContent } from '../components/MetaPixelTracker';
 import VerticalCardProduct from '../components/VerticalCardProduct';
 import { useQuery } from '@tanstack/react-query';
 
@@ -505,6 +505,9 @@ useEffect(() => {
     if (productData.productImage && productData.productImage.length > 0) {
       setActiveImage(productData.productImage[0]);
     }
+    
+    // ✅ TRACKEAR VIEW CONTENT CUANDO SE CARGA EL PRODUCTO
+    trackViewContent(productData);
   } else {
     setLoading(productLoading);
   }

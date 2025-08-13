@@ -5,6 +5,7 @@ import addToCart from '../helpers/addToCart';
 import { Link } from 'react-router-dom';
 import displayPYGCurrency from '../helpers/displayCurrency';
 import { FaShoppingCart } from 'react-icons/fa';
+import { trackViewContent, trackAddToCart } from './MetaPixelTracker';
 
 const VerticalCard = ({ loading, data = [] }) => {
     const loadingList = new Array(12).fill(null);
@@ -13,6 +14,8 @@ const VerticalCard = ({ loading, data = [] }) => {
     const [imageErrors, setImageErrors] = useState(new Set());
     const [hoveredProductId, setHoveredProductId] = useState(null);
     const [hoverTimeout, setHoverTimeout] = useState(null);
+    const [viewedProducts, setViewedProducts] = useState(new Set());
+    const observerRef = useRef(null);
 
    // ✅ PRELOAD INTELIGENTE Y PROGRESIVO
 useEffect(() => {
@@ -37,10 +40,50 @@ useEffect(() => {
         });
     }
 }, [data]);
+// ✅ INTERSECTION OBSERVER PARA TRACKEAR VIEW CONTENT
+    useEffect(() => {
+        if (!data.length) return;
+        
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const productId = entry.target.dataset.productId;
+                        const product = data.find(p => p._id === productId);
+                        
+                        if (product && !viewedProducts.has(productId)) {
+                            setViewedProducts(prev => new Set([...prev, productId]));
+                            trackViewContent(product);
+                        }
+                    }
+                });
+            },
+            {
+                threshold: 0.5, // 50% del producto visible
+                rootMargin: '0px'
+            }
+        );
+
+        // Observar todos los productos
+        const productElements = document.querySelectorAll('[data-product-id]');
+        productElements.forEach(el => {
+            observerRef.current.observe(el);
+        });
+
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        };
+    }, [data, viewedProducts]);
 
     const handleAddToCart = (e, product) => {
         e.stopPropagation();
         e.preventDefault();
+        
+        // ✅ TRACKEAR ADD TO CART CON ID CONSISTENTE
+        trackAddToCart(product);
+        
         addToCart(e, product);
         fetchUserAddToCart();
     };
@@ -125,7 +168,8 @@ useEffect(() => {
                 return (
                     <Link
                         to={`/producto/${product?.slug || product?._id}`} 
-                        key={product._id} 
+                        key={product._id}
+                        data-product-id={product._id}
                         className='w-full h-[280px] sm:h-[300px] bg-white rounded-lg shadow-sm border hover:shadow-md transition-all duration-200 group/card relative flex flex-col'
                         onClick={scrollTop}
                         onMouseEnter={handleMouseEnter}

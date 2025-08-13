@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import addToCart from '../helpers/addToCart';
 import Context from '../context';
 import scrollTop from '../helpers/scrollTop';
+import { trackViewContent, trackAddToCart } from './MetaPixelTracker';
 
 // ✅ COMPONENTE OPTIMIZADO PARA MOBILE/DESKTOP
 const VerticalCardProduct = ({ 
@@ -146,6 +147,10 @@ const VerticalCardProduct = ({
 
     const handleAddToCart = (e, product) => {
         e.preventDefault();
+        
+        // ✅ TRACKEAR ADD TO CART CON ID CONSISTENTE
+        trackAddToCart(product);
+        
         addToCart(e, product);
         fetchUserAddToCart();
     };
@@ -291,7 +296,7 @@ const VerticalCardProduct = ({
                             if (isMobile && !isVisible) {
                                 return <ProductPlaceholder key={product?._id} product={product} />;
                             }
-                            
+                          
                             return (
                                 <Link to={`/producto/${product?.slug || product?._id}`}
                                     key={product?._id} 

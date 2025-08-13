@@ -34,28 +34,6 @@ const MetaPixelTracker = () => {
   return null;
 };
 
-// ✅ FUNCIÓN HELPER PARA NORMALIZAR CONTENT_IDS
-const normalizeContentId = (productData) => {
-  if (!productData) return [];
-  
-  // Si es un producto individual
-  if (productData._id) {
-    return [productData._id]; // Usar el ID del producto de MongoDB
-  }
-  
-  // Si es un slug
-  if (productData.slug) {
-    return [productData.slug];
-  }
-  
-  // Si ya es un array
-  if (Array.isArray(productData)) {
-    return productData.filter(Boolean);
-  }
-  
-  return [];
-};
-
 // ✅ FUNCIÓN HELPER PARA OBTENER CATEGORY CORRECTA
 const getProductCategory = (product) => {
   if (!product) return 'Sin categoría';
@@ -65,6 +43,26 @@ const getProductCategory = (product) => {
          product.productId?.category || 
          product.categoryName || 
          'Sin categoría';
+};
+
+// ✅ FUNCIÓN PARA GENERAR IDS CONSISTENTES CON CHANNABLE
+const generateCleanId = (product) => {
+    if (!product || !product._id) return '';
+    
+    const id = product._id.toString();
+    const brand = (product.brandName || 'prod').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const category = (product.subcategory || product.category || 'item').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    return `${brand}${category}${id}`.substring(0, 50);
+};
+
+// ✅ FUNCIÓN HELPER PARA NORMALIZAR CONTENT_IDS
+const normalizeContentId = (productData) => {
+  if (!productData) return [];
+  
+  // ✅ USAR LA MISMA FUNCIÓN QUE EL FEED DE CHANNABLE
+  const cleanId = generateCleanId(productData);
+  return cleanId ? [cleanId] : [];
 };
 
 // ✅ FUNCIÓN PARA TRACKEAR CONTACTO POR WHATSAPP
@@ -89,7 +87,7 @@ export const trackWhatsAppContact = (productData = null) => {
       timestamp: Date.now()
     });
          
-    console.log('✅ Evento WhatsApp enviado a Meta exitosamente');
+    console.log('✅ Evento WhatsApp enviado a Meta exitosamente con IDs:', contentIds);
   } else {
     console.warn('⚠️ Meta Pixel no está disponible');
   }
@@ -100,14 +98,17 @@ export const trackPDFDownload = (customerData, cartTotal, cartItems = []) => {
   console.log('🟢 Tracking PDF download');
      
   if (typeof window.fbq !== 'undefined') {
-    // ✅ Extraer IDs de todos los productos en el carrito
+    // ✅ Extraer IDs de todos los productos en el carrito usando generateCleanId
     const contentIds = cartItems
       .filter(item => item && (item.productId || item._id))
-      .map(item => item.productId?._id || item._id)
+      .map(item => {
+        const product = item.productId || item;
+        return generateCleanId(product);
+      })
       .filter(Boolean);
     
     window.fbq('track', 'Lead', {
-      content_ids: contentIds, // ✅ IDs de productos del carrito
+      content_ids: contentIds, // ✅ IDs consistentes con Channable
       content_name: 'PDF_Presupuesto',
       value: cartTotal,
       currency: 'PYG',
@@ -186,10 +187,11 @@ export const trackInitiateCheckout = (cartItems, totalValue) => {
   console.log('🟢 Tracking Initiate Checkout');
   
   if (typeof window.fbq !== 'undefined') {
-    // ✅ Extraer todos los IDs de productos válidos
+    // ✅ Usar generateCleanId para consistencia
     const contentIds = cartItems
       .filter(item => item && item.productId && item.productId._id)
-      .map(item => item.productId._id);
+      .map(item => generateCleanId(item.productId))
+      .filter(Boolean);
     
     window.fbq('track', 'InitiateCheckout', {
       content_ids: contentIds,
@@ -207,9 +209,11 @@ export const trackPurchase = (transactionData, cartItems) => {
   console.log('🟢 Tracking Purchase');
   
   if (typeof window.fbq !== 'undefined') {
+    // ✅ Usar generateCleanId para consistencia
     const contentIds = cartItems
       .filter(item => item && item.productId && item.productId._id)
-      .map(item => item.productId._id);
+      .map(item => generateCleanId(item.productId))
+      .filter(Boolean);
     
     window.fbq('track', 'Purchase', {
       content_ids: contentIds,
