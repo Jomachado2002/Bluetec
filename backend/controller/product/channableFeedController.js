@@ -1,8 +1,8 @@
-// backend/controller/product/channableFeedController.js - VERSIÓN OPTIMIZADA PARA META
+// backend/controller/product/channableFeedController.js - VERSIÓN CORREGIDA PARA CHANNABLE
 const ProductModel = require('../../models/productModel');
 
-// ===== CONFIGURACIÓN OPTIMIZADA PARA META =====
-const XML_CONFIG = {
+// ===== CONFIGURACIÓN BASE =====
+const BASE_CONFIG = {
     STORE_NAME: 'Bluetec',
     STORE_URL: 'https://www.bluetec.com.py',
     STORE_DESCRIPTION: 'Tienda especializada en tecnología e informática',
@@ -10,26 +10,48 @@ const XML_CONFIG = {
     SHIPPING_COST: 30000,
     COUNTRY: 'PY',
     LANGUAGE: 'es',
-    INCLUDE_OUT_OF_STOCK: true, // Cambiado a true para incluir más productos
     MIN_PRICE: 1000,
-    MAX_TITLE_LENGTH: 60, // Reducido para Meta
     DEFAULT_BRAND: 'Bluetec'
 };
 
-// ===== FUNCIÓN PARA EXTRAER ESPECIFICACIONES =====
-function extractProductSpecs(product) {
-    return {
-        memory: product.memory || product.phoneRAM || product.tabletRAM || '',
-        processor: product.processor || product.phoneProcessor || product.tabletProcessor || '',
-        storage: product.storage || product.phoneStorage || product.tabletStorage || '',
-        graphicsCard: product.graphicsCard || product.graphicCardModel || '',
-        screenSize: product.notebookScreen || product.phoneScreenSize || product.tabletScreenSize || product.monitorSize || '',
-        refreshRate: product.monitorRefreshRate || '',
-        resolution: product.monitorResolution || product.tabletScreenResolution || product.cameraResolution || ''
-    };
+// ===== CONFIGURACIONES ESPECÍFICAS POR PLATAFORMA =====
+const PLATFORM_CONFIGS = {
+    META: {
+        ...BASE_CONFIG,
+        INCLUDE_OUT_OF_STOCK: true,
+        MAX_TITLE_LENGTH: 60,
+        PLATFORM_NAME: 'Meta',
+        USE_NAMESPACE: true,
+        NAMESPACE_PREFIX: 'g:'
+    },
+    TIKTOK: {
+        ...BASE_CONFIG,
+        INCLUDE_OUT_OF_STOCK: false,
+        MAX_TITLE_LENGTH: 100,
+        PLATFORM_NAME: 'TikTok',
+        USE_NAMESPACE: false,
+        NAMESPACE_PREFIX: ''
+    }
+};
+
+// ===== FUNCIÓN PARA DETECTAR PLATAFORMA =====
+function detectPlatform(req) {
+    const platform = req.query.platform || '';
+    const userAgent = req.get('User-Agent') || '';
+    const referer = req.get('Referer') || '';
+    
+    if (platform.toLowerCase() === 'tiktok' || platform.toLowerCase() === 'tt') {
+        return 'TIKTOK';
+    }
+    
+    if (userAgent.includes('TikTok') || userAgent.includes('ByteDance') || referer.includes('tiktok')) {
+        return 'TIKTOK';
+    }
+    
+    return 'META'; // Por defecto
 }
 
-// ===== MAPEO COMPLETO DE CATEGORÍAS =====
+// ===== MAPEO COMPLETO DE CATEGORÍAS (RESTAURADO) =====
 const CATEGORY_MAPPING = {
     'informatica': {
         label: 'Informática',
@@ -159,55 +181,67 @@ function escapeXML(text) {
         .trim();
 }
 
-function formatNumber(number) {
-    return Number(number).toLocaleString('es-PY', { maximumFractionDigits: 0 });
+// ===== FUNCIÓN PARA EXTRAER ESPECIFICACIONES =====
+function extractProductSpecs(product) {
+    return {
+        memory: product.memory || product.phoneRAM || product.tabletRAM || '',
+        processor: product.processor || product.phoneProcessor || product.tabletProcessor || '',
+        storage: product.storage || product.phoneStorage || product.tabletStorage || '',
+        graphicsCard: product.graphicsCard || product.graphicCardModel || '',
+        screenSize: product.notebookScreen || product.phoneScreenSize || product.tabletScreenSize || product.monitorSize || '',
+        refreshRate: product.monitorRefreshRate || '',
+        resolution: product.monitorResolution || product.tabletScreenResolution || product.cameraResolution || ''
+    };
 }
 
+// CORREGIR FORMATO DE PRECIOS PARA CHANNABLE
+function formatPriceForChannable(priceInGuaranis) {
+    // Channable espera formato: "123456.78 PYG" (número + espacio + moneda)
+    const cleanPrice = Number(priceInGuaranis) || 0;
+    if (cleanPrice <= 0) return '';
+    
+    // Formato limpio: número.decimales MONEDA
+    return `${cleanPrice.toFixed(0)} PYG`;
+}
+
+// Mantener funciones originales para compatibilidad con Meta
 function formatPrice(priceInGuaranis) {
-    return `₲${formatNumber(priceInGuaranis)}`;
+    return `₲${Number(priceInGuaranis).toLocaleString('es-PY', { maximumFractionDigits: 0 })}`;
 }
 
 function formatPriceForFacebook(priceInGuaranis) {
-    // Precio para Facebook: solo números sin formato
     return Math.round(Number(priceInGuaranis)).toString();
 }
 
 function formatPriceForDisplay(priceInGuaranis) {
-    // Precio para templates de imagen: Gs. 4.000.000
-    return `Gs. ${formatNumber(priceInGuaranis)}`;
+    return `Gs. ${Number(priceInGuaranis).toLocaleString('es-PY', { maximumFractionDigits: 0 })}`;
 }
 
-function generateCleanId(product) {
-    // ID único más simple y seguro
+function generateCleanId(product, platform) {
     const id = product._id.toString();
-    const brand = (product.brandName || 'prod').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const category = (product.subcategory || 'item').substring(0, 3).toLowerCase().replace(/[^a-z0-9]/g, '');
-    
-    // Usar solo el ID del producto para garantizar unicidad
-    return `${brand}${category}${id}`.substring(0, 50);
+    const prefix = platform === 'TIKTOK' ? 'tt_' : 'fb_';
+    return `${prefix}${id}`;
 }
 
-function generateOptimizedTitle(product) {
+function generateOptimizedTitle(product, config) {
     let title = product.productName || '';
     
-    // Limpiar título de caracteres problemáticos
     title = title
-        .replace(/[^\w\s\-().]/g, ' ') // Solo letras, números, espacios, guiones y paréntesis
+        .replace(/[^\w\s\-()./]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     
-    // Si es muy largo, acortar manteniendo información importante
-    if (title.length > XML_CONFIG.MAX_TITLE_LENGTH) {
+    if (title.length > config.MAX_TITLE_LENGTH) {
         const words = title.split(' ');
         let shortTitle = '';
         let i = 0;
         
-        while (i < words.length && (shortTitle + words[i]).length <= XML_CONFIG.MAX_TITLE_LENGTH) {
+        while (i < words.length && (shortTitle + words[i]).length <= config.MAX_TITLE_LENGTH) {
             shortTitle += (shortTitle ? ' ' : '') + words[i];
             i++;
         }
         
-        title = shortTitle || title.substring(0, XML_CONFIG.MAX_TITLE_LENGTH);
+        title = shortTitle || title.substring(0, config.MAX_TITLE_LENGTH);
     }
     
     return title;
@@ -217,11 +251,10 @@ function getCategoryInfo(category, subcategory) {
     const categoryData = CATEGORY_MAPPING[category];
     if (!categoryData) {
         return {
-            categoryLabel: category,
-            subcategoryLabel: subcategory,
+            categoryLabel: 'Electronics',
+            subcategoryLabel: 'General',
             googleCategory: 'Electronics',
-            productType: `${category} > ${subcategory}`,
-            channableCategory: 'Electronics'
+            productType: 'Electronics > General'
         };
     }
     
@@ -231,15 +264,13 @@ function getCategoryInfo(category, subcategory) {
         categoryLabel: categoryData.label,
         subcategoryLabel: subcategoryData ? subcategoryData.label : subcategory,
         googleCategory: subcategoryData ? subcategoryData.google : categoryData.googleCategory,
-        productType: `${categoryData.label} > ${subcategoryData ? subcategoryData.label : subcategory}`,
-        channableCategory: subcategoryData ? subcategoryData.google : categoryData.googleCategory
+        productType: `${categoryData.label} > ${subcategoryData ? subcategoryData.label : subcategory}`
     };
 }
 
-function getAvailability(product) {
-    // Más flexible para incluir más productos
-    if (XML_CONFIG.INCLUDE_OUT_OF_STOCK) {
-        return 'in stock'; // Para Meta, mejor mostrar como disponible
+function getAvailability(product, config) {
+    if (config.INCLUDE_OUT_OF_STOCK) {
+        return 'in stock';
     }
     
     if (product.stockStatus === 'in_stock' || (product.stock && product.stock > 0)) {
@@ -252,7 +283,7 @@ function getAvailability(product) {
 }
 
 function generateProductURL(slug) {
-    return `${XML_CONFIG.STORE_URL}/producto/${slug}`;
+    return `${BASE_CONFIG.STORE_URL}/producto/${slug}`;
 }
 
 function getDiscountInfo(product) {
@@ -281,252 +312,193 @@ function getDiscountInfo(product) {
     };
 }
 
-function buildCustomLabels(product, categoryInfo) {
-    const discountInfo = getDiscountInfo(product);
-    
-    const labels = {
-        custom_label_0: categoryInfo.categoryLabel,
-        custom_label_1: categoryInfo.subcategoryLabel,
-        custom_label_2: product.isVipOffer ? 'VIP' : 'REGULAR',
-        custom_label_3: discountInfo.hasDiscount ? `OFERTA ${discountInfo.discountPercentage}%` : 'PRECIO_REGULAR',
-        custom_label_4: (product.brandName || XML_CONFIG.DEFAULT_BRAND).toUpperCase()
-    };
-    
-    // Agregar custom_label_5 si hay descuento
-    if (discountInfo.hasDiscount) {
-        labels.custom_label_5 = `${discountInfo.discountPercentage}% OFF`;
-    }
-    
-    return labels;
+// ===== GENERADORES DE XML POR PLATAFORMA =====
+function generateMetaXML(products, config) {
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+    <channel>
+        <title>${escapeXML(config.STORE_NAME)} - Meta Catalog</title>
+        <link>${config.STORE_URL}</link>
+        <description>${escapeXML(config.STORE_DESCRIPTION)}</description>
+        <language>${config.LANGUAGE}</language>
+        <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>\n`;
+
+    products.forEach(product => {
+        const discountInfo = getDiscountInfo(product);
+        const id = generateCleanId(product, 'META');
+        const title = escapeXML(generateOptimizedTitle(product, config));
+        const description = escapeXML((product.description || product.productName || '').substring(0, 500));
+        const brand = escapeXML(product.brandName || config.DEFAULT_BRAND);
+        const categoryInfo = getCategoryInfo(product.category, product.subcategory);
+        const availability = getAvailability(product, config);
+        const productUrl = generateProductURL(product.slug);
+        const mainImage = product.productImage[0] || '';
+        
+        // PRECIOS CORREGIDOS PARA CHANNABLE
+        const price = formatPriceForChannable(discountInfo.originalPrice);
+        const salePrice = discountInfo.hasDiscount ? formatPriceForChannable(discountInfo.sellingPrice) : '';
+
+        xml += `        <item>
+            <g:id>${escapeXML(id)}</g:id>
+            <title>${title}</title>
+            <description>${description}</description>
+            <g:google_product_category>${escapeXML(categoryInfo.googleCategory)}</g:google_product_category>
+            <g:product_type>${escapeXML(categoryInfo.productType)}</g:product_type>
+            <link>${productUrl}</link>
+            <g:image_link>${escapeXML(mainImage)}</g:image_link>
+            <g:condition>new</g:condition>
+            <g:availability>${availability}</g:availability>
+            <g:price>${escapeXML(price)}</g:price>`;
+
+        // Sale price solo si hay descuento Y no está vacío
+        if (discountInfo.hasDiscount && salePrice) {
+            xml += `
+            <g:sale_price>${escapeXML(salePrice)}</g:sale_price>
+            <g:sale_price_effective_date>${new Date().toISOString().split('T')[0]}/${new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]}</g:sale_price_effective_date>`;
+        }
+
+        xml += `
+            <g:brand>${brand}</g:brand>
+            <g:mpn>${escapeXML(id)}</g:mpn>
+            <g:identifier_exists>false</g:identifier_exists>
+            <g:age_group>adult</g:age_group>
+            <g:gender>unisex</g:gender>
+            <g:gtin></g:gtin>
+            <g:item_group_id>${escapeXML(id)}</g:item_group_id>
+            <g:color></g:color>
+            <g:size></g:size>
+            <g:material></g:material>
+            <g:pattern></g:pattern>
+            <g:shipping>
+                <g:country>${config.COUNTRY}</g:country>
+                <g:service>Standard</g:service>
+                <g:price>${formatPriceForChannable(config.SHIPPING_COST)}</g:price>
+            </g:shipping>
+            <g:shipping_weight>1 kg</g:shipping_weight>
+            <g:custom_label_0>${escapeXML(categoryInfo.categoryLabel)}</g:custom_label_0>
+            <g:custom_label_1>${escapeXML(categoryInfo.subcategoryLabel)}</g:custom_label_1>
+            <g:custom_label_2>${product.isVipOffer ? 'VIP' : 'REGULAR'}</g:custom_label_2>
+            <g:custom_label_3>${discountInfo.hasDiscount ? `OFERTA ${discountInfo.discountPercentage}%` : 'PRECIO_REGULAR'}</g:custom_label_3>
+            <g:custom_label_4>${escapeXML((product.brandName || config.DEFAULT_BRAND).toUpperCase())}</g:custom_label_4>`;
+
+        // Campos adicionales para Mobile Apps (todos opcionales)
+        xml += `
+            <g:ios_url></g:ios_url>
+            <g:ios_app_store_id></g:ios_app_store_id>
+            <g:ios_app_name></g:ios_app_name>
+            <g:android_url></g:android_url>
+            <g:android_package></g:android_package>
+            <g:android_app_name></g:android_app_name>`;
+
+        xml += `
+        </item>\n`;
+    });
+
+    xml += `    </channel>
+</rss>`;
+
+    return xml;
+}
+
+function generateTikTokXML(products, config) {
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <title>${escapeXML(config.STORE_NAME)} - TikTok Catalog</title>
+    <link href="${config.STORE_URL}"/>
+    <updated>${new Date().toISOString()}</updated>
+    <id>${config.STORE_URL}</id>\n`;
+
+    products.forEach(product => {
+        const discountInfo = getDiscountInfo(product);
+        const id = generateCleanId(product, 'TIKTOK');
+        const title = escapeXML(generateOptimizedTitle(product, config));
+        const description = escapeXML((product.description || product.productName || '').substring(0, 500));
+        const brand = escapeXML(product.brandName || config.DEFAULT_BRAND);
+        const categoryInfo = getCategoryInfo(product.category, product.subcategory);
+        const availability = getAvailability(product, config);
+        const productUrl = generateProductURL(product.slug);
+        const mainImage = product.productImage[0] || '';
+        
+        // PRECIOS CORREGIDOS PARA TIKTOK
+        const price = formatPriceForChannable(discountInfo.sellingPrice);
+
+        xml += `    <entry>
+        <sku_id>${escapeXML(id)}</sku_id>
+        <title>${title}</title>
+        <description>${description}</description>
+        <google_product_category>${escapeXML(categoryInfo.googleCategory)}</google_product_category>
+        <product_type>${escapeXML(categoryInfo.productType)}</product_type>
+        <link>${productUrl}</link>
+        <image_link>${escapeXML(mainImage)}</image_link>
+        <condition>new</condition>
+        <availability>${availability}</availability>
+        <price>${escapeXML(price)}</price>
+        <brand>${brand}</brand>
+        <gtin></gtin>
+    </entry>\n`;
+    });
+
+    xml += `</feed>`;
+    return xml;
 }
 
 // ===== CONTROLADOR PRINCIPAL =====
 const channableFeedController = async (req, res) => {
     try {
-        console.log('🔄 Generando feed XML optimizado para Meta/Channable...');
+        const platform = detectPlatform(req);
+        const config = PLATFORM_CONFIGS[platform];
         
-        // Query optimizada para incluir más productos
+        console.log(`🔄 Generando feed XML para ${config.PLATFORM_NAME}...`);
+        
+        // Query optimizada
         const query = {
             productImage: { $exists: true, $ne: [], $not: { $size: 0 } },
             productName: { $exists: true, $ne: '' },
-            sellingPrice: { $gte: XML_CONFIG.MIN_PRICE },
+            sellingPrice: { $gte: config.MIN_PRICE },
             slug: { $exists: true, $ne: '' }
         };
+
+        // Filtrar productos sin stock para TikTok
+        if (!config.INCLUDE_OUT_OF_STOCK) {
+            query.$or = [
+                { stockStatus: 'in_stock' },
+                { stock: { $gt: 0 } }
+            ];
+        }
         
         const products = await ProductModel
             .find(query)
             .sort({ updatedAt: -1 })
             .lean();
         
-        console.log(`✅ ${products.length} productos obtenidos para el feed`);
+        console.log(`✅ ${products.length} productos obtenidos para ${config.PLATFORM_NAME}`);
         
-        // Generar XML
-        let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
-    <channel>
-        <title>${escapeXML(XML_CONFIG.STORE_NAME)} - Catálogo de Productos</title>
-        <link>${XML_CONFIG.STORE_URL}</link>
-        <description>${escapeXML(XML_CONFIG.STORE_DESCRIPTION)}</description>
-        <language>${XML_CONFIG.LANGUAGE}</language>
-        <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-        <generator>Bluetec Meta Feed Generator v3.0</generator>\n`;
-
-        let includedCount = 0;
-        let skippedCount = 0;
-
-        products.forEach(product => {
-            try {
-                // Validaciones básicas
-                if (!product.productName || !product.productImage || product.productImage.length === 0) {
-                    skippedCount++;
-                    return;
-                }
-                
-                const sellingPrice = Number(product.sellingPrice);
-                if (!sellingPrice || sellingPrice < XML_CONFIG.MIN_PRICE) {
-                    skippedCount++;
-                    return;
-                }
-                
-                includedCount++;
-                
-                // Generar datos del producto
-                const productSpecs = extractProductSpecs(product);
-                const id = generateCleanId(product);
-                const title = escapeXML(generateOptimizedTitle(product));
-                const description = escapeXML((product.description || product.productName || '').substring(0, 500));
-                const brand = escapeXML(product.brandName || XML_CONFIG.DEFAULT_BRAND);
-                const categoryInfo = getCategoryInfo(product.category, product.subcategory);
-                const availability = getAvailability(product);
-                const productUrl = generateProductURL(product.slug);
-                const discountInfo = getDiscountInfo(product);
-                const customLabels = buildCustomLabels(product, categoryInfo);
-                
-                // Imagen principal
-                const mainImage = product.productImage[0] || '';
-                const additionalImages = product.productImage.slice(1, 11) || []; // Máximo 10 adicionales
-                
-                // Formatear precios
-                const price = formatPrice(discountInfo.originalPrice);
-                const salePrice = discountInfo.hasDiscount ? formatPrice(discountInfo.sellingPrice) : null;
-                
-                // Precios específicos para Facebook y templates
-                const fbPrice = formatPriceForFacebook(discountInfo.sellingPrice);
-                const fbSalePrice = discountInfo.hasDiscount ? formatPriceForFacebook(discountInfo.sellingPrice) : null;
-                const displayPrice = formatPriceForDisplay(discountInfo.sellingPrice);
-                const displayOriginalPrice = formatPriceForDisplay(discountInfo.originalPrice);
-                
-                xml += `        <item>
-            <g:id>${escapeXML(id)}</g:id>
-            <title>${title}</title>
-            <description>${description}</description>
-            <g:google_product_category>${categoryInfo.googleCategory}</g:google_product_category>
-            <g:product_type>${escapeXML(categoryInfo.productType)}</g:product_type>
-            <link>${productUrl}</link>
-            <g:image_link>${escapeXML(mainImage)}</g:image_link>`;
-
-                // Imágenes adicionales (asegurar que siempre haya al menos un campo)
-                if (additionalImages.length > 0) {
-                    additionalImages.forEach(img => {
-                        xml += `
-            <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
-                    });
-                } else {
-                    // Campo vacío para evitar warnings
-                    xml += `
-            <g:additional_image_link></g:additional_image_link>`;
-                }
-
-                xml += `
-            <g:condition>new</g:condition>
-            <g:availability>${availability}</g:availability>
-            <g:price>${escapeXML(price)}</g:price>`;
-
-                // Precio de oferta si hay descuento
-                if (discountInfo.hasDiscount && salePrice) {
-                    xml += `
-            <g:sale_price>${escapeXML(salePrice)}</g:sale_price>
-            <g:sale_price_effective_date>${new Date().toISOString().split('T')[0]}/${new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]}</g:sale_price_effective_date>`;
-                }
-
-                xml += `
-            <g:brand>${brand}</g:brand>
-            <g:mpn>${escapeXML(id)}</g:mpn>
-            <g:identifier_exists>false</g:identifier_exists>
-            <g:age_group>adult</g:age_group>
-            <g:gender>unisex</g:gender>`;
-
-                // Información de envío
-                xml += `
-            <g:shipping>
-                <g:country>${XML_CONFIG.COUNTRY}</g:country>
-                <g:service>Standard</g:service>
-                <g:price>${formatPrice(XML_CONFIG.SHIPPING_COST)}</g:price>
-            </g:shipping>`;
-
-                // Labels personalizados
-                Object.entries(customLabels).forEach(([key, value]) => {
-                    if (value) {
-                        xml += `
-            <g:${key}>${escapeXML(value)}</g:${key}>`;
-                    }
-                });
-
-                // Campos adicionales para debugging en Channable
-                xml += `
-            <precio_original>${escapeXML(price)}</precio_original>
-            <categoria_es>${escapeXML(categoryInfo.categoryLabel)}</categoria_es>
-            <subcategoria_es>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria_es>
-            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>
-            <precio_original_formateado>${escapeXML(price)}</precio_original_formateado>
-            <precio_pys_formateado>${escapeXML(price)}</precio_pys_formateado>`;
-                
-                // NUEVOS CAMPOS PARA FACEBOOK Y TEMPLATES
-                xml += `
-            <fb_price>${fbPrice}</fb_price>
-            <fb_sale_price>${fbSalePrice || fbPrice}</fb_sale_price>
-            <display_price>${escapeXML(displayPrice)}</display_price>
-            <display_original_price>${escapeXML(displayOriginalPrice)}</display_original_price>`;
-                
-                // Calcular precio en USD
-                const priceUSD = Math.round(discountInfo.sellingPrice / 7300);
-                xml += `
-            <precio_usd>${priceUSD}</precio_usd>`;
-                
-                // Agregar specs y campos específicos para templates
-                xml += `
-            <memory>${escapeXML(productSpecs.memory)}</memory>
-            <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>
-            <refresh_rate>${escapeXML(productSpecs.refreshRate)}</refresh_rate>
-            <resolution>${escapeXML(productSpecs.resolution)}</resolution>
-            <processor>${escapeXML(productSpecs.processor)}</processor>
-            <storage>${escapeXML(productSpecs.storage)}</storage>
-            <screen_size>${escapeXML(productSpecs.screenSize)}</screen_size>
-            <model>${escapeXML(product.productName.split(' ').slice(0, 3).join(' '))}</model>
-            <operating_system>${escapeXML(productSpecs.processor)}</operating_system>
-            <storage_capacity>${escapeXML(productSpecs.storage)}</storage_capacity>`;
-                
-                // Campos de producto detallado
-                xml += `
-            <g:product_detail>
-                <g:section_name>ESPECIFICACIONES</g:section_name>
-                <g:attribute_name>CARACTERÍSTICAS</g:attribute_name>
-                <g:attribute_value>${escapeXML(productSpecs.memory || productSpecs.processor || productSpecs.storage || 'Consultar especificaciones')}</g:attribute_value>
-            </g:product_detail>`;
-                
-                // Campo de cantidad
-                xml += `
-            <g:quantity>${product.stock > 0 ? product.stock : 1}</g:quantity>`;
-                
-                // Campo de imagen sin fondo (obligatorio para algunos canales)
-                xml += `
-            <image_link_nobg></image_link_nobg>`;
-                
-                xml += `
-            <gtin></gtin>`;
-                
-                if (discountInfo.hasDiscount) {
-                    xml += `
-            <precio_oferta>${escapeXML(salePrice)}</precio_oferta>
-            <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>
-            <descuento>${discountInfo.discountPercentage}</descuento>`;
-                } else {
-                    xml += `
-            <precio_oferta></precio_oferta>
-            <descuento_porcentaje></descuento_porcentaje>
-            <descuento></descuento>`;
-                }
-                
-                xml += `
-            <categoria_principal>${escapeXML(categoryInfo.categoryLabel)}</categoria_principal>
-            <subcategoria>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria>
-            <stock_disponible>${product.stock || 0}</stock_disponible>
-            <fecha_actualizacion>${new Date().toISOString()}</fecha_actualizacion>`;
-
-                xml += `
-        </item>\n`;
-                
-            } catch (itemError) {
-                console.error('❌ Error procesando producto:', product._id, itemError.message);
-                skippedCount++;
-            }
+        // Filtrar productos con precios válidos
+        const validProducts = products.filter(product => {
+            const sellingPrice = Number(product.sellingPrice);
+            return sellingPrice && sellingPrice >= config.MIN_PRICE;
         });
-
-        xml += `    </channel>
-</rss>`;
-
-        console.log(`✅ Feed XML generado exitosamente:`);
-        console.log(`   - Productos incluidos: ${includedCount}`);
-        console.log(`   - Productos omitidos: ${skippedCount}`);
-        console.log(`   - Total procesados: ${products.length}`);
         
-        // Headers optimizados para Meta
+        console.log(`✅ ${validProducts.length} productos válidos después de filtrar precios`);
+        
+        // Generar XML según plataforma
+        let xml;
+        if (platform === 'TIKTOK') {
+            xml = generateTikTokXML(validProducts, config);
+        } else {
+            xml = generateMetaXML(validProducts, config);
+        }
+        
+        console.log(`✅ Feed XML para ${config.PLATFORM_NAME} generado exitosamente`);
+        
+        // Headers optimizados
         res.set({
             'Content-Type': 'application/xml; charset=utf-8',
-            'Cache-Control': 'public, max-age=1800', // 30 minutos
+            'Cache-Control': 'public, max-age=1800',
             'Last-Modified': new Date().toUTCString(),
             'Content-Length': Buffer.byteLength(xml, 'utf8'),
-            'X-Robots-Tag': 'noindex, nofollow'
+            'X-Robots-Tag': 'noindex, nofollow',
+            'X-Platform': config.PLATFORM_NAME
         });
         
         res.send(xml);
@@ -534,7 +506,7 @@ const channableFeedController = async (req, res) => {
     } catch (error) {
         console.error('❌ Error crítico generando feed:', error);
         res.status(500).json({
-            message: 'Error generando feed XML para Meta/Channable',
+            message: 'Error generando feed XML',
             error: true,
             success: false,
             details: error.message
