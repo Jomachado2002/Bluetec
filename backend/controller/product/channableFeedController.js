@@ -173,14 +173,34 @@ function isValidImageUrl(url) {
         const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
         const pathname = urlObj.pathname.toLowerCase();
         
-        // Para Firebase Storage, el formato puede ser diferente
+        // Verificar que termine con extensión válida
+        const hasValidExtension = validExtensions.some(ext => pathname.endsWith(ext));
+        
+        // Para Firebase Storage con extensión en query params
         if (url.includes('firebasestorage.googleapis.com')) {
-            // Firebase URLs son válidas si tienen el dominio correcto
-            return true;
+            // Verificar que tenga token válido
+            if (!url.includes('?alt=media&token=')) return false;
+            
+            // Excluir URLs problemáticas conocidas
+            const problematicPatterns = [
+                'FONTE_ATX',
+                'FONTE-TP-LINK', 
+                '%2B',
+                '%2F%2F',
+                'REAL_1.jpg', // Patrón problemático detectado
+                '%20_%20'     // Espacios codificados problemáticos
+            ];
+            
+            if (problematicPatterns.some(pattern => url.includes(pattern))) {
+                return false;
+            }
+            
+            // Si es Firebase, es válida si tiene token y no tiene patrones problemáticos
+            return hasValidExtension || url.includes('.jpg') || url.includes('.png');
         }
         
-        // Para otras URLs, verificar extensión
-        return validExtensions.some(ext => pathname.includes(ext));
+        // Para otras URLs, verificar extensión estrictamente
+        return hasValidExtension;
         
     } catch (error) {
         return false;
@@ -291,17 +311,18 @@ function generateProductURL(slug) {
 }
 
 function getDiscountInfo(product) {
-    const sellingPrice = Number(product.sellingPrice) || 0;
-    const originalPrice = Number(product.price) || sellingPrice;
+    // CORRECCIÓN: sellingPrice es el PRECIO ORIGINAL, price es el PRECIO ACTUAL
+    const currentPrice = Number(product.price) || 0;        // Precio actual/oferta
+    const originalPrice = Number(product.sellingPrice) || currentPrice;  // Precio original/anterior
     
-    if (originalPrice > sellingPrice && sellingPrice > 0) {
-        const discountAmount = originalPrice - sellingPrice;
+    if (originalPrice > currentPrice && currentPrice > 0) {
+        const discountAmount = originalPrice - currentPrice;
         const discountPercentage = Math.round((discountAmount / originalPrice) * 100);
         
         return {
             hasDiscount: true,
-            originalPrice: originalPrice,
-            sellingPrice: sellingPrice,
+            originalPrice: originalPrice,    // ₲8.900.000 (sellingPrice)
+            sellingPrice: currentPrice,      // ₲7.780.000 (price)
             discountAmount: discountAmount,
             discountPercentage: discountPercentage
         };
@@ -309,8 +330,8 @@ function getDiscountInfo(product) {
     
     return {
         hasDiscount: false,
-        originalPrice: sellingPrice,
-        sellingPrice: sellingPrice,
+        originalPrice: currentPrice,         // Si no hay descuento, usar precio actual
+        sellingPrice: currentPrice,          // Ambos iguales
         discountAmount: 0,
         discountPercentage: 0
     };
@@ -344,7 +365,7 @@ const channableFeedController = async (req, res) => {
         const query = {
             productImage: { $exists: true, $ne: [], $not: { $size: 0 } },
             productName: { $exists: true, $ne: '' },
-            sellingPrice: { $gte: XML_CONFIG.MIN_PRICE },
+            price: { $gte: XML_CONFIG.MIN_PRICE },  // CAMBIO: usar 'price' (precio actual)
             slug: { $exists: true, $ne: '' },
             // Filtrar solo productos con al menos una imagen de Firebase
             'productImage.0': { $regex: /firebasestorage\.googleapis\.com/, $options: 'i' }
@@ -387,8 +408,8 @@ const channableFeedController = async (req, res) => {
                     return;
                 }
                 
-                const sellingPrice = Number(product.sellingPrice);
-                if (!sellingPrice || sellingPrice < XML_CONFIG.MIN_PRICE) {
+                const currentPrice = Number(product.price);  // CAMBIO: precio actual
+                if (!currentPrice || currentPrice < XML_CONFIG.MIN_PRICE) {
                     skippedCount++;
                     return;
                 }
