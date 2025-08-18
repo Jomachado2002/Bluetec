@@ -159,6 +159,42 @@ function escapeXML(text) {
         .trim();
 }
 
+// ===== FUNCIÓN PARA VALIDAR IMÁGENES =====
+function isValidImageUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    
+    try {
+        const urlObj = new URL(url);
+        
+        // Verificar que sea HTTPS
+        if (urlObj.protocol !== 'https:') return false;
+        
+        // Verificar extensiones válidas
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        const pathname = urlObj.pathname.toLowerCase();
+        
+        // Para Firebase Storage, el formato puede ser diferente
+        if (url.includes('firebasestorage.googleapis.com')) {
+            // Firebase URLs son válidas si tienen el dominio correcto
+            return true;
+        }
+        
+        // Para otras URLs, verificar extensión
+        return validExtensions.some(ext => pathname.includes(ext));
+        
+    } catch (error) {
+        return false;
+    }
+}
+
+function getValidImages(productImages) {
+    if (!Array.isArray(productImages)) return [];
+    
+    return productImages
+        .filter(img => isValidImageUrl(img))
+        .slice(0, 10); // Máximo 10 imágenes para evitar problemas
+}
+
 function formatPriceForMeta(priceInGuaranis) {
     // Para Meta/Channable: SOLO NÚMEROS (formato requerido)
     return Math.round(Number(priceInGuaranis)).toString();
@@ -304,12 +340,14 @@ const channableFeedController = async (req, res) => {
     try {
         console.log('🔄 Generando feed XML optimizado para Meta/Channable...');
         
-        // Query optimizada para incluir más productos
+        // Query optimizada para incluir SOLO productos con imágenes válidas
         const query = {
             productImage: { $exists: true, $ne: [], $not: { $size: 0 } },
             productName: { $exists: true, $ne: '' },
             sellingPrice: { $gte: XML_CONFIG.MIN_PRICE },
-            slug: { $exists: true, $ne: '' }
+            slug: { $exists: true, $ne: '' },
+            // Filtrar solo productos con al menos una imagen de Firebase
+            'productImage.0': { $regex: /firebasestorage\.googleapis\.com/, $options: 'i' }
         };
         
         const products = await ProductModel
@@ -335,8 +373,16 @@ const channableFeedController = async (req, res) => {
 
         products.forEach(product => {
             try {
-                // Validaciones básicas
+                // Validaciones básicas mejoradas
                 if (!product.productName || !product.productImage || product.productImage.length === 0) {
+                    skippedCount++;
+                    return;
+                }
+                
+                // Validar que tenga al menos una imagen válida
+                const validImages = getValidImages(product.productImage);
+                if (validImages.length === 0) {
+                    console.log(`⚠️  Producto ${product.productName} omitido: sin imágenes válidas`);
                     skippedCount++;
                     return;
                 }
@@ -361,9 +407,9 @@ const channableFeedController = async (req, res) => {
                 const discountInfo = getDiscountInfo(product);
                 const customLabels = buildCustomLabels(product, categoryInfo);
                 
-                // Imagen principal
-                const mainImage = product.productImage[0] || '';
-                const additionalImages = product.productImage.slice(1, 11) || []; // Máximo 10 adicionales
+                // Solo usar imágenes válidas
+                const mainImage = validImages[0] || '';
+                const additionalImages = validImages.slice(1, 10) || []; // Máximo 9 adicionales
                 
                 // Formatear precios CORRECTAMENTE
                 const priceForMeta = formatPriceForMeta(discountInfo.originalPrice);
@@ -386,11 +432,13 @@ const channableFeedController = async (req, res) => {
             <link>${productUrl}</link>
             <g:image_link>${escapeXML(mainImage)}</g:image_link>`;
 
-                // Imágenes adicionales
+                // Solo agregar imágenes adicionales si existen y son válidas
                 if (additionalImages.length > 0) {
                     additionalImages.forEach(img => {
-                        xml += `
+                        if (isValidImageUrl(img)) {
+                            xml += `
             <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
+                        }
                     });
                 }
 
@@ -503,6 +551,8 @@ const channableFeedController = async (req, res) => {
                 
             } catch (itemError) {
                 console.error('❌ Error procesando producto:', product._id, itemError.message);
+                console.error('   - Nombre:', product.productName);
+                console.error('   - Imágenes:', product.productImage?.length || 0);
                 skippedCount++;
             }
         });
@@ -514,14 +564,16 @@ const channableFeedController = async (req, res) => {
         console.log(`   - Productos incluidos: ${includedCount}`);
         console.log(`   - Productos omitidos: ${skippedCount}`);
         console.log(`   - Total procesados: ${products.length}`);
+        console.log(`   - Solo productos con imágenes Firebase válidas incluidos`);
         
-        // Headers optimizados para Meta
+        // Headers optimizados para Meta y Channable
         res.set({
             'Content-Type': 'application/xml; charset=utf-8',
             'Cache-Control': 'public, max-age=1800', // 30 minutos
             'Last-Modified': new Date().toUTCString(),
             'Content-Length': Buffer.byteLength(xml, 'utf8'),
-            'X-Robots-Tag': 'noindex, nofollow'
+            'X-Robots-Tag': 'noindex, nofollow',
+            'Access-Control-Allow-Origin': '*' // Para evitar problemas CORS
         });
         
         res.send(xml);
