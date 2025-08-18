@@ -1,18 +1,18 @@
-// backend/controller/product/channableFeedController.js - VERSIÓN OPTIMIZADA PARA META
+// backend/controller/product/channableFeedController.js - VERSIÓN COMPLETA CORREGIDA
 const ProductModel = require('../../models/productModel');
 
-// ===== CONFIGURACIÓN OPTIMIZADA PARA META =====
+// ===== CONFIGURACIÓN OPTIMIZADA PARA META/CHANNABLE =====
 const XML_CONFIG = {
     STORE_NAME: 'Bluetec',
     STORE_URL: 'https://www.bluetec.com.py',
     STORE_DESCRIPTION: 'Tienda especializada en tecnología e informática',
-    BASE_CURRENCY: 'PYG',
+    CURRENCY: 'PYG',
     SHIPPING_COST: 30000,
     COUNTRY: 'PY',
     LANGUAGE: 'es',
-    INCLUDE_OUT_OF_STOCK: true, // Cambiado a true para incluir más productos
+    INCLUDE_OUT_OF_STOCK: true,
     MIN_PRICE: 1000,
-    MAX_TITLE_LENGTH: 60, // Reducido para Meta
+    MAX_TITLE_LENGTH: 60,
     DEFAULT_BRAND: 'Bluetec'
 };
 
@@ -159,22 +159,21 @@ function escapeXML(text) {
         .trim();
 }
 
-function formatNumber(number) {
-    return Number(number).toLocaleString('es-PY', { maximumFractionDigits: 0 });
-}
-
-function formatPrice(priceInGuaranis) {
-    return `₲${formatNumber(priceInGuaranis)}`;
-}
-
-function formatPriceForFacebook(priceInGuaranis) {
-    // Precio para Facebook: solo números sin formato
+function formatPriceForMeta(priceInGuaranis) {
+    // Para Meta/Channable: SOLO NÚMEROS (formato requerido)
     return Math.round(Number(priceInGuaranis)).toString();
 }
 
-function formatPriceForDisplay(priceInGuaranis) {
-    // Precio para templates de imagen: Gs. 4.000.000
-    return `Gs. ${formatNumber(priceInGuaranis)}`;
+function formatPriceWithCurrency(priceInGuaranis) {
+    // Para mostrar en la web: ₲1.215.000
+    const formatted = Number(priceInGuaranis).toLocaleString('es-PY', { maximumFractionDigits: 0 });
+    return `₲${formatted}`;
+}
+
+function formatPriceForImage(priceInGuaranis) {
+    // Para templates de imagen: Gs. 1.025.000
+    const formatted = Number(priceInGuaranis).toLocaleString('es-PY', { maximumFractionDigits: 0 });
+    return `Gs. ${formatted}`;
 }
 
 function generateCleanId(product) {
@@ -366,15 +365,17 @@ const channableFeedController = async (req, res) => {
                 const mainImage = product.productImage[0] || '';
                 const additionalImages = product.productImage.slice(1, 11) || []; // Máximo 10 adicionales
                 
-                // Formatear precios
-                const price = formatPrice(discountInfo.originalPrice);
-                const salePrice = discountInfo.hasDiscount ? formatPrice(discountInfo.sellingPrice) : null;
+                // Formatear precios CORRECTAMENTE
+                const priceForMeta = formatPriceForMeta(discountInfo.originalPrice);
+                const salePriceForMeta = discountInfo.hasDiscount ? formatPriceForMeta(discountInfo.sellingPrice) : null;
                 
-                // Precios específicos para Facebook y templates
-                const fbPrice = formatPriceForFacebook(discountInfo.sellingPrice);
-                const fbSalePrice = discountInfo.hasDiscount ? formatPriceForFacebook(discountInfo.sellingPrice) : null;
-                const displayPrice = formatPriceForDisplay(discountInfo.sellingPrice);
-                const displayOriginalPrice = formatPriceForDisplay(discountInfo.originalPrice);
+                // Precios para mostrar (con formato bonito)
+                const priceDisplay = formatPriceWithCurrency(discountInfo.originalPrice);
+                const salePriceDisplay = discountInfo.hasDiscount ? formatPriceWithCurrency(discountInfo.sellingPrice) : null;
+                
+                // Precios para imágenes/templates
+                const priceForImage = formatPriceForImage(discountInfo.sellingPrice);
+                const originalPriceForImage = formatPriceForImage(discountInfo.originalPrice);
                 
                 xml += `        <item>
             <g:id>${escapeXML(id)}</g:id>
@@ -385,27 +386,23 @@ const channableFeedController = async (req, res) => {
             <link>${productUrl}</link>
             <g:image_link>${escapeXML(mainImage)}</g:image_link>`;
 
-                // Imágenes adicionales (asegurar que siempre haya al menos un campo)
+                // Imágenes adicionales
                 if (additionalImages.length > 0) {
                     additionalImages.forEach(img => {
                         xml += `
             <g:additional_image_link>${escapeXML(img)}</g:additional_image_link>`;
                     });
-                } else {
-                    // Campo vacío para evitar warnings
-                    xml += `
-            <g:additional_image_link></g:additional_image_link>`;
                 }
 
                 xml += `
             <g:condition>new</g:condition>
             <g:availability>${availability}</g:availability>
-            <g:price>${escapeXML(price)}</g:price>`;
+            <g:price>${priceForMeta} ${XML_CONFIG.CURRENCY}</g:price>`; // FORMATO CORRECTO PARA META
 
                 // Precio de oferta si hay descuento
-                if (discountInfo.hasDiscount && salePrice) {
+                if (discountInfo.hasDiscount && salePriceForMeta) {
                     xml += `
-            <g:sale_price>${escapeXML(salePrice)}</g:sale_price>
+            <g:sale_price>${salePriceForMeta} ${XML_CONFIG.CURRENCY}</g:sale_price>
             <g:sale_price_effective_date>${new Date().toISOString().split('T')[0]}/${new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]}</g:sale_price_effective_date>`;
                 }
 
@@ -421,7 +418,7 @@ const channableFeedController = async (req, res) => {
             <g:shipping>
                 <g:country>${XML_CONFIG.COUNTRY}</g:country>
                 <g:service>Standard</g:service>
-                <g:price>${formatPrice(XML_CONFIG.SHIPPING_COST)}</g:price>
+                <g:price>${formatPriceForMeta(XML_CONFIG.SHIPPING_COST)} ${XML_CONFIG.CURRENCY}</g:price>
             </g:shipping>`;
 
                 // Labels personalizados
@@ -432,28 +429,29 @@ const channableFeedController = async (req, res) => {
                     }
                 });
 
-                // Campos adicionales para debugging en Channable
+                // CAMPOS SEPARADOS PARA DIFERENTES USOS
                 xml += `
-            <precio_original>${escapeXML(price)}</precio_original>
+            <precio_original>${escapeXML(priceDisplay)}</precio_original>
             <categoria_es>${escapeXML(categoryInfo.categoryLabel)}</categoria_es>
             <subcategoria_es>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria_es>
             <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>
-            <precio_original_formateado>${escapeXML(price)}</precio_original_formateado>
-            <precio_pys_formateado>${escapeXML(price)}</precio_pys_formateado>`;
+            <precio_original_formateado>${escapeXML(priceDisplay)}</precio_original_formateado>
+            <precio_pys_formateado>${escapeXML(priceDisplay)}</precio_pys_formateado>
+            
+            <!-- PRECIOS PARA META/FACEBOOK (solo números) -->
+            <fb_price>${formatPriceForMeta(discountInfo.sellingPrice)}</fb_price>
+            <fb_sale_price>${formatPriceForMeta(discountInfo.sellingPrice)}</fb_sale_price>
+            
+            <!-- PRECIOS PARA IMÁGENES/TEMPLATES (formato bonito) -->
+            <display_price>${escapeXML(priceForImage)}</display_price>
+            <display_original_price>${escapeXML(originalPriceForImage)}</display_original_price>`;
                 
-                // NUEVOS CAMPOS PARA FACEBOOK Y TEMPLATES
-                xml += `
-            <fb_price>${fbPrice}</fb_price>
-            <fb_sale_price>${fbSalePrice || fbPrice}</fb_sale_price>
-            <display_price>${escapeXML(displayPrice)}</display_price>
-            <display_original_price>${escapeXML(displayOriginalPrice)}</display_original_price>`;
-                
-                // Calcular precio en USD
+                // Precio en USD
                 const priceUSD = Math.round(discountInfo.sellingPrice / 7300);
                 xml += `
             <precio_usd>${priceUSD}</precio_usd>`;
                 
-                // Agregar specs y campos específicos para templates
+                // Specs simplificados (solo los importantes para evitar warnings)
                 xml += `
             <memory>${escapeXML(productSpecs.memory)}</memory>
             <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>
@@ -466,7 +464,7 @@ const channableFeedController = async (req, res) => {
             <operating_system>${escapeXML(productSpecs.processor)}</operating_system>
             <storage_capacity>${escapeXML(productSpecs.storage)}</storage_capacity>`;
                 
-                // Campos de producto detallado
+                // Campos de producto detallado (simplificado)
                 xml += `
             <g:product_detail>
                 <g:section_name>ESPECIFICACIONES</g:section_name>
@@ -478,16 +476,15 @@ const channableFeedController = async (req, res) => {
                 xml += `
             <g:quantity>${product.stock > 0 ? product.stock : 1}</g:quantity>`;
                 
-                // Campo de imagen sin fondo (obligatorio para algunos canales)
+                // Campos obligatorios vacíos para evitar warnings
                 xml += `
-            <image_link_nobg></image_link_nobg>`;
-                
-                xml += `
+            <image_link_nobg></image_link_nobg>
             <gtin></gtin>`;
                 
+                // Solo agregar campos con valores para evitar warnings
                 if (discountInfo.hasDiscount) {
                     xml += `
-            <precio_oferta>${escapeXML(salePrice)}</precio_oferta>
+            <precio_oferta>${escapeXML(salePriceDisplay)}</precio_oferta>
             <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>
             <descuento>${discountInfo.discountPercentage}</descuento>`;
                 } else {
@@ -500,10 +497,8 @@ const channableFeedController = async (req, res) => {
                 xml += `
             <categoria_principal>${escapeXML(categoryInfo.categoryLabel)}</categoria_principal>
             <subcategoria>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria>
-            <stock_disponible>${product.stock || 0}</stock_disponible>
-            <fecha_actualizacion>${new Date().toISOString()}</fecha_actualizacion>`;
-
-                xml += `
+            <stock_disponible>${product.stock || 1}</stock_disponible>
+            <fecha_actualizacion>${new Date().toISOString()}</fecha_actualizacion>
         </item>\n`;
                 
             } catch (itemError) {
@@ -541,6 +536,5 @@ const channableFeedController = async (req, res) => {
         });
     }
 };
-
 
 module.exports = channableFeedController;
