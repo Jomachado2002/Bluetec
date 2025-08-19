@@ -1,4 +1,4 @@
-// backend/controller/product/channableFeedController.js - VERSIÓN COMPLETA CORREGIDA
+// backend/controller/product/channableFeedController.js - VERSIÓN COMPLETA CORREGIDA DEFINITIVAMENTE
 const ProductModel = require('../../models/productModel');
 
 // ===== CONFIGURACIÓN OPTIMIZADA PARA META/CHANNABLE =====
@@ -13,7 +13,9 @@ const XML_CONFIG = {
     INCLUDE_OUT_OF_STOCK: true,
     MIN_PRICE: 1000,
     MAX_TITLE_LENGTH: 60,
-    DEFAULT_BRAND: 'Bluetec'
+    MAX_IMAGE_TITLE_LENGTH: 35,
+    DEFAULT_BRAND: 'Bluetec',
+    USD_EXCHANGE_RATE: 7400 // Tasa de cambio PYG a USD
 };
 
 // ===== FUNCIÓN PARA EXTRAER ESPECIFICACIONES =====
@@ -232,6 +234,23 @@ function formatPriceForImage(priceInGuaranis) {
     return `Gs. ${formatted}`;
 }
 
+// ===== NUEVAS FUNCIONES PARA USD =====
+function convertToUSD(priceInGuaranis) {
+    return Math.round(Number(priceInGuaranis) / XML_CONFIG.USD_EXCHANGE_RATE);
+}
+
+function formatUSDForMeta(priceUSD) {
+    return priceUSD.toString();
+}
+
+function formatUSDWithCurrency(priceUSD) {
+    return `$${priceUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
+function formatUSDForImage(priceUSD) {
+    return `$${priceUSD.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
 function generateCleanId(product) {
     // ID único más simple y seguro
     const id = product._id.toString();
@@ -263,6 +282,24 @@ function generateOptimizedTitle(product) {
         }
         
         title = shortTitle || title.substring(0, XML_CONFIG.MAX_TITLE_LENGTH);
+    }
+    
+    return title;
+}
+
+// ===== NUEVA FUNCIÓN PARA TÍTULO DE IMAGEN =====
+function generateImageTitle(product) {
+    let title = product.productName || '';
+    
+    // Limpiar título de caracteres problemáticos
+    title = title
+        .replace(/[^\w\s\-().]/g, ' ') // Solo letras, números, espacios, guiones y paréntesis
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    // Si supera 35 caracteres, cortar y agregar "..."
+    if (title.length > XML_CONFIG.MAX_IMAGE_TITLE_LENGTH) {
+        title = title.substring(0, XML_CONFIG.MAX_IMAGE_TITLE_LENGTH).trim() + '...';
     }
     
     return title;
@@ -310,28 +347,57 @@ function generateProductURL(slug) {
     return `${XML_CONFIG.STORE_URL}/producto/${slug}`;
 }
 
+// ===== FUNCIÓN CORREGIDA DEFINITIVAMENTE PARA OBTENER INFORMACIÓN DE DESCUENTO =====
 function getDiscountInfo(product) {
-    // CORRECCIÓN: sellingPrice es el PRECIO ORIGINAL, price es el PRECIO ACTUAL
-    const currentPrice = Number(product.price) || 0;        // Precio actual/oferta
-    const originalPrice = Number(product.sellingPrice) || currentPrice;  // Precio original/anterior
+    // CORRECCIÓN DEFINITIVA: 
+    // price = precio ANTERIOR/sin descuento (₲4.949.999)
+    // sellingPrice = precio ACTUAL/de venta (₲4.730.000)
     
-    if (originalPrice > currentPrice && currentPrice > 0) {
-        const discountAmount = originalPrice - currentPrice;
+    const originalPrice = Number(product.price) || 0;        // Precio ANTERIOR/sin descuento
+    const finalPrice = Number(product.sellingPrice) || 0;    // Precio ACTUAL/de venta
+    
+    // Caso 1: Solo hay sellingPrice (precio actual), no hay descuento
+    if (!originalPrice && finalPrice > 0) {
+        return {
+            hasDiscount: false,
+            originalPrice: finalPrice,    // sellingPrice es el precio único
+            finalPrice: finalPrice,       // Mismo precio
+            discountAmount: 0,
+            discountPercentage: 0
+        };
+    }
+    
+    // Caso 2: Solo hay price (precio anterior), no hay descuento
+    if (originalPrice > 0 && !finalPrice) {
+        return {
+            hasDiscount: false,
+            originalPrice: originalPrice,  // price es el precio único
+            finalPrice: originalPrice,     // Mismo precio
+            discountAmount: 0,
+            discountPercentage: 0
+        };
+    }
+    
+    // Caso 3: Hay ambos precios y price > sellingPrice (hay descuento)
+    if (originalPrice > finalPrice && finalPrice > 0) {
+        const discountAmount = originalPrice - finalPrice;
         const discountPercentage = Math.round((discountAmount / originalPrice) * 100);
         
         return {
             hasDiscount: true,
-            originalPrice: originalPrice,    // ₲8.900.000 (sellingPrice)
-            sellingPrice: currentPrice,      // ₲7.780.000 (price)
-            discountAmount: discountAmount,
-            discountPercentage: discountPercentage
+            originalPrice: originalPrice,    // ₲4.949.999 (price - precio sin descuento)
+            finalPrice: finalPrice,          // ₲4.730.000 (sellingPrice - precio con descuento)
+            discountAmount: discountAmount,  // ₲219.999
+            discountPercentage: discountPercentage // 4%
         };
     }
     
+    // Caso 4: Ambos precios iguales o sellingPrice >= price (sin descuento válido)
+    const priceToUse = finalPrice > 0 ? finalPrice : originalPrice;
     return {
         hasDiscount: false,
-        originalPrice: currentPrice,         // Si no hay descuento, usar precio actual
-        sellingPrice: currentPrice,          // Ambos iguales
+        originalPrice: priceToUse,
+        finalPrice: priceToUse,
         discountAmount: 0,
         discountPercentage: 0
     };
@@ -361,11 +427,14 @@ const channableFeedController = async (req, res) => {
     try {
         console.log('🔄 Generando feed XML optimizado para Meta/Channable...');
         
-        // Query optimizada para incluir SOLO productos con imágenes válidas
+        // Query optimizada para incluir productos con precio válido
         const query = {
             productImage: { $exists: true, $ne: [], $not: { $size: 0 } },
             productName: { $exists: true, $ne: '' },
-            price: { $gte: XML_CONFIG.MIN_PRICE },  // CAMBIO: usar 'price' (precio actual)
+            $or: [
+                { price: { $gte: XML_CONFIG.MIN_PRICE } },
+                { sellingPrice: { $gte: XML_CONFIG.MIN_PRICE } }
+            ],
             slug: { $exists: true, $ne: '' },
             // Filtrar solo productos con al menos una imagen de Firebase
             'productImage.0': { $regex: /firebasestorage\.googleapis\.com/, $options: 'i' }
@@ -387,7 +456,7 @@ const channableFeedController = async (req, res) => {
         <description>${escapeXML(XML_CONFIG.STORE_DESCRIPTION)}</description>
         <language>${XML_CONFIG.LANGUAGE}</language>
         <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-        <generator>Bluetec Meta Feed Generator v3.0</generator>\n`;
+        <generator>Bluetec Meta Feed Generator v4.0 - Lógica de Precios Corregida</generator>\n`;
 
         let includedCount = 0;
         let skippedCount = 0;
@@ -408,8 +477,10 @@ const channableFeedController = async (req, res) => {
                     return;
                 }
                 
-                const currentPrice = Number(product.price);  // CAMBIO: precio actual
-                if (!currentPrice || currentPrice < XML_CONFIG.MIN_PRICE) {
+                // Obtener información de precios y descuentos
+                const discountInfo = getDiscountInfo(product);
+                
+                if (!discountInfo.finalPrice || discountInfo.finalPrice < XML_CONFIG.MIN_PRICE) {
                     skippedCount++;
                     return;
                 }
@@ -420,30 +491,47 @@ const channableFeedController = async (req, res) => {
                 const productSpecs = extractProductSpecs(product);
                 const id = generateCleanId(product);
                 const title = escapeXML(generateOptimizedTitle(product));
+                const imageTitle = escapeXML(generateImageTitle(product)); // NUEVO: Título para imágenes
                 const description = escapeXML((product.description || product.productName || '').substring(0, 500));
                 const brand = escapeXML(product.brandName || XML_CONFIG.DEFAULT_BRAND);
                 const categoryInfo = getCategoryInfo(product.category, product.subcategory);
                 const availability = getAvailability(product);
                 const productUrl = generateProductURL(product.slug);
-                const discountInfo = getDiscountInfo(product);
                 const customLabels = buildCustomLabels(product, categoryInfo);
                 
                 // Solo usar imágenes válidas
                 const mainImage = validImages[0] || '';
                 const additionalImages = validImages.slice(1, 10) || []; // Máximo 9 adicionales
                 
-                // Formatear precios CORRECTAMENTE
-                const priceForMeta = formatPriceForMeta(discountInfo.originalPrice);
-                const salePriceForMeta = discountInfo.hasDiscount ? formatPriceForMeta(discountInfo.sellingPrice) : null;
+                // ===== PRECIOS EN GUARANÍES =====
+                // Para Meta/Facebook (solo números)
+                const priceForMeta = formatPriceForMeta(discountInfo.hasDiscount ? discountInfo.originalPrice : discountInfo.finalPrice); // Precio regular
+                const salePriceForMeta = discountInfo.hasDiscount ? formatPriceForMeta(discountInfo.finalPrice) : null; // Precio con descuento
                 
-                // Precios para mostrar (con formato bonito)
-                const priceDisplay = formatPriceWithCurrency(discountInfo.originalPrice);
-                const salePriceDisplay = discountInfo.hasDiscount ? formatPriceWithCurrency(discountInfo.sellingPrice) : null;
+                // Para mostrar en web (con formato bonito)
+                const priceDisplay = formatPriceWithCurrency(discountInfo.originalPrice); // Precio original
+                const salePriceDisplay = discountInfo.hasDiscount ? formatPriceWithCurrency(discountInfo.finalPrice) : null; // Precio final
                 
-                // Precios para imágenes/templates
-                const priceForImage = formatPriceForImage(discountInfo.sellingPrice);
-                const originalPriceForImage = formatPriceForImage(discountInfo.originalPrice);
+                // Para imágenes/templates
+                const priceForImage = formatPriceForImage(discountInfo.finalPrice); // Precio a mostrar
+                const originalPriceForImage = formatPriceForImage(discountInfo.originalPrice); // Precio original
                 
+                // ===== PRECIOS EN USD =====
+                const finalPriceUSD = convertToUSD(discountInfo.finalPrice);
+                const originalPriceUSD = convertToUSD(discountInfo.originalPrice);
+                
+                // Para Meta/Facebook USD (solo números)
+                const priceUSDForMeta = formatUSDForMeta(discountInfo.hasDiscount ? originalPriceUSD : finalPriceUSD);
+                const salePriceUSDForMeta = discountInfo.hasDiscount ? formatUSDForMeta(finalPriceUSD) : null;
+                
+                // Para mostrar en web USD
+                const priceUSDDisplay = formatUSDWithCurrency(originalPriceUSD);
+                const salePriceUSDDisplay = discountInfo.hasDiscount ? formatUSDWithCurrency(finalPriceUSD) : null;
+                
+                // Para imágenes USD
+                const priceUSDForImage = formatUSDForImage(finalPriceUSD);
+                const originalPriceUSDForImage = formatUSDForImage(originalPriceUSD);
+
                 xml += `        <item>
             <g:id>${escapeXML(id)}</g:id>
             <title>${title}</title>
@@ -466,13 +554,22 @@ const channableFeedController = async (req, res) => {
                 xml += `
             <g:condition>new</g:condition>
             <g:availability>${availability}</g:availability>
-            <g:price>${priceForMeta} ${XML_CONFIG.CURRENCY}</g:price>`; // FORMATO CORRECTO PARA META
+            <g:price>${priceForMeta} ${XML_CONFIG.CURRENCY}</g:price>`; // PRECIO REGULAR PARA META
 
                 // Precio de oferta si hay descuento
                 if (discountInfo.hasDiscount && salePriceForMeta) {
                     xml += `
             <g:sale_price>${salePriceForMeta} ${XML_CONFIG.CURRENCY}</g:sale_price>
             <g:sale_price_effective_date>${new Date().toISOString().split('T')[0]}/${new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]}</g:sale_price_effective_date>`;
+                }
+
+                // Precios en USD para Meta/Facebook
+                xml += `
+            <g:price_usd>${formatUSDForMeta(discountInfo.hasDiscount ? originalPriceUSD : finalPriceUSD)} USD</g:price_usd>`;
+                
+                if (discountInfo.hasDiscount && salePriceUSDForMeta) {
+                    xml += `
+            <g:sale_price_usd>${salePriceUSDForMeta} USD</g:sale_price_usd>`;
                 }
 
                 xml += `
@@ -498,29 +595,67 @@ const channableFeedController = async (req, res) => {
                     }
                 });
 
-                // CAMPOS SEPARADOS PARA DIFERENTES USOS
+                // ===== CAMPOS PERSONALIZADOS CORREGIDOS =====
                 xml += `
+            <!-- TÍTULOS PARA DIFERENTES USOS -->
+            <titulo>${title}</titulo>
+            <titulo_imagen>${imageTitle}</titulo_imagen>
+            
+            <!-- PRECIOS ORIGINALES EN GUARANÍES -->
             <precio_original>${escapeXML(priceDisplay)}</precio_original>
-            <categoria_es>${escapeXML(categoryInfo.categoryLabel)}</categoria_es>
-            <subcategoria_es>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria_es>
-            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>
             <precio_original_formateado>${escapeXML(priceDisplay)}</precio_original_formateado>
             <precio_pys_formateado>${escapeXML(priceDisplay)}</precio_pys_formateado>
             
-            <!-- PRECIOS PARA META/FACEBOOK (solo números) -->
-            <fb_price>${formatPriceForMeta(discountInfo.sellingPrice)}</fb_price>
-            <fb_sale_price>${formatPriceForMeta(discountInfo.sellingPrice)}</fb_sale_price>
+            <!-- PRECIOS PARA META/FACEBOOK GUARANÍES (solo números) -->
+            <fb_price>${formatPriceForMeta(discountInfo.finalPrice)}</fb_price>
+            <fb_sale_price>${formatPriceForMeta(discountInfo.finalPrice)}</fb_sale_price>
             
-            <!-- PRECIOS PARA IMÁGENES/TEMPLATES (formato bonito) -->
+            <!-- PRECIOS PARA IMÁGENES/TEMPLATES GUARANÍES (formato bonito) -->
             <display_price>${escapeXML(priceForImage)}</display_price>
-            <display_original_price>${escapeXML(originalPriceForImage)}</display_original_price>`;
+            <display_original_price>${escapeXML(originalPriceForImage)}</display_original_price>
+            
+            <!-- PRECIOS EN USD -->
+            <precio_usd>${finalPriceUSD}</precio_usd>
+            <precio_original_usd>${originalPriceUSD}</precio_original_usd>
+            
+            <!-- PRECIOS PARA META/FACEBOOK USD (solo números) -->
+            <fb_price_usd>${priceUSDForMeta}</fb_price_usd>
+            <fb_sale_price_usd>${salePriceUSDForMeta || formatUSDForMeta(finalPriceUSD)}</fb_sale_price_usd>
+            
+            <!-- PRECIOS PARA MOSTRAR USD (con formato) -->
+            <precio_usd_display>${escapeXML(priceUSDDisplay)}</precio_usd_display>
+            <precio_usd_formateado>${escapeXML(priceUSDDisplay)}</precio_usd_formateado>
+            
+            <!-- PRECIOS PARA IMÁGENES USD -->
+            <display_price_usd>${escapeXML(priceUSDForImage)}</display_price_usd>
+            <display_original_price_usd>${escapeXML(originalPriceUSDForImage)}</display_original_price_usd>`;
                 
-                // Precio en USD
-                const priceUSD = Math.round(discountInfo.sellingPrice / 7300);
+                // Información de categorías y marca
                 xml += `
-            <precio_usd>${priceUSD}</precio_usd>`;
+            <categoria_es>${escapeXML(categoryInfo.categoryLabel)}</categoria_es>
+            <subcategoria_es>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria_es>
+            <marca_mayuscula>${escapeXML(brand.toUpperCase())}</marca_mayuscula>
+            
+            <!-- INFORMACIÓN DE DESCUENTOS -->`;
                 
-                // Specs simplificados (solo los importantes para evitar warnings)
+                // Solo agregar campos de descuento con valores para evitar warnings
+                if (discountInfo.hasDiscount) {
+                    xml += `
+            <precio_oferta>${escapeXML(salePriceDisplay)}</precio_oferta>
+            <precio_oferta_usd>${escapeXML(salePriceUSDDisplay)}</precio_oferta_usd>
+            <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>
+            <descuento>${discountInfo.discountPercentage}</descuento>
+            <tiene_descuento>true</tiene_descuento>`;
+                } else {
+                    xml += `
+            <precio_oferta></precio_oferta>
+            <precio_oferta_usd></precio_oferta_usd>
+            <descuento_porcentaje>0</descuento_porcentaje>
+            <descuento>0</descuento>
+            <tiene_descuento>false</tiene_descuento>`;
+                }
+                
+                // Especificaciones del producto (simplificado)
                 xml += `
             <memory>${escapeXML(productSpecs.memory)}</memory>
             <graphics_card>${escapeXML(productSpecs.graphicsCard)}</graphics_card>
@@ -541,39 +676,25 @@ const channableFeedController = async (req, res) => {
                 <g:attribute_value>${escapeXML(productSpecs.memory || productSpecs.processor || productSpecs.storage || 'Consultar especificaciones')}</g:attribute_value>
             </g:product_detail>`;
                 
-                // Campo de cantidad
+                // Información adicional
                 xml += `
-            <g:quantity>${product.stock > 0 ? product.stock : 1}</g:quantity>`;
-                
-                // Campos obligatorios vacíos para evitar warnings
-                xml += `
-            <image_link_nobg></image_link_nobg>
-            <gtin></gtin>`;
-                
-                // Solo agregar campos con valores para evitar warnings
-                if (discountInfo.hasDiscount) {
-                    xml += `
-            <precio_oferta>${escapeXML(salePriceDisplay)}</precio_oferta>
-            <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>
-            <descuento>${discountInfo.discountPercentage}</descuento>`;
-                } else {
-                    xml += `
-            <precio_oferta></precio_oferta>
-            <descuento_porcentaje></descuento_porcentaje>
-            <descuento></descuento>`;
-                }
-                
-                xml += `
+            <g:quantity>${product.stock > 0 ? product.stock : 1}</g:quantity>
             <categoria_principal>${escapeXML(categoryInfo.categoryLabel)}</categoria_principal>
             <subcategoria>${escapeXML(categoryInfo.subcategoryLabel)}</subcategoria>
             <stock_disponible>${product.stock || 1}</stock_disponible>
             <fecha_actualizacion>${new Date().toISOString()}</fecha_actualizacion>
+            
+            <!-- CAMPOS OBLIGATORIOS VACÍOS PARA EVITAR WARNINGS -->
+            <image_link_nobg></image_link_nobg>
+            <gtin></gtin>
         </item>\n`;
                 
             } catch (itemError) {
                 console.error('❌ Error procesando producto:', product._id, itemError.message);
                 console.error('   - Nombre:', product.productName);
                 console.error('   - Imágenes:', product.productImage?.length || 0);
+                console.error('   - Price:', product.price);
+                console.error('   - SellingPrice:', product.sellingPrice);
                 skippedCount++;
             }
         });
@@ -585,6 +706,9 @@ const channableFeedController = async (req, res) => {
         console.log(`   - Productos incluidos: ${includedCount}`);
         console.log(`   - Productos omitidos: ${skippedCount}`);
         console.log(`   - Total procesados: ${products.length}`);
+        console.log(`   - ✅ PRECIOS CORREGIDOS: sellingPrice (actual), price (anterior)`);
+        console.log(`   - ✅ PRECIOS USD: Tasa de cambio ${XML_CONFIG.USD_EXCHANGE_RATE}`);
+        console.log(`   - ✅ TÍTULO IMAGEN: Máximo ${XML_CONFIG.MAX_IMAGE_TITLE_LENGTH} caracteres`);
         console.log(`   - Solo productos con imágenes Firebase válidas incluidos`);
         
         // Headers optimizados para Meta y Channable
