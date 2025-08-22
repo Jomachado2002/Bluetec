@@ -1,4 +1,4 @@
-// backend/controller/product/channableFeedController.js - VERSIÓN OPTIMIZADA PARA META/FACEBOOK
+// backend/controller/product/channableFeedController.js - VERSIÓN OPTIMIZADA PARA META/FACEBOOK CON FILTRO DE STOCK
 const ProductModel = require('../../models/productModel');
 
 // ===== CONFIGURACIÓN OPTIMIZADA PARA META/FACEBOOK =====
@@ -12,7 +12,8 @@ const XML_CONFIG = {
     LANGUAGE: 'es',
     MIN_PRICE: 1000,
     MAX_TITLE_LENGTH: 60,
-    DEFAULT_BRAND: 'Bluetec'
+    DEFAULT_BRAND: 'Bluetec',
+    MIN_STOCK: 1  // ✅ NUEVO: Stock mínimo requerido
 };
 
 // ===== MAPEO DE CATEGORÍAS PARA GOOGLE =====
@@ -87,15 +88,18 @@ function escapeXML(text) {
         .trim();
 }
 
+// ✅ FUNCIÓN OPTIMIZADA PARA META - SOLO JPG Y PNG
 function isValidImageUrl(url) {
     if (!url || typeof url !== 'string') return false;
     
     try {
         const urlObj = new URL(url);
         
+        // Solo HTTPS
         if (urlObj.protocol !== 'https:') return false;
         
-        const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        // ✅ SOLO FORMATOS COMPATIBLES CON META
+        const validExtensions = ['.jpg', '.jpeg', '.png'];
         const pathname = urlObj.pathname.toLowerCase();
         
         const hasValidExtension = validExtensions.some(ext => pathname.endsWith(ext));
@@ -103,15 +107,21 @@ function isValidImageUrl(url) {
         if (url.includes('firebasestorage.googleapis.com')) {
             if (!url.includes('?alt=media&token=')) return false;
             
+            // Patrones problemáticos conocidos
             const problematicPatterns = [
-                'FONTE_ATX', 'FONTE-TP-LINK', '%2B', '%2F%2F', 'REAL_1.jpg', '%20_%20'
+                'FONTE_ATX', 'FONTE-TP-LINK', '%2B', '%2F%2F', 'REAL_1.jpg', '%20_%20',
+                '.webp', '.gif', '.svg', '.bmp' // ✅ EXCLUIR FORMATOS NO COMPATIBLES
             ];
             
-            if (problematicPatterns.some(pattern => url.includes(pattern))) {
+            if (problematicPatterns.some(pattern => url.toLowerCase().includes(pattern.toLowerCase()))) {
                 return false;
             }
             
-            return hasValidExtension || url.includes('.jpg') || url.includes('.png');
+            // ✅ VALIDACIÓN ESPECÍFICA PARA META
+            return hasValidExtension || 
+                   url.toLowerCase().includes('.jpg') || 
+                   url.toLowerCase().includes('.jpeg') || 
+                   url.toLowerCase().includes('.png');
         }
         
         return hasValidExtension;
@@ -121,9 +131,10 @@ function isValidImageUrl(url) {
     }
 }
 
+// ✅ VALIDACIÓN MEJORADA PARA META (máximo 5 imágenes)
 function getValidImages(productImages) {
     if (!Array.isArray(productImages)) return [];
-    return productImages.filter(img => isValidImageUrl(img)).slice(0, 10);
+    return productImages.filter(img => isValidImageUrl(img)).slice(0, 5); // Meta recomienda máximo 5
 }
 
 function formatPrice(priceInGuaranis) {
@@ -179,10 +190,31 @@ function getCategoryInfo(category, subcategory) {
     };
 }
 
+// ✅ FUNCIÓN MEJORADA PARA VALIDAR STOCK
+function hasValidStock(product) {
+    const stock = Number(product.stock) || 0;
+    
+    // Verificar stock numérico
+    if (stock >= XML_CONFIG.MIN_STOCK) {
+        return true;
+    }
+    
+    // Verificar stockStatus si existe
+    if (product.stockStatus === 'in_stock') {
+        return true;
+    }
+    
+    // Si no hay stock o es 0, no incluir
+    return false;
+}
+
+// ✅ FUNCIÓN ACTUALIZADA PARA AVAILABILITY
 function getAvailability(product) {
-    if (product.stockStatus === 'in_stock' || (product.stock && product.stock > 0)) {
+    const stock = Number(product.stock) || 0;
+    
+    if (stock >= XML_CONFIG.MIN_STOCK || product.stockStatus === 'in_stock') {
         return 'in stock';
-    } else if (product.stockStatus === 'low_stock') {
+    } else if (product.stockStatus === 'low_stock' && stock > 0) {
         return 'limited availability';
     } else {
         return 'out of stock';
@@ -258,8 +290,9 @@ function extractProductSpecs(product) {
 // ===== CONTROLADOR PRINCIPAL OPTIMIZADO PARA META =====
 const channableFeedController = async (req, res) => {
     try {
-        console.log('🔄 Generando feed XML optimizado para Meta/Facebook...');
+        console.log('🔄 Generando feed XML optimizado para Meta/Facebook con filtro de stock...');
         
+        // ✅ QUERY MEJORADO CON FILTRO DE STOCK Y VALIDACIÓN DE IMÁGENES PARA META
         const query = {
             productImage: { $exists: true, $ne: [], $not: { $size: 0 } },
             productName: { $exists: true, $ne: '' },
@@ -268,7 +301,18 @@ const channableFeedController = async (req, res) => {
                 { sellingPrice: { $gte: XML_CONFIG.MIN_PRICE } }
             ],
             slug: { $exists: true, $ne: '' },
-            'productImage.0': { $regex: /firebasestorage\.googleapis\.com/, $options: 'i' }
+            // ✅ SOLO IMÁGENES FIREBASE (Meta requiere URLs estables)
+            'productImage.0': { $regex: /firebasestorage\.googleapis\.com/, $options: 'i' },
+            // ✅ FILTROS DE STOCK AGREGADOS AL QUERY
+            $and: [
+                {
+                    $or: [
+                        { stock: { $gte: XML_CONFIG.MIN_STOCK } },  // Stock numérico >= 1
+                        { stockStatus: 'in_stock' },               // O stockStatus = 'in_stock'
+                        { stockStatus: 'low_stock', stock: { $gt: 0 } } // O low_stock con stock > 0
+                    ]
+                }
+            ]
         };
         
         const products = await ProductModel
@@ -276,33 +320,45 @@ const channableFeedController = async (req, res) => {
             .sort({ updatedAt: -1 })
             .lean();
         
-        console.log(`✅ ${products.length} productos obtenidos para Meta`);
+        console.log(`✅ ${products.length} productos con stock obtenidos para Meta`);
         
         // Generar XML optimizado para Meta
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
     <channel>
-        <title>${escapeXML(XML_CONFIG.STORE_NAME)} - Catálogo para Meta</title>
+        <title>${escapeXML(XML_CONFIG.STORE_NAME)} - Catálogo para Meta (Solo con Stock)</title>
         <link>${XML_CONFIG.STORE_URL}</link>
-        <description>${escapeXML(XML_CONFIG.STORE_DESCRIPTION)}</description>
+        <description>${escapeXML(XML_CONFIG.STORE_DESCRIPTION)} - Solo productos con stock disponible</description>
         <language>${XML_CONFIG.LANGUAGE}</language>
         <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-        <generator>Bluetec Meta Feed v5.0</generator>\n`;
+        <generator>Bluetec Meta Feed v5.1 - Stock Filter</generator>\n`;
 
         let includedCount = 0;
         let skippedCount = 0;
+        let noStockSkipped = 0; // ✅ CONTADOR ESPECÍFICO PARA PRODUCTOS SIN STOCK
 
         products.forEach(product => {
             try {
+                // ✅ VALIDACIÓN ADICIONAL DE STOCK (doble verificación)
+                if (!hasValidStock(product)) {
+                    noStockSkipped++;
+                    skippedCount++;
+                    console.log(`⚠️ Producto sin stock omitido: ${product.productName} (Stock: ${product.stock}, Status: ${product.stockStatus})`);
+                    return;
+                }
+                
                 // Validaciones básicas
                 if (!product.productName || !product.productImage || product.productImage.length === 0) {
                     skippedCount++;
+                    console.log(`⚠️ Producto omitido - falta nombre o imágenes: ${product.productName || product._id}`);
                     return;
                 }
                 
                 const validImages = getValidImages(product.productImage);
                 if (validImages.length === 0) {
                     skippedCount++;
+                    console.log(`⚠️ Producto omitido - imágenes no válidas: ${product.productName}`);
+                    console.log(`   Imágenes originales: ${JSON.stringify(product.productImage)}`);
                     return;
                 }
                 
@@ -310,6 +366,7 @@ const channableFeedController = async (req, res) => {
                 
                 if (!discountInfo.finalPrice || discountInfo.finalPrice < XML_CONFIG.MIN_PRICE) {
                     skippedCount++;
+                    console.log(`⚠️ Producto omitido - precio no válido: ${product.productName} (Precio: ${discountInfo.finalPrice})`);
                     return;
                 }
                 
@@ -326,7 +383,7 @@ const channableFeedController = async (req, res) => {
                 const specifications = extractProductSpecs(product);
                 
                 const mainImage = validImages[0];
-                const additionalImages = validImages.slice(1, 5); // Máximo 4 adicionales para Meta
+                const additionalImages = validImages.slice(1, 4); // ✅ Máximo 3 adicionales para Meta (total 4)
                 
                 // Precios para Meta (solo números)
                 const price = formatPrice(discountInfo.hasDiscount ? discountInfo.originalPrice : discountInfo.finalPrice);
@@ -412,8 +469,11 @@ const channableFeedController = async (req, res) => {
             <descuento_porcentaje>${discountInfo.discountPercentage}</descuento_porcentaje>`;
                 }
 
+                // ✅ INFORMACIÓN DE STOCK MEJORADA
+                const stockValue = Number(product.stock) || 1;
                 xml += `
-            <stock>${product.stock || 1}</stock>
+            <stock>${stockValue}</stock>
+            <stock_status>${product.stockStatus || 'in_stock'}</stock_status>
             <fecha_actualizacion>${new Date().toISOString()}</fecha_actualizacion>
         </item>\n`;
                 
@@ -426,11 +486,16 @@ const channableFeedController = async (req, res) => {
         xml += `    </channel>
 </rss>`;
 
-        console.log(`✅ Feed XML para Meta generado exitosamente:`);
+                console.log(`✅ Feed XML para Meta generado exitosamente:`);
         console.log(`   - Productos incluidos: ${includedCount}`);
-        console.log(`   - Productos omitidos: ${skippedCount}`);
+        console.log(`   - Productos omitidos por falta de stock: ${noStockSkipped}`);
+        console.log(`   - Productos omitidos por otras razones: ${skippedCount - noStockSkipped}`);
+        console.log(`   - Total omitidos: ${skippedCount}`);
         console.log(`   - Total procesados: ${products.length}`);
-        console.log(`   - Solo imágenes Firebase válidas incluidas`);
+        console.log(`   - Stock mínimo requerido: ${XML_CONFIG.MIN_STOCK}`);
+        console.log(`   - Solo productos con stock disponible incluidos`);
+        console.log(`   - Solo imágenes JPG/PNG para máxima compatibilidad con Meta`);
+        console.log(`   - Máximo 4 imágenes por producto (1 principal + 3 adicionales)`);
         console.log(`   - Optimizado específicamente para Meta/Facebook`);
         
         // Headers optimizados para Meta
